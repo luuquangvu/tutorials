@@ -1,11 +1,12 @@
 import asyncio
-import orjson
 import sqlite3
 import threading
 import time
 from contextlib import closing
 from pathlib import Path
 from typing import Any
+
+import orjson
 
 TTL = 300  # The Conversation ID retention period in Home Assistant is set to a fixed 5 minutes of idle time and cannot be modified.
 DB_PATH = Path("/config/cache.db")
@@ -454,7 +455,7 @@ async def memory_cache_index_update(
             seq = [_value]
         elif isinstance(_value, list):
             seq = _value
-        elif isinstance(_value, tuple) or isinstance(_value, set):
+        elif isinstance(_value, (tuple, set)):
             seq = list(_value)
         else:
             return []

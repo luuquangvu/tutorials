@@ -1,48 +1,32 @@
 import asyncio
-import orjson
 import random
 import re
 import sqlite3
-import ssl
 import threading
 import time
+import urllib.parse
 from contextlib import closing
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import aiohttp
-import google.api_core.exceptions
-from PIL import Image
-from PIL import ImageOps
+import orjson
 from bs4 import BeautifulSoup
+from curl_cffi.requests import AsyncSession
 
 TTL = 30  # Cache retention period (1-30 days)
 RETRY_LIMIT = 3
-GET_URL = "https://www.csgt.vn/"
-POST_URL = "https://www.csgt.vn/?mod=contact&task=tracuu_post&ajax"
-CAPTCHA_URL = "https://www.csgt.vn/lib/captcha/captcha.class.php"
-USER_AGENTS_URL = (
-    "https://cdn.jsdelivr.net/gh/microlinkhq/top-user-agents@master/src/desktop.json"
-)
-USER_AGENTS_CACHE_KEY = "user_agents_list"
+BASE_URL = "https://www.csgt.vn"
+LOOKUP_URL = f"{BASE_URL}/tra-cuu-phat-nguoi"
+POST_URL = f"{BASE_URL}/tra-cuu-vi-pham-qua-hinh-anh"
+RECAPTCHA_SITEKEY = "6Le8H9ArAAAAAOWw8BZe4rg5mgbagZtxG1dVxv4i"
+RECAPTCHA_CO = "aHR0cHM6Ly93d3cuY3NndC52bjo0NDM."
+
+VEHICLE_TYPES = {"car", "motorbike", "electricbike"}
 
 DB_PATH = Path("/config/cache.db")
 
-GEMINI_MODEL = pyscript.config.get("gemini_model", "gemini-2.5-flash")  # noqa: F821
-GEMINI_API_KEY = pyscript.config.get("gemini_api_key")  # noqa: F821
-
-if not GEMINI_API_KEY:
-    raise ValueError("You need to configure your Gemini API key")
-
 if TTL < 1 or TTL > 30:
     raise ValueError("TTL must be between 1 and 30")
-
-GEMINI_CLIENT: Any = None
-_GEMINI_LOCK = asyncio.Lock()
-
-SSL_CTX: ssl.SSLContext | None = None
-_SSL_LOCK = asyncio.Lock()
 
 _CACHE_READY = False
 _CACHE_READY_LOCK = threading.Lock()
@@ -142,7 +126,7 @@ def _cache_get_sync(key: str) -> tuple[str | None, int | None]:
         except sqlite3.OperationalError:
             _reset_cache_ready()
             if attempt == 0:
-                time.sleep(0.1)  # Add a small delay for retry
+                time.sleep(0.1)
                 continue
             raise
     return None, None
@@ -177,7 +161,7 @@ def _cache_set_sync(key: str, value: str, ttl_seconds: int) -> bool:
         except sqlite3.OperationalError:
             _reset_cache_ready()
             if attempt == 0:
-                time.sleep(0.1)  # Add a small delay for retry
+                time.sleep(0.1)
                 continue
             raise
     return False
@@ -203,7 +187,7 @@ def _cache_delete_sync(key: str) -> int:
         except sqlite3.OperationalError:
             _reset_cache_ready()
             if attempt == 0:
-                time.sleep(0.1)  # Add a small delay for retry
+                time.sleep(0.1)
                 continue
             raise
     return 0
@@ -242,465 +226,323 @@ async def _prune_expired() -> int:
     return await asyncio.to_thread(_prune_expired_sync)
 
 
-async def _refresh_user_agents() -> list[str]:
-    """Fetch user agents from remote and update cache."""
-    try:
-        async with aiohttp.ClientSession() as ss:
-            resp = await ss.get(
-                USER_AGENTS_URL, timeout=aiohttp.ClientTimeout(total=60)
-            )
-            async with resp:
-                resp.raise_for_status()
-                agents = await resp.json(loads=orjson.loads)
-                if isinstance(agents, list) and agents:
-                    await _cache_set(
-                        USER_AGENTS_CACHE_KEY,
-                        orjson.dumps(agents).decode("utf-8"),
-                        7 * 24 * 60 * 60,
-                    )
-                    return agents
-    except Exception as e:
-        print(f"Error refreshing user agents: {e}")
-
-    # Fallback to a default UA if fetch fails
-    return [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
-    ]
-
-
-async def _get_user_agents() -> list[str]:
-    """Fetch user agents from cache or remote if missing/expired."""
-    cached_value, ttl = await _cache_get(USER_AGENTS_CACHE_KEY)
-
-    if cached_value:
-        agents = orjson.loads(cached_value)
-        # Refresh in background if getting old (less than 1 day remaining)
-        if ttl is not None and ttl < 24 * 60 * 60:
-            task.create(_refresh_user_agents)  # noqa: F821
-        return agents
-
-    return await _refresh_user_agents()
-
-
-async def _get_dynamic_headers(method: str = "GET", ua: str = None) -> dict[str, str]:
-    """Generate dynamic headers with a random or provided User-Agent."""
-    if not ua:
-        agents = await _get_user_agents()
-        ua = random.choice(agents)
-
-    origin = GET_URL.rstrip("/")
-    referer = GET_URL
-
-    base_headers = {
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Accept-Language": "en-US,en;q=0.9,vi;q=0.8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "DNT": "1",
-        "Host": "www.csgt.vn",
-        "Pragma": "no-cache",
-        "User-Agent": ua,
-    }
-
-    if method == "GET":
-        base_headers.update(
-            {
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                "Referer": referer,
-                "Sec-Fetch-Dest": "document",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "none",
-                "Sec-Fetch-User": "?1",
-                "Upgrade-Insecure-Requests": "1",
-            }
-        )
-    else:
-        base_headers.update(
-            {
-                "Accept": "*/*",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": origin,
-                "Referer": referer,
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-origin",
-                "X-Requested-With": "XMLHttpRequest",
-            }
-        )
-    return base_headers
-
-
 @time_trigger("cron(15 3 * * *)")  # noqa: F821
 async def prune_cache_db() -> None:
     """Regularly prune expired entries from the cache database."""
     await _prune_expired()
 
 
-@pyscript_compile  # noqa: F821
-def _build_ssl_ctx() -> ssl.SSLContext:
-    """Build an SSL context compatible with target site requirements.
+async def _get_recaptcha_version(ss: AsyncSession) -> str | None:
+    """Fetch the current reCAPTCHA JS version from Google's API.
 
-    Configures ciphers and TLS minimum version explicitly to improve
-    compatibility when connecting via aiohttp.
-
-    Returns:
-        An initialized `ssl.SSLContext` instance.
-    """
-    ctx = ssl.create_default_context()
-    ctx.set_ciphers(
-        "@SECLEVEL=0:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA"
-    )
-    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
-    return ctx
-
-
-@pyscript_compile  # noqa: F821
-def _build_gemini_client() -> Any:
-    """Create a Gemini client using the configured API key.
-
-    Returns:
-        Google GenAI client instance.
-    """
-    import google.genai as genai
-
-    return genai.Client(api_key=GEMINI_API_KEY)
-
-
-async def _ensure_ssl_ctx() -> None:
-    """Ensure the global SSL context is built once in a thread.
-
-    Safe to call multiple times; only initializes when missing.
-    """
-    global SSL_CTX
-    if SSL_CTX is None:
-        async with _SSL_LOCK:
-            if SSL_CTX is None:
-                SSL_CTX = await asyncio.to_thread(_build_ssl_ctx)
-
-
-async def _ensure_gemini_client() -> None:
-    """Ensure the global Gemini client is initialized once in a thread.
-
-    Safe to call multiple times; only initializes when missing.
-    """
-    global GEMINI_CLIENT
-    if GEMINI_CLIENT is None:
-        async with _GEMINI_LOCK:
-            if GEMINI_CLIENT is None:
-                GEMINI_CLIENT = await asyncio.to_thread(_build_gemini_client)
-
-
-@pyscript_compile  # noqa: F821
-def _extract_violations_from_html(content: str, url: str) -> dict[str, Any]:
-    """Parse violations from the result HTML page.
+    The version string changes with each Google release. It is extracted from
+    the releases URL embedded in ``api.js``.
 
     Args:
-        content: HTML content returned by csgt.vn for a lookup.
-        url: Final detail URL used to fetch the result page.
+        ss: An active AsyncSession.
 
     Returns:
-        A dict with status (success/error), source URL, message, and details.
+        Version string or None on failure.
     """
-    soup = BeautifulSoup(content, "html.parser")
-    violations = []
-    body_print = soup.find("div", id="bodyPrint123")
+    try:
+        api_url = f"https://www.google.com/recaptcha/api.js?render={RECAPTCHA_SITEKEY}"
+        resp = await ss.get(api_url, timeout=60)
+        resp.raise_for_status()
+        match = re.search(r"/recaptcha/releases/([^/]+)/", resp.text)
+        return match.group(1) if match else None
+    except Exception:
+        return None
 
-    if not body_print:
+
+async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[None, str]:
+    """Obtain a reCAPTCHA v3 token via the anchor+reload API flow.
+
+    Uses curl_cffi's Chrome impersonation to get a valid token from Google's
+    reCAPTCHA API without running JavaScript. The token is obtained by:
+    1. Fetching ``api.js`` to get the current release version
+    2. Fetching the anchor page to get an initial token
+    3. Posting to the reload endpoint to get the full response token
+
+    Args:
+        ss: An active AsyncSession with Chrome impersonation.
+
+    Returns:
+        (token, None) on success or (None, error_message) on failure.
+    """
+    try:
+        version = await _get_recaptcha_version(ss)
+        if not version:
+            return None, "Failed to fetch reCAPTCHA version from api.js"
+
+        anchor_url = (
+            f"https://www.google.com/recaptcha/api2/anchor?"
+            f"ar=1&k={RECAPTCHA_SITEKEY}"
+            f"&co={RECAPTCHA_CO}"
+            f"&hl=en&v={version}"
+            f"&size=invisible&cb={int(time.time() * 1000)}"
+        )
+
+        resp_anchor = await ss.get(anchor_url, timeout=60)
+        resp_anchor.raise_for_status()
+
+        match = re.search(r'id="recaptcha-token"\s+value="([^"]+)"', resp_anchor.text)
+        if not match:
+            return None, "Failed to extract anchor token from reCAPTCHA"
+
+        anchor_token = match.group(1)
+
+        reload_url = (
+            f"https://www.google.com/recaptcha/api2/reload?k={RECAPTCHA_SITEKEY}"
+        )
+        reload_data = {
+            "v": version,
+            "reason": "q",
+            "c": anchor_token,
+            "k": RECAPTCHA_SITEKEY,
+            "co": RECAPTCHA_CO,
+            "hl": "en",
+            "size": "invisible",
+        }
+        reload_headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": anchor_url,
+        }
+
+        resp_reload = await ss.post(
+            reload_url, data=reload_data, headers=reload_headers, timeout=60
+        )
+        resp_reload.raise_for_status()
+
+        rresp_match = re.search(r'"rresp","([^"]+)"', resp_reload.text)
+        if not rresp_match:
+            return None, "Failed to extract response token from reCAPTCHA reload"
+
+        return rresp_match.group(1), None
+
+    except Exception as error:
+        return None, f"reCAPTCHA token retrieval failed: {error}"
+
+
+@pyscript_compile  # noqa: F821
+def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
+    """Parse violations from the resultHtml returned by the new csgt.vn API.
+
+    The new HTML structure uses Bootstrap cards with the following layout:
+    - Each violation is inside a ``div.violation-card``
+    - Status in ``span.status-badge``
+    - Info items in ``div.info-item`` containing ``span.label`` and ``span.value``
+
+    Args:
+        result_html: The HTML string from the ``resultHtml`` field in the JSON response.
+
+    Returns:
+        A dict with status (success/error), message, and violation details.
+    """
+    soup = BeautifulSoup(result_html, "html.parser")
+    violation_cards = soup.find_all("div", class_="violation-card")
+
+    if not violation_cards:
+        # Check if the page returns a "no violations" message
+        text_content = soup.get_text(strip=True)
+        if text_content:
+            return {
+                "status": "success",
+                "message": "Không có vi phạm giao thông",
+                "detail": "",
+            }
         return {
             "status": "error",
-            "url": url,
             "message": "Không tìm thấy dữ liệu vi phạm",
             "detail": "",
         }
 
-    sections = body_print.find_all(recursive=False)
-    current_violation = {}
-    for element in sections:
-        classes = element.get("class")
-        if classes and "form-group" in classes:
-            if not current_violation:
-                current_violation = {
-                    "Biển kiểm soát": "",
-                    "Màu biển": "",
-                    "Loại phương tiện": "",
-                    "Thời gian vi phạm": "",
-                    "Địa điểm vi phạm": "",
-                    "Hành vi vi phạm": "",
-                    "Trạng thái": "",
-                    "Đơn vị phát hiện vi phạm": "",
-                    "Nơi giải quyết vụ việc": [],
-                }
+    violations = []
+    for card in violation_cards:
+        violation = {}
 
-            label = element.find("label", class_="control-label")
-            value = element.find("div", class_="col-md-9")
-            if label and value:
-                key = label.get_text(strip=True).replace(":", "")
-                val = value.get_text(strip=True)
-                if key in current_violation:
-                    if key != "Nơi giải quyết vụ việc":
-                        current_violation[key] = val
+        # Extract plate number from violation title
+        title_div = card.find("div", class_="violation-title")
+        if title_div:
+            violation["Biển kiểm soát"] = title_div.get_text(strip=True)
 
-            text = element.get_text(strip=True)
-            if text and re.match(r"[1-9]\. |Địa chỉ:|Số điện thoại liên hệ:", text):
-                current_violation["Nơi giải quyết vụ việc"].append(text)
+        # Extract status
+        status_span = card.find("span", class_="status-badge")
+        if status_span:
+            violation["Trạng thái"] = status_span.get_text(strip=True)
 
-        elif element.name == "hr":
-            if current_violation:
-                violations.append(current_violation)
-                current_violation = {}
+        # Extract info by section to handle duplicate "Địa chỉ" labels
+        info_groups = card.find_all("div", class_="info-group")
+        for group in info_groups:
+            title_el = group.find("h6", class_="info-title")
+            section = title_el.get_text(strip=True) if title_el else ""
 
-    if current_violation:
-        violations.append(current_violation)
+            if section == "Thông tin xử lý":
+                # This section has two col-md-6 columns, each with "Đơn vị" + "Địa chỉ"
+                columns = group.find_all("div", class_="col-md-6")
+                resolution_items = []
+                for col in columns:
+                    col_data = {}
+                    for item in col.find_all("div", class_="info-item"):
+                        label_span = item.find("span", class_="label")
+                        value_span = item.find("span", class_="value")
+                        if label_span and value_span:
+                            key = label_span.get_text(strip=True).rstrip(":")
+                            col_data[key] = value_span.get_text(strip=True)
+                    if col_data:
+                        resolution_items.append(col_data)
+
+                for col_data in resolution_items:
+                    # Prefix duplicate keys with their context label
+                    unit_key = next(
+                        (k for k in col_data if k.startswith("Đơn vị")), None
+                    )
+                    if unit_key:
+                        violation[unit_key] = col_data[unit_key]
+                        addr = col_data.get("Địa chỉ")
+                        if addr:
+                            violation[f"Địa chỉ ({unit_key})"] = addr
+                    else:
+                        violation.update(col_data)
+            else:
+                for item in group.find_all("div", class_="info-item"):
+                    label_span = item.find("span", class_="label")
+                    value_span = item.find("span", class_="value")
+                    if label_span and value_span:
+                        key = label_span.get_text(strip=True).rstrip(":")
+                        violation[key] = value_span.get_text(strip=True)
+
+        if violation:
+            violations.append(violation)
 
     if not violations:
         return {
             "status": "success",
-            "url": url,
             "message": "Không có vi phạm giao thông",
             "detail": "",
         }
 
     return {
         "status": "success",
-        "url": url,
         "message": f"Có {len(violations)} vi phạm giao thông",
         "detail": violations,
     }
 
 
-async def _get_captcha(
-    ss: aiohttp.ClientSession, url: str
-) -> tuple[BytesIO, None] | tuple[None, str]:
-    """Download the CAPTCHA image.
-
-    Args:
-        ss: An aiohttp session.
-        url: CAPTCHA endpoint URL.
-
-    Returns:
-        (BytesIO, None) on success or (None, error_message) on failure.
-    """
-    try:
-        resp = await ss.get(url, timeout=aiohttp.ClientTimeout(total=60))
-        async with resp:
-            resp.raise_for_status()
-            content = await resp.read()
-            return BytesIO(content), None
-    except asyncio.TimeoutError as error:
-        return None, f"TimeoutError during retrieve CAPTCHA image: {error}"
-    except aiohttp.ClientError as error:
-        return None, f"ClientError during retrieve CAPTCHA image: {error}"
-    except Exception as error:
-        return None, f"An unexpected error during retrieve CAPTCHA image: {error}"
-
-
-@pyscript_compile  # noqa: F821
-def _process_captcha(
-    image: str | BytesIO, threshold: int = 180, factor: int = 8, padding: int = 35
-) -> Image.Image:
-    """Preprocess CAPTCHA for better OCR.
-
-    Applies grayscale, contrast, binarization, scaling, background removal,
-    and crop around glyphs.
-
-    Args:
-        image: File path or BytesIO of the CAPTCHA image.
-        threshold: Binarization threshold (0-255).
-        factor: Scale multiplier for upscaling.
-        padding: Padding applied when cropping around glyphs.
-
-    Returns:
-        A Pillow Image prepared for OCR.
-    """
-    img = Image.open(image)
-    img = img.convert("L")
-    img = ImageOps.autocontrast(img, cutoff=2)
-    table = [0] * threshold + [255] * (256 - threshold)
-    img = img.point(table)
-    img = img.resize(
-        (img.width * factor, img.height * factor), resample=Image.Resampling.BOX
-    )
-    img = img.convert("RGBA")
-    for x in range(img.width):
-        for y in range(img.height):
-            (r, g, b, a) = img.getpixel((x, y))
-            if (r, g, b) == (255, 255, 255):
-                img.putpixel((x, y), (r, g, b, 0))
-    bbox = img.getbbox()
-    if bbox:
-        (left, upper, right, lower) = bbox
-        left = max(0, left - padding)
-        upper = max(0, upper - padding)
-        right = min(img.width, right + padding)
-        lower = min(img.height, lower + padding)
-        img = img.crop((left, upper, right, lower))
-    img = img.convert("L")
-    return img
-
-
-@pyscript_compile  # noqa: F821
-def _generate_gemini_content(_prompt: str, _image: Image.Image) -> Any:
-    """Generate content using Gemini model synchronously."""
-    return GEMINI_CLIENT.models.generate_content(
-        model=GEMINI_MODEL, contents=[_prompt, _image]
-    )
-
-
-async def _solve_captcha(
-    image: Image.Image, retry_count: int = 1
-) -> tuple[str, None] | tuple[None, str]:
-    """Solve CAPTCHA using Gemini with optional retries.
-
-    Args:
-        image: Preprocessed CAPTCHA image.
-        retry_count: Current retry attempt counter.
-
-    Returns:
-        (solution_text, None) on success or (None, error_message) on failure.
-    """
-    prompt = "Analyze the image and extract the CAPTCHA text, which consists of exactly 6 alphanumeric characters. Return ONLY the extracted text. Do not include any other words, spaces, or markdown."
-    await _ensure_gemini_client()
-
-    try:
-        response = await asyncio.to_thread(_generate_gemini_content, prompt, image)
-        if (
-            response.candidates
-            and response.candidates[0].content
-            and response.candidates[0].content.parts
-            and response.candidates[0].content.parts[0].text
-        ):
-            generated_text = response.candidates[0].content.parts[0].text.strip()
-            return generated_text, None
-        else:
-            reason = (
-                response.candidates[0].finish_reason
-                if response.candidates
-                else "Unknown"
-            )
-            return None, f"CAPTCHA solving was not successful for reason: {reason}"
-    except google.api_core.exceptions.ResourceExhausted as error:
-        if retry_count < RETRY_LIMIT:
-            print(
-                f"Quota exceeded. Retrying in 30 seconds... (Attempt {retry_count}/{RETRY_LIMIT}): {error}"
-            )
-            await asyncio.sleep(30)
-            return await _solve_captcha(image, retry_count + 1)
-        else:
-            return (
-                None,
-                f"Quota exhausted and retry limit ({retry_count}/{RETRY_LIMIT}) reached: {error}",
-            )
-    except AttributeError as error:
-        return (
-            None,
-            f"Possibly incorrect field in the response. Check for proper API handling: {error}",
-        )
-    except Exception as error:
-        return None, f"An unexpected error occurred during CAPTCHA solving: {error}"
-
-
 async def _check_license_plate(
-    license_plate: str, vehicle_type: int, retry_count: int = 1
+    license_plate: str, vehicle_type: str, retry_count: int = 0
 ) -> dict[str, Any]:
-    """End-to-end lookup flow against csgt.vn with caching and retries.
+    """End-to-end lookup flow against csgt.vn with retries.
 
-    Performs: fetch landing page -> get CAPTCHA -> preprocess -> solve ->
-    submit form -> fetch result detail -> parse violations. Caches successful
-    results via the shared SQLite cache outside of this function.
+    Performs: visit homepage → visit lookup page (get CSRF token + cookies) →
+    obtain reCAPTCHA v3 token → submit form → parse resultHtml.
 
     Args:
         license_plate: VN plate number (uppercase, validated by caller).
-        vehicle_type: 1=Car, 2=Motorbike, 3=Electric Bicycle.
-        retry_count: Current retry attempt counter.
+        vehicle_type: One of ``car``, ``motorbike``, ``electricbike``.
+        retry_count: Current retry attempt (0-based, max ``RETRY_LIMIT`` retries).
 
     Returns:
         Parsed response dict with status and details, or error.
     """
-    await _ensure_ssl_ctx()
-    headers_get = await _get_dynamic_headers("GET")
-    ua = headers_get["User-Agent"]
-    headers_post = await _get_dynamic_headers("POST", ua=ua)
-
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=SSL_CTX)) as ss:
+    async with AsyncSession(impersonate="chrome") as ss:
         try:
-            resp_1st = await ss.get(
-                GET_URL, headers=headers_get, timeout=aiohttp.ClientTimeout(total=60)
+            # Step 1: Visit homepage to establish session cookies
+            await ss.get(BASE_URL, timeout=60)
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+
+            # Step 2: Visit lookup page to get CSRF token and session cookies
+            resp_page = await ss.get(LOOKUP_URL, timeout=60)
+            resp_page.raise_for_status()
+
+            token_match = re.search(r'name="_token"\s+value="([^"]+)"', resp_page.text)
+            if not token_match:
+                return {"error": "Failed to extract CSRF token from lookup page"}
+
+            csrf_token = token_match.group(1)
+
+            # Step 3: Obtain reCAPTCHA token
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            recaptcha_token, error = await _get_recaptcha_token(ss)
+            if not recaptcha_token:
+                if retry_count < RETRY_LIMIT:
+                    print(
+                        f"reCAPTCHA failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}"
+                    )
+                    await asyncio.sleep(30)
+                    return await _check_license_plate(
+                        license_plate, vehicle_type, retry_count + 1
+                    )
+                return {"error": f"reCAPTCHA token retrieval failed: {error}"}
+
+            # Step 4: Submit the lookup form
+            xsrf_token = urllib.parse.unquote(dict(ss.cookies).get("XSRF-TOKEN", ""))
+            headers = {
+                "Accept": "*/*",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": BASE_URL,
+                "Referer": LOOKUP_URL,
+                "X-Requested-With": "XMLHttpRequest",
+                "X-XSRF-TOKEN": xsrf_token,
+            }
+            form_data = urllib.parse.urlencode(
+                {
+                    "_token": csrf_token,
+                    "g-recaptcha-response": recaptcha_token,
+                    "vehicle_type": vehicle_type,
+                    "plate_number": license_plate,
+                }
             )
-            async with resp_1st:
-                resp_1st.raise_for_status()
-                image, error = await _get_captcha(ss, CAPTCHA_URL)
 
-                if not image:
-                    return {"error": f"Unable to retrieve CAPTCHA image: {error}"}
+            resp = await ss.post(POST_URL, data=form_data, headers=headers, timeout=60)
 
-                image_filtered = await asyncio.to_thread(_process_captcha, image)
-                captcha, error = await _solve_captcha(image_filtered)
-
-                if not captcha:
-                    return {"error": f"CAPTCHA solving was not successful: {error}"}
-
-                captcha = re.sub(r"[^a-zA-Z0-9]", "", captcha).lower()
-
-                data = f"BienKS={license_plate}&Xe={vehicle_type}&captcha={captcha}&ipClient=9.9.9.91&cUrl=1"
-
-                resp_2nd = await ss.post(
-                    url=POST_URL,
-                    headers=headers_post,
-                    data=data,
-                    timeout=aiohttp.ClientTimeout(total=60),
-                )
-                async with resp_2nd:
-                    resp_2nd.raise_for_status()
-                    response_2nd_json = await resp_2nd.json(
-                        content_type="text/html", loads=orjson.loads
+            if resp.status_code == 429:
+                if retry_count < RETRY_LIMIT:
+                    print(f"Rate limited (Retry {retry_count + 1}/{RETRY_LIMIT})")
+                    await asyncio.sleep(60)
+                    return await _check_license_plate(
+                        license_plate, vehicle_type, retry_count + 1
                     )
-                    url = response_2nd_json.get("href")
+                return {"error": f"Rate limited after {RETRY_LIMIT} retries"}
 
-                    if not url:
-                        if retry_count < RETRY_LIMIT:
-                            print(
-                                f"Retrying in 30 seconds... (Attempt {retry_count}/{RETRY_LIMIT})"
-                            )
-                            await asyncio.sleep(30)
-                            return await _check_license_plate(
-                                license_plate, vehicle_type, retry_count + 1
-                            )
-                        else:
-                            return {
-                                "error": f"Retry limit ({retry_count}/{RETRY_LIMIT}) reached"
-                            }
-
-                    resp_3rd = await ss.get(
-                        url=url,
-                        headers=headers_get,
-                        timeout=aiohttp.ClientTimeout(total=60),
+            if resp.status_code == 422:
+                response_data = orjson.loads(resp.content)
+                if retry_count < RETRY_LIMIT:
+                    msg = response_data.get("message", "Verification failed")
+                    print(
+                        f"Verification failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
-                    async with resp_3rd:
-                        resp_3rd.raise_for_status()
-                        text_content = await resp_3rd.text()
-                        response = _extract_violations_from_html(text_content, url)
+                    await asyncio.sleep(30)
+                    return await _check_license_plate(
+                        license_plate, vehicle_type, retry_count + 1
+                    )
+                return {
+                    "error": f"Verification failed after {RETRY_LIMIT} retries: "
+                    + response_data.get("message", "Verification failed")
+                }
 
-                        if response and response.get("status") == "success":
-                            await _cache_set(
-                                f"{license_plate}-{vehicle_type}",
-                                orjson.dumps(response).decode("utf-8"),
-                                CACHE_MAX_AGE,
-                            )
-                        return response
+            resp.raise_for_status()
+
+            # Step 5: Parse the response
+            response_data = orjson.loads(resp.content)
+            result_html = response_data.get("resultHtml", "")
+
+            if not result_html:
+                return {
+                    "status": "success",
+                    "message": "Không có vi phạm giao thông",
+                    "detail": "",
+                }
+
+            return _extract_violations_from_html(result_html)
 
         except Exception as error:
             if retry_count < RETRY_LIMIT:
-                print(
-                    f"Retrying in 30 seconds... (Attempt {retry_count}/{RETRY_LIMIT}): {error}"
-                )
+                print(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")
                 await asyncio.sleep(30)
                 return await _check_license_plate(
                     license_plate, vehicle_type, retry_count + 1
                 )
-            else:
-                return {
-                    "error": f"Retry limit ({retry_count}/{RETRY_LIMIT}) reached: {error}"
-                }
+            return {"error": f"Failed after {RETRY_LIMIT} retries: {error}"}
 
 
 @time_trigger("startup")  # noqa: F821
@@ -708,13 +550,11 @@ async def build_cached_ctx() -> None:
     """Run once at HA startup / Pyscript reload."""
     await _cache_prepare_db(force=True)
     await _prune_expired()
-    await _ensure_ssl_ctx()
-    await _ensure_gemini_client()
 
 
 @service(supports_response="only")  # noqa: F821
 async def traffic_fine_lookup_tool(
-    license_plate: str, vehicle_type: int, bypass_caching: bool = False
+    license_plate: str, vehicle_type: str, bypass_caching: bool = False
 ) -> dict[str, Any]:
     """
     yaml
@@ -730,19 +570,19 @@ async def traffic_fine_lookup_tool(
           text:
       vehicle_type:
         name: Vehicle Type
-        description: Vehicle classification expected by csgt.vn (1=Car, 2=Motorbike, 3=Electric Bicycle).
-        example: "1"
+        description: Vehicle classification expected by csgt.vn.
+        example: car
         required: true
         selector:
           select:
             options:
               - label: Car
-                value: "1"
+                value: car
               - label: Motorbike
-                value: "2"
-              - label: Electric Bicycle
-                value: "3"
-        default: "1"
+                value: motorbike
+              - label: Electric Bike
+                value: electricbike
+        default: car
       bypass_caching:
         name: Bypass Caching
         description: Ignore cached data and fetch fresh results (useful for debugging).
@@ -752,30 +592,44 @@ async def traffic_fine_lookup_tool(
     """
     try:
         license_plate = str(license_plate).upper()
-        # Clean the license plate by removing any non-alphanumeric characters
         license_plate = re.sub(r"[^A-Z0-9]", "", license_plate)
-        vehicle_type = int(vehicle_type)
+        vehicle_type = str(vehicle_type).lower()
 
-        if vehicle_type == 1:
+        if vehicle_type not in VEHICLE_TYPES:
+            return {"error": "The type of vehicle is invalid"}
+
+        if vehicle_type == "car":
             pattern = r"^\d{2}[A-Z]{1,2}\d{4,5}$"
         else:
             pattern = r"^\d{2}[A-Z1-9]{2}\d{4,5}$"
         if not (license_plate and re.match(pattern, license_plate)):
             return {"error": "The license plate number is invalid"}
 
-        if vehicle_type not in [1, 2, 3]:
-            return {"error": "The type of vehicle is invalid"}
-
         cache_key = f"{license_plate}-{vehicle_type}"
         if bool(bypass_caching):
             await _cache_delete(cache_key)
-            return await _check_license_plate(license_plate, vehicle_type)
+            response = await _check_license_plate(license_plate, vehicle_type)
+            if response and response.get("status") == "success":
+                await _cache_set(
+                    cache_key,
+                    orjson.dumps(response).decode("utf-8"),
+                    CACHE_MAX_AGE,
+                )
+            return response
 
         cached_value, ttl = await _cache_get(cache_key)
         if cached_value is not None:
             if ttl is not None and ttl < CACHE_REFRESH_THRESHOLD:
                 task.create(_check_license_plate, license_plate, vehicle_type)  # noqa: F821
             return orjson.loads(cached_value)
-        return await _check_license_plate(license_plate, vehicle_type)
+
+        response = await _check_license_plate(license_plate, vehicle_type)
+        if response and response.get("status") == "success":
+            await _cache_set(
+                cache_key,
+                orjson.dumps(response).decode("utf-8"),
+                CACHE_MAX_AGE,
+            )
+        return response
     except Exception as error:
         return {"error": f"An unexpected error occurred during processing: {error}"}
