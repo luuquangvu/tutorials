@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Memory Tool Local
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/memory_tool_local.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/memory_tool_local.yaml
   description: |-
     # Fully local universal memory tool used for Voice Assistant
 

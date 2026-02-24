@@ -156,9 +156,11 @@ async def youtube_search_tool(query: str, **kwargs) -> dict[str, Any]:
             }
         return response
     except HttpError as error:
+        log.error(f"{__name__}: YouTube API Error: {error}")  # noqa: F821
         return {
             "error": "YouTube API Error",
             "detail": str(error),
         }
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}

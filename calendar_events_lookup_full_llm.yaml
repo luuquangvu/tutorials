@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Get Calendar Events
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/calendar_events_lookup_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/calendar_events_lookup_full_llm.yaml
   description: |-
     # Tool gets events from calendar used for Voice Assistant
 

@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Send to Telegram
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/send_to_telegram_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/send_to_telegram_full_llm.yaml
   description: |-
     # Tool for sending content to Telegram used for Voice Assistant
 

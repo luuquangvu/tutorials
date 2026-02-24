@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Find Device
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/device_location_lookup_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/device_location_lookup_full_llm.yaml
   description: |-
     # Find My Device Tool used for Voice Assistant
 

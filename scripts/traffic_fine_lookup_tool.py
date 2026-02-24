@@ -401,6 +401,7 @@ async def _check_license_plate(
 
             token_match = re.search(r'name="_token"\s+value="([^"]+)"', resp_page.text)
             if not token_match:
+                log.error(f"CSRF token extraction failed for {license_plate}")  # noqa: F821
                 return {"error": "Failed to extract CSRF token"}
 
             csrf_token = token_match.group(1)
@@ -409,13 +410,14 @@ async def _check_license_plate(
             recaptcha_token, error = await _get_recaptcha_token(ss)
             if not recaptcha_token:
                 if retry_count < RETRY_LIMIT:
-                    print(
+                    log.warning(  # noqa: F821
                         f"reCAPTCHA failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}"
                     )
                     await asyncio.sleep(30)
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
+                log.error(f"reCAPTCHA failed for {license_plate}: {error}")  # noqa: F821
                 return {"error": f"reCAPTCHA retrieval failed: {error}"}
 
             xsrf_token = urllib.parse.unquote(dict(ss.cookies).get("XSRF-TOKEN", ""))
@@ -439,19 +441,30 @@ async def _check_license_plate(
             resp = await ss.post(POST_URL, data=form_data, headers=headers, timeout=60)
 
             if resp.status_code == 429:
+                try:
+                    msg = orjson.loads(resp.content).get("message", "")
+                except orjson.JSONDecodeError:
+                    msg = ""
+
+                if "Bạn đã vượt quá số lần tra cứu" in msg:
+                    log.error(f"Daily limit reached for {license_plate}: {msg}")  # noqa: F821
+                    return {"error": msg}
+
                 if retry_count < RETRY_LIMIT:
-                    print(f"Rate limited (Retry {retry_count + 1}/{RETRY_LIMIT})")
+                    log.warning(  # noqa: F821
+                        f"Rate limited (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
+                    )
                     await asyncio.sleep(60)
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
-                return {"error": f"Rate limited after {RETRY_LIMIT} retries"}
+                return {"error": msg or f"Rate limited after {RETRY_LIMIT} retries"}
 
             if resp.status_code == 422:
                 response_data = orjson.loads(resp.content)
                 if retry_count < RETRY_LIMIT:
                     msg = response_data.get("message", "Verification failed")
-                    print(
+                    log.warning(  # noqa: F821
                         f"Verification failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
                     await asyncio.sleep(30)
@@ -479,11 +492,14 @@ async def _check_license_plate(
 
         except (RequestsError, orjson.JSONDecodeError) as error:
             if retry_count < RETRY_LIMIT:
-                print(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")
+                log.warning(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")  # noqa: F821
                 await asyncio.sleep(30)
                 return await _check_license_plate(
                     license_plate, vehicle_type, retry_count + 1
                 )
+            log.error(  # noqa: F821
+                f"Lookup failed for {license_plate} after {RETRY_LIMIT} retries: {error}"
+            )
             return {"error": f"Failed after {RETRY_LIMIT} retries: {error}"}
 
 
@@ -574,4 +590,5 @@ async def traffic_fine_lookup_tool(
             )
         return response
     except Exception as error:
+        log.error(f"Unexpected error for {license_plate}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}

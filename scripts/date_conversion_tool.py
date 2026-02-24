@@ -1098,6 +1098,9 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
 
             return response
         except Exception as error:
+            log.error(  # noqa: F821
+                f"{__name__}: Solar to Lunar conversion failed for {date}: {error}"
+            )
             return {
                 "error": f"Error converting Solar date {date} to Lunar date: {error}"
             }
@@ -1159,6 +1162,9 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             response["field_mapping"] = FIELD_MAPPING
             return response
         except Exception as error:
+            log.error(  # noqa: F821
+                f"{__name__}: Lunar to Solar conversion failed for {date}: {error}"
+            )
             return {
                 "error": f"Error converting Lunar date {date} {kwargs} to Solar date: {error}"
             }

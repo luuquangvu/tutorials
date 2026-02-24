@@ -1,7 +1,7 @@
 blueprint:
   name: Link On/Off State of Multiple Devices
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/link_multiple_devices.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/link_multiple_devices.yaml
   description: |-
     # Link State of Multiple Devices (Ultra-Fast)
 

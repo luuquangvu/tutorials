@@ -290,6 +290,7 @@ async def memory_cache_get(key: str) -> dict[str, Any]:
             "error": "not_found",
         }
     except Exception as error:
+        log.error(f"{__name__}: cache_get failed for '{key}': {error}")  # noqa: F821
         return {
             "status": "error",
             "op": "get",
@@ -328,6 +329,7 @@ async def memory_cache_forget(key: str) -> dict[str, Any]:
             "deleted": deleted,
         }
     except Exception as error:
+        log.error(f"{__name__}: cache_forget failed for '{key}': {error}")  # noqa: F821
         return {
             "status": "error",
             "op": "forget",
@@ -389,6 +391,7 @@ async def memory_cache_set(
             "ttl": ttl,
         }
     except Exception as error:
+        log.error(f"{__name__}: cache_set failed for '{key}': {error}")  # noqa: F821
         return {
             "status": "error",
             "op": "set",
@@ -539,6 +542,7 @@ async def memory_cache_index_update(
                 "changed": changed,
             }
         except Exception as error:
+            log.error(f"{__name__}: index_update failed for '{cleaned_key}': {error}")  # noqa: F821
             return {
                 "status": "error",
                 "op": "index_update",

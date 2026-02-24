@@ -349,6 +349,7 @@ async def send_zalo_message(chat_id: str, message: str) -> dict[str, Any]:
             return {"error": "Failed to send message"}
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -393,6 +394,7 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
             response["supported"] = False
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -407,6 +409,7 @@ async def get_zalo_webhook() -> dict[str, Any]:
         session = await _ensure_session()
         return await _get_webhook_info(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -437,6 +440,7 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             response["webhook_id"] = webhook_id
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -451,6 +455,7 @@ async def delete_zalo_webhook() -> dict[str, Any]:
         session = await _ensure_session()
         return await _delete_webhook(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -482,6 +487,7 @@ async def get_zalo_updates(timeout: int = 30) -> dict[str, Any]:
             }
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -496,6 +502,7 @@ async def get_zalo_bot_info() -> dict[str, Any]:
         session = await _ensure_session()
         return await _get_me(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -522,6 +529,7 @@ async def send_zalo_chat_action(chat_id: str) -> dict[str, Any]:
             return {"error": "Failed to send message"}
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -563,6 +571,7 @@ async def send_zalo_photo(
         response = await _send_photo(session, chat_id, public_url, caption=caption)
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
     finally:
         if published_path:

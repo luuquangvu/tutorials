@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Control AC Mode, Temp & Fan Speed
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/ac_mode_and_fan_control_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/ac_mode_and_fan_control_full_llm.yaml
   description: |-
     # Tool for Controlling Air Conditioner Mode, Temperature and Fan Speed used for Voice Assistant
 
