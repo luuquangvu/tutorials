@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Send to Zalo
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/send_to_zalo_custom_bot_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/send_to_zalo_custom_bot_full_llm.yaml
   description: |-
     # Tool for sending content to Zalo used for Voice Assistant
 

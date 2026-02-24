@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Check Traffic Fine
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/traffic_fine_lookup_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/traffic_fine_lookup_full_llm.yaml
   description: |-
     # Tool for checking traffic fines used for Voice Assistant
 

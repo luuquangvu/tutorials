@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - File Content Analyzer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/file_content_analyzer_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/file_content_analyzer_full_llm.yaml
   description: |-
     # Tool designed to analyze and extract all types of information from media and document files
 

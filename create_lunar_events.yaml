@@ -1,7 +1,7 @@
 blueprint:
   name: Create Lunar Events
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/create_lunar_events.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/create_lunar_events.yaml
   description: |-
     # Tool help to create Lunar calendar events
 

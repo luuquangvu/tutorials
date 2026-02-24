@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Convert Calendar Dates
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/date_lookup_and_conversion_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/date_lookup_and_conversion_full_llm.yaml
   description: |-
     # Tool converts Solar date to Lunar date and vice versa used for Voice Assistant
 
