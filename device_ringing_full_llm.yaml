@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Ring Device
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/device_ringing_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/device_ringing_full_llm.yaml
   description: |-
     # Device Ringing Tool used for Voice Assistant
 

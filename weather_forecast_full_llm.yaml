@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Get Home Weather Forecast
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/weather_forecast_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/weather_forecast_full_llm.yaml
   description: |-
     # Tool for requesting the weather forecast used for Voice Assistant
 

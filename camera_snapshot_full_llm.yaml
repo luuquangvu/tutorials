@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Capture Camera Snapshot
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/camera_snapshot_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/camera_snapshot_full_llm.yaml
   description: |-
     # Tool for capturing camera snapshots used for Voice Assistant
 

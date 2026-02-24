@@ -1,7 +1,7 @@
 blueprint:
   name: Devices Schedules
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/devices_schedules.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/devices_schedules.yaml
   description: |-
     # Voice assistant friendly multi-device timer controller
 

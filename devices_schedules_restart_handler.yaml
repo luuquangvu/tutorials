@@ -1,7 +1,7 @@
 blueprint:
   name: Devices Schedules Restart Handler
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/devices_schedules_restart_handler.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/devices_schedules_restart_handler.yaml
   description: |-
     # Devices Schedules Restart Handler
 
