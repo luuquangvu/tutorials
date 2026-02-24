@@ -16,23 +16,14 @@ _session: aiohttp.ClientSession | None = None
 
 
 def _to_relative_path(path: str) -> str:
-    """Convert a /media/ path to Home Assistant local/ media source path.
-
-    Converts leading "/media/" to "local/". Leaves other paths unchanged.
-
-    Args:
-        path: Absolute media path.
-
-    Returns:
-        Path with leading "local/" when applicable.
-    """
+    """Convert an absolute /media/ path to a relative local/ media source path."""
     if path.startswith("/media/"):
         return "local/" + path.removeprefix("/media/")
     return path
 
 
 def _internal_url() -> str | None:
-    """Return the internal Home Assistant URL, or None when it cannot be resolved."""
+    """Return the internal Home Assistant base URL."""
     try:
         return network.get_url(hass, allow_external=False)  # noqa: F821
     except network.NoURLAvailableError:
@@ -40,7 +31,7 @@ def _internal_url() -> str | None:
 
 
 def _external_url() -> str | None:
-    """Return the external HTTPS Home Assistant URL when configured and reachable."""
+    """Return the external HTTPS Home Assistant base URL."""
     try:
         return network.get_url(
             hass,  # noqa: F821
@@ -54,11 +45,7 @@ def _external_url() -> str | None:
 
 
 async def _ensure_session() -> aiohttp.ClientSession:
-    """Create or reuse a shared aiohttp session.
-
-    Returns:
-        An open `aiohttp.ClientSession` with a default timeout.
-    """
+    """Create or return a shared aiohttp ClientSession."""
     global _session
     if _session is None or _session.closed:
         _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
@@ -66,41 +53,33 @@ async def _ensure_session() -> aiohttp.ClientSession:
 
 
 async def _ensure_dir(path: str) -> None:
-    """Ensure a directory exists, creating it if missing.
-
-    Args:
-        path: Directory path to create if it does not exist.
-    """
+    """Ensure a directory exists, creating it if necessary."""
     await asyncio.to_thread(os.makedirs, path, exist_ok=True)
 
 
 @pyscript_compile  # noqa: F821
 def _open_file(path: str, mode: str):
-    """Open a file safely using native Python."""
+    """Safely open a file using native Python."""
     return open(path, mode)
 
 
 @pyscript_compile  # noqa: F821
 def _cleanup_disk_sync(directory: str, cutoff: float) -> None:
-    """Native Python function to perform disk cleanup safely."""
+    """Remove files from a directory older than a specified cutoff time."""
     path = Path(directory)
     if not path.exists():
         return
 
     for entry in path.iterdir():
         try:
-            if entry.is_file():
-                # Extracting variable for clarity
-                file_mtime = entry.stat().st_mtime
-                if file_mtime < cutoff:
-                    entry.unlink()
+            if entry.is_file() and entry.stat().st_mtime < cutoff:
+                entry.unlink()
         except OSError:
-            # Silently skip files that are locked or inaccessible
             pass
 
 
 async def _cleanup_old_files(directory: str, days: int = 30) -> None:
-    """Delete files in the directory older than the specified number of days."""
+    """Delete local files older than the specified number of days."""
     now = time.time()
     cutoff = now - (days * 86400)
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
@@ -109,15 +88,7 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
 async def _download_file(
     session: aiohttp.ClientSession, url: str
 ) -> tuple[str, None] | tuple[None, str]:
-    """Download a file from a given URL and save it under DIRECTORY (streaming).
-
-    Args:
-        session: Shared aiohttp session.
-        url: Direct URL to the file to download.
-
-    Returns:
-        Full file path of the saved file, or None on failure.
-    """
+    """Download a file from a URL and save it locally."""
     try:
         resp = await session.get(url)
         async with resp:
@@ -149,13 +120,13 @@ async def _download_file(
                 await asyncio.to_thread(f.close)
 
             return file_path, None
-    except Exception as error:
-        return None, f"An unexpected error occurred during download: {error}"
+    except (aiohttp.ClientError, OSError) as error:
+        return None, f"Download failed: {error}"
 
 
 @time_trigger("shutdown")  # noqa: F821
 async def _close_session() -> None:
-    """Close the aiohttp session on shutdown."""
+    """Close the shared ClientSession on service shutdown."""
     global _session
     if _session and not _session.closed:
         await _session.close()
@@ -164,7 +135,7 @@ async def _close_session() -> None:
 
 @time_trigger("cron(0 0 * * *)")  # noqa: F821
 async def _daily_cleanup() -> None:
-    """Run daily cleanup of old files."""
+    """Perform daily cleanup of archived media files."""
     await _cleanup_old_files(DIRECTORY, days=30)
 
 
@@ -219,20 +190,23 @@ async def generate_webhook_id() -> dict[str, Any]:
     name: Generate Webhook ID
     description: Generate a unique URL-safe webhook ID and sample URLs.
     """
-    webhook_id = secrets.token_urlsafe()
-    internal_url = _internal_url()
-    external_url = _external_url()
-    response = {"webhook_id": webhook_id}
-    if internal_url:
-        response["sample_internal_url"] = f"{internal_url}/api/webhook/{webhook_id}"
-    else:
-        response["sample_internal_url"] = (
-            "The internal Home Assistant URL is not found."
-        )
-    if external_url:
-        response["sample_external_url"] = f"{external_url}/api/webhook/{webhook_id}"
-    else:
-        response["sample_external_url"] = (
-            "The external Home Assistant URL is not found or incorrect."
-        )
-    return response
+    try:
+        webhook_id = secrets.token_urlsafe()
+        internal_url = _internal_url()
+        external_url = _external_url()
+        response = {"webhook_id": webhook_id}
+        if internal_url:
+            response["sample_internal_url"] = f"{internal_url}/api/webhook/{webhook_id}"
+        else:
+            response["sample_internal_url"] = (
+                "The internal Home Assistant URL is not found."
+            )
+        if external_url:
+            response["sample_external_url"] = f"{external_url}/api/webhook/{webhook_id}"
+        else:
+            response["sample_external_url"] = (
+                "The external Home Assistant URL is not found or incorrect."
+            )
+        return response
+    except Exception as error:
+        return {"error": f"An unexpected error occurred during processing: {error}"}

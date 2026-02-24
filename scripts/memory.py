@@ -63,7 +63,7 @@ result_entity_name: dict[str, str] = {}
 
 
 def _build_result_entity_name() -> dict[str, str]:
-    """Build a friendly name dict for the result entity."""
+    """Generate a friendly name dictionary for the result entity."""
     tail = RESULT_ENTITY.split(".")[-1]
     parts = [part.capitalize() for part in tail.split("_") if part]
     friendly = " ".join(parts) or tail
@@ -71,7 +71,7 @@ def _build_result_entity_name() -> dict[str, str]:
 
 
 def _ensure_result_entity_name(force: bool = False) -> None:
-    """Ensure result_entity_name is populated, optionally forcing a refresh."""
+    """Ensure the result entity name is populated."""
     global result_entity_name
     if force or not result_entity_name:
         result_entity_name = _build_result_entity_name()
@@ -79,13 +79,13 @@ def _ensure_result_entity_name(force: bool = False) -> None:
 
 @pyscript_compile  # noqa: F821
 def _utcnow_iso() -> str:
-    """Return the current UTC time as an ISO 8601 string."""
+    """Return current UTC time in ISO 8601 format."""
     return datetime.now(UTC).isoformat()
 
 
 @pyscript_compile  # noqa: F821
 def _dt_from_iso(s: str) -> datetime | None:
-    """Parse an ISO string into datetime; return None if invalid."""
+    """Parse an ISO 8601 string into a datetime object."""
     try:
         return datetime.fromisoformat(s)
     except (TypeError, ValueError):
@@ -94,7 +94,7 @@ def _dt_from_iso(s: str) -> datetime | None:
 
 @pyscript_compile  # noqa: F821
 def _get_db_connection() -> sqlite3.Connection:
-    """Create a properly configured database connection."""
+    """Create a configured SQLite connection with optimized PRAGMAs."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA synchronous=NORMAL;")
@@ -105,11 +105,7 @@ def _get_db_connection() -> sqlite3.Connection:
 
 @pyscript_compile  # noqa: F821
 def _ensure_db() -> None:
-    """Ensure database exists and tables/indices are created.
-
-    Uses a short-lived connection to avoid leaving an idle connection open
-    at import time.
-    """
+    """Initialize the database schema and indices."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with closing(_get_db_connection()) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -184,7 +180,7 @@ def _ensure_db() -> None:
 
 @pyscript_compile  # noqa: F821
 def _ensure_db_once(force: bool = False) -> None:
-    """Ensure the database schema exists once per runtime."""
+    """Ensure the database is initialized, optionally forcing a rebuild."""
     global _DB_READY
     if force:
         _DB_READY = False
@@ -200,7 +196,7 @@ def _ensure_db_once(force: bool = False) -> None:
 
 @pyscript_compile  # noqa: F821
 def _normalize_value(s: str) -> str:
-    """Normalize a text value for storage (NFC)."""
+    """Normalize text value to Unicode NFC form."""
     if s is None:
         return ""
     return unicodedata.normalize("NFC", str(s))
@@ -208,7 +204,7 @@ def _normalize_value(s: str) -> str:
 
 @pyscript_compile  # noqa: F821
 def _strip_diacritics(value: str) -> str:
-    """Remove diacritics and normalize locale-specific letters (Vietnamese, Turkish, Spanish, Germanic, Nordic)."""
+    """Remove diacritics and normalize locale-specific characters."""
     if value is None:
         return ""
     decomposed = unicodedata.normalize("NFKD", value)
@@ -227,7 +223,7 @@ def _strip_diacritics(value: str) -> str:
 
 @pyscript_compile  # noqa: F821
 def _normalize_search_text(value: str | None) -> str:
-    """Lowercase, strip diacritics, and collapse whitespace for search usage."""
+    """Normalize text for search indexing and querying."""
     if value is None:
         return ""
     lowered = str(value).lower()
@@ -239,13 +235,13 @@ def _normalize_search_text(value: str | None) -> str:
 
 @pyscript_compile  # noqa: F821
 def _normalize_tags(s: str) -> str:
-    """Normalize tags similarly to keys but retain space-separated words."""
+    """Normalize space-separated tags for consistent searching."""
     return _normalize_search_text(s)
 
 
 @pyscript_compile  # noqa: F821
 def _normalize_key(s: str) -> str:
-    """Normalize a key to [a-z0-9_], lowercase, no accents."""
+    """Normalize a memory key to a standard alphanumeric format."""
     if s is None:
         return ""
     s = str(s).strip().lower()
@@ -258,7 +254,7 @@ def _normalize_key(s: str) -> str:
 def _condense_candidate_for_selection(
     entry: dict[str, Any], *, score: float | None = None
 ) -> dict[str, Any]:
-    """Prepare a candidate dict with trimmed value and optional score."""
+    """Condense a database entry for inclusion in result lists."""
     value = entry.get("value")
     if isinstance(value, str) and len(value) > VALUE_PREVIEW_CHARS:
         value = value[: VALUE_PREVIEW_CHARS - 3] + "..."
@@ -280,7 +276,7 @@ def _condense_candidate_for_selection(
 def _calculate_match_score(
     source_tokens: set[str], candidate_tokens: set[str], bm25_raw: float | None
 ) -> float:
-    """Blend Jaccard overlap with BM25 to estimate relevance."""
+    """Calculate a combined match score using Jaccard similarity and BM25."""
     if not source_tokens or not candidate_tokens:
         jaccard_score = 0.0
     else:
@@ -304,7 +300,7 @@ async def _search_tag_candidates(
     limit: int | None = None,
     log_context: str = "tag lookup",
 ) -> list[tuple[dict[str, Any], float]]:
-    """Return (entry, score) tuples for memories sharing normalized tags."""
+    """Find memory records with similar tags using normalized token matching."""
     tags_search = _normalize_tags(source or "")
     if not tags_search:
         return []
@@ -317,7 +313,7 @@ async def _search_tag_candidates(
     limit_value = max(1, min(limit_value, SEARCH_LIMIT_MAX))
     try:
         raw_matches = await _memory_search_db(tags_search, limit=limit_value)
-    except Exception as lookup_err:
+    except sqlite3.Error as lookup_err:
         log.error(f"memory {log_context} failed for '{tags_search}': {lookup_err}")  # noqa: F821
         return []
     if not raw_matches:
@@ -360,7 +356,7 @@ async def _find_tag_matches_for_query(
     exclude_keys: set[str] | None = None,
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Search for potential key matches based on normalized tags."""
+    """Search for potential key matches based on tag similarity."""
     candidates = await _search_tag_candidates(
         source,
         exclude_keys=exclude_keys,
@@ -377,7 +373,7 @@ async def _find_tag_matches_for_query(
 
 @pyscript_compile  # noqa: F821
 def _tokenize_query(q: str) -> list[str]:
-    """Tokenize a free-text query into normalized word tokens for FTS."""
+    """Tokenize query string into normalized word tokens."""
     normalized = _normalize_search_text(q)
     if not normalized:
         return []
@@ -386,7 +382,7 @@ def _tokenize_query(q: str) -> list[str]:
 
 @pyscript_compile  # noqa: F821
 def _near_distance_for_tokens(n: int) -> int:
-    """Compute dynamic NEAR distance based on token count."""
+    """Calculate NEAR distance threshold based on token count."""
     if n <= 1:
         return 0
     val = 2 * n - 1
@@ -399,49 +395,35 @@ def _near_distance_for_tokens(n: int) -> int:
 
 @pyscript_compile  # noqa: F821
 def _build_fts_queries(raw_query: str) -> list[str]:
-    """Build a list of FTS5 MATCH query variants to improve recall.
-
-    Strategy (ordered by priority):
-    - PHRASE: exact phrase (highest precision when user typed a phrase)
-    - NEAR: tokens appear within proximity (high relevance, dynamic distance)
-    - AND: all tokens must appear (relevant but looser than NEAR)
-    - OR*: any token with prefix match (broad recall)
-    - RAW: the original raw query as a last option
-    """
+    """Generate prioritized FTS5 query variants for improved recall."""
     normalized_query = _normalize_search_text(raw_query)
     tokens = normalized_query.split() if normalized_query else []
     variants = []
 
     if tokens:
-        # 1) PHRASE exact order (if 2+ tokens)
         if len(tokens) >= 2:
             phrase = " ".join(tokens)
             variants.append(f'"{phrase}"')
 
-        # 2) NEAR across all tokens (if 2+ tokens)
         if len(tokens) >= 2:
             near_inner = " ".join(tokens)
             near_dist = _near_distance_for_tokens(len(tokens))
             variants.append(f"NEAR({near_inner}, {near_dist})")
 
-        # 3) AND of all tokens (or single token)
         if len(tokens) == 1:
             variants.append(tokens[0])
         else:
             variants.append(" AND ".join(tokens))
 
-        # 4) OR with prefix match to broaden recall
         or_tokens = [f"{t}*" for t in tokens]
         variants.append(" OR ".join(or_tokens))
 
-    # 5) RAW as very last resort if provided
     if normalized_query:
         variants.append(normalized_query)
     rq = (raw_query or "").strip()
     if rq:
         variants.append(rq)
 
-    # Deduplicate while preserving order
     seen = set()
     out = []
     for v in variants:
@@ -455,7 +437,7 @@ def _build_fts_queries(raw_query: str) -> list[str]:
 def _fetch_with_expiry(
     cur: sqlite3.Cursor, key: str
 ) -> tuple[bool, sqlite3.Row | None]:
-    """Fetch the row and report whether it is expired; never deletes the row."""
+    """Retrieve a row and check if its expiration date has passed."""
     row = cur.execute(
         """
         SELECT key,
@@ -481,7 +463,7 @@ def _fetch_with_expiry(
 
 
 def _set_result(state_value: str = "ok", **attrs: Any) -> None:
-    """Set result sensor state and attributes."""
+    """Update the memory result sensor state and attributes."""
     _ensure_result_entity_name()
     attrs.update(result_entity_name)
     state.set(RESULT_ENTITY, value=state_value, new_attributes=attrs)  # noqa: F821
@@ -489,7 +471,7 @@ def _set_result(state_value: str = "ok", **attrs: Any) -> None:
 
 @pyscript_compile  # noqa: F821
 def _reset_db_ready() -> None:
-    """Mark the cached DB-ready flag as stale so the next call rebuilds."""
+    """Reset the database initialization flag."""
     global _DB_READY
     with _DB_READY_LOCK:
         _DB_READY = False
@@ -505,7 +487,7 @@ def _memory_set_db_sync(
     now_iso: str,
     expires_at: str | None,
 ) -> bool:
-    """Persist a memory record, retrying once if schema objects are missing."""
+    """Synchronously persist a memory record to the database."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -546,7 +528,7 @@ def _memory_set_db_sync(
 
 @pyscript_compile  # noqa: F821
 def _memory_key_exists_db_sync(key_norm: str) -> bool:
-    """Return True if a memory row already exists for key."""
+    """Synchronously check if a memory key exists."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -568,7 +550,7 @@ def _memory_key_exists_db_sync(key_norm: str) -> bool:
 
 @pyscript_compile  # noqa: F821
 def _memory_get_db_sync(key_norm: str) -> tuple[str, dict[str, Any] | None]:
-    """Fetch a memory by key, updating access time and handling expiry."""
+    """Synchronously fetch a memory record and update its last-used timestamp."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -607,7 +589,7 @@ def _memory_get_db_sync(key_norm: str) -> tuple[str, dict[str, Any] | None]:
 
 @pyscript_compile  # noqa: F821
 def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
-    """Run the primary search query, returning matching memory rows."""
+    """Synchronously search for memory records matching the provided query."""
     normalized_query = _normalize_search_text(query)
     query_tokens = set(normalized_query.split()) if normalized_query else set()
     for attempt in range(2):
@@ -654,8 +636,6 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                         if len(found_by_key) >= limit:
                             break
                 if not total_rows:
-                    # Fallback to LIKE using normalized query to match normalized columns (key, tags)
-                    # We prioritize normalized matching because key/tags are the primary search vectors.
                     like_q = f"%{normalized_query}%"
                     total_rows = cur.execute(
                         """
@@ -711,7 +691,7 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
 
 @pyscript_compile  # noqa: F821
 def _memory_forget_db_sync(key_norm: str) -> int:
-    """Delete a memory row by key and return the number of rows removed."""
+    """Synchronously delete a memory record by its key."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -733,7 +713,7 @@ def _memory_forget_db_sync(key_norm: str) -> int:
 
 @pyscript_compile  # noqa: F821
 def _memory_purge_expired_db_sync(grace_days: int = 0) -> int:
-    """Remove expired rows older than the grace period and report how many were purged."""
+    """Synchronously remove expired memory records."""
     grace = max(int(grace_days), 0)
     cutoff_dt = datetime.now(UTC) - timedelta(days=grace)
     cutoff_iso = cutoff_dt.isoformat()
@@ -761,7 +741,7 @@ def _memory_purge_expired_db_sync(grace_days: int = 0) -> int:
 
 @pyscript_compile  # noqa: F821
 def _memory_reindex_fts_db_sync() -> tuple[int, int]:
-    """Rebuild the FTS index, returning counts before and after the rebuild."""
+    """Synchronously rebuild the FTS index from the main memory table."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -841,7 +821,7 @@ def _memory_reindex_fts_db_sync() -> tuple[int, int]:
 
 @pyscript_compile  # noqa: F821
 def _memory_health_check_db_sync() -> tuple[int, int, int]:
-    """Return basic health counts (total, expired, FTS rows) for diagnostics."""
+    """Synchronously perform a health check on the memory database."""
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -876,7 +856,7 @@ async def _memory_set_db(
     now_iso: str,
     expires_at: str | None,
 ) -> bool:
-    """Async wrapper around _memory_set_db_sync to keep writes off the event loop."""
+    """Async wrapper for persisting a memory record."""
     return await asyncio.to_thread(
         _memory_set_db_sync,
         key_norm,
@@ -890,37 +870,37 @@ async def _memory_set_db(
 
 
 async def _memory_key_exists_db(key_norm: str) -> bool:
-    """Async wrapper that checks key existence via _memory_key_exists_db_sync."""
+    """Async wrapper for checking key existence."""
     return await asyncio.to_thread(_memory_key_exists_db_sync, key_norm)
 
 
 async def _memory_get_db(key_norm: str) -> tuple[str, dict[str, Any] | None]:
-    """Async wrapper for _memory_get_db_sync handling DB access in a thread."""
+    """Async wrapper for fetching a memory record."""
     return await asyncio.to_thread(_memory_get_db_sync, key_norm)
 
 
 async def _memory_search_db(query: str, limit: int) -> list[dict[str, Any]]:
-    """Async wrapper that runs _memory_search_db_sync without blocking."""
+    """Async wrapper for searching memory records."""
     return await asyncio.to_thread(_memory_search_db_sync, query, limit)
 
 
 async def _memory_forget_db(key_norm: str) -> int:
-    """Async wrapper for _memory_forget_db_sync."""
+    """Async wrapper for deleting a memory record."""
     return await asyncio.to_thread(_memory_forget_db_sync, key_norm)
 
 
 async def _memory_purge_expired_db(grace_days: int = 0) -> int:
-    """Async wrapper for the purge helper supporting a grace window."""
+    """Async wrapper for removing expired memory records."""
     return await asyncio.to_thread(_memory_purge_expired_db_sync, grace_days)
 
 
 async def _memory_reindex_fts_db() -> tuple[int, int]:
-    """Async wrapper rebuilding the FTS index via _memory_reindex_fts_db_sync."""
+    """Async wrapper for rebuilding the FTS index."""
     return await asyncio.to_thread(_memory_reindex_fts_db_sync)
 
 
 async def _memory_health_check_db() -> tuple[int, int, int]:
-    """Async wrapper running the health-check query in a thread."""
+    """Async wrapper for checking database health."""
     return await asyncio.to_thread(_memory_health_check_db_sync)
 
 
@@ -1421,7 +1401,7 @@ async def memory_health_check():
 
 @time_trigger("cron(0 3 * * *)")  # noqa: F821
 async def memory_daily_housekeeping():
-    """Daily housekeeping: purge entries older than HOUSEKEEPING_GRACE_DAYS and tidy the FTS index."""
+    """Perform daily memory database maintenance."""
     try:
         await memory_purge_expired(grace_days=HOUSEKEEPING_GRACE_DAYS)
     except Exception as e:

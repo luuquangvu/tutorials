@@ -11,7 +11,7 @@ from typing import Any
 
 import orjson
 from bs4 import BeautifulSoup
-from curl_cffi.requests import AsyncSession
+from curl_cffi.requests import AsyncSession, RequestsError
 
 TTL = 30  # Cache retention period (1-30 days)
 RETRY_LIMIT = 3
@@ -39,13 +39,13 @@ CACHE_REFRESH_THRESHOLD = CACHE_MAX_AGE - CACHE_REFRESH_PERIOD
 
 @pyscript_compile  # noqa: F821
 def _connect_db() -> sqlite3.Connection:
-    """Create a configured SQLite connection with necessary PRAGMAs."""
+    """Create a configured SQLite connection with optimized PRAGMAs."""
     conn = sqlite3.connect(DB_PATH)
     try:
         conn.execute("PRAGMA synchronous=NORMAL;")
         conn.execute("PRAGMA temp_store=MEMORY;")
         conn.execute("PRAGMA busy_timeout=3000;")
-    except Exception:
+    except sqlite3.Error:
         conn.close()
         raise
     return conn
@@ -53,7 +53,7 @@ def _connect_db() -> sqlite3.Connection:
 
 @pyscript_compile  # noqa: F821
 def _ensure_cache_db() -> None:
-    """Create the cache database directory, SQLite file, and schema if they do not already exist."""
+    """Initialize the cache database schema and directory."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with closing(_connect_db()) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -87,21 +87,21 @@ def _ensure_cache_db_once(force: bool = False) -> None:
 
 
 def _reset_cache_ready() -> None:
-    """Mark the cache database schema as stale so it will be recreated."""
+    """Mark the cache database schema as stale."""
     global _CACHE_READY
     with _CACHE_READY_LOCK:
         _CACHE_READY = False
 
 
 async def _cache_prepare_db(force: bool = False) -> bool:
-    """Ensure the cache database is ready for use."""
+    """Async wrapper to ensure the cache database is ready."""
     await asyncio.to_thread(_ensure_cache_db_once, force)
     return True
 
 
 @pyscript_compile  # noqa: F821
 def _cache_get_sync(key: str) -> tuple[str | None, int | None]:
-    """Fetch a cache record synchronously if it exists and has not expired."""
+    """Fetch a cache record synchronously (returns value and remaining TTL)."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -133,13 +133,13 @@ def _cache_get_sync(key: str) -> tuple[str | None, int | None]:
 
 
 async def _cache_get(key: str) -> tuple[str | None, int | None]:
-    """Return the cached JSON payload for a key and its remaining TTL in seconds."""
+    """Fetch cached JSON payload and its remaining TTL in seconds."""
     return await asyncio.to_thread(_cache_get_sync, key)
 
 
 @pyscript_compile  # noqa: F821
 def _cache_set_sync(key: str, value: str, ttl_seconds: int) -> bool:
-    """Store or update a cache record synchronously with retry on schema loss."""
+    """Store or update a cache record synchronously."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -168,13 +168,13 @@ def _cache_set_sync(key: str, value: str, ttl_seconds: int) -> bool:
 
 
 async def _cache_set(key: str, value: str, ttl_seconds: int) -> bool:
-    """Persist a cache entry with the provided TTL and prune expired records."""
+    """Persist a cache entry with the provided TTL."""
     return await asyncio.to_thread(_cache_set_sync, key, value, ttl_seconds)
 
 
 @pyscript_compile  # noqa: F821
 def _cache_delete_sync(key: str) -> int:
-    """Remove a cache record synchronously and return the rowcount."""
+    """Remove a cache record synchronously."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -194,13 +194,13 @@ def _cache_delete_sync(key: str) -> int:
 
 
 async def _cache_delete(key: str) -> int:
-    """Remove the cache entry identified by key if it exists."""
+    """Remove a cache entry by key."""
     return await asyncio.to_thread(_cache_delete_sync, key)
 
 
 @pyscript_compile  # noqa: F821
 def _prune_expired_sync() -> int:
-    """Prune expired entries from the cache database."""
+    """Remove expired entries from the cache database."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once()
@@ -222,57 +222,34 @@ def _prune_expired_sync() -> int:
 
 
 async def _prune_expired() -> int:
-    """Async wrapper for pruning expired entries."""
+    """Async wrapper for pruning expired cache entries."""
     return await asyncio.to_thread(_prune_expired_sync)
 
 
 @time_trigger("cron(15 3 * * *)")  # noqa: F821
 async def prune_cache_db() -> None:
-    """Regularly prune expired entries from the cache database."""
+    """Daily cleanup of expired cache entries."""
     await _prune_expired()
 
 
 async def _get_recaptcha_version(ss: AsyncSession) -> str | None:
-    """Fetch the current reCAPTCHA JS version from Google's API.
-
-    The version string changes with each Google release. It is extracted from
-    the releases URL embedded in ``api.js``.
-
-    Args:
-        ss: An active AsyncSession.
-
-    Returns:
-        Version string or None on failure.
-    """
+    """Fetch the current reCAPTCHA JS version from Google's API."""
     try:
         api_url = f"https://www.google.com/recaptcha/api.js?render={RECAPTCHA_SITEKEY}"
         resp = await ss.get(api_url, timeout=60)
         resp.raise_for_status()
         match = re.search(r"/recaptcha/releases/([^/]+)/", resp.text)
         return match.group(1) if match else None
-    except Exception:
+    except RequestsError:
         return None
 
 
 async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[None, str]:
-    """Obtain a reCAPTCHA v3 token via the anchor+reload API flow.
-
-    Uses curl_cffi's Chrome impersonation to get a valid token from Google's
-    reCAPTCHA API without running JavaScript. The token is obtained by:
-    1. Fetching ``api.js`` to get the current release version
-    2. Fetching the anchor page to get an initial token
-    3. Posting to the reload endpoint to get the full response token
-
-    Args:
-        ss: An active AsyncSession with Chrome impersonation.
-
-    Returns:
-        (token, None) on success or (None, error_message) on failure.
-    """
+    """Obtain a reCAPTCHA v3 token via the anchor+reload API flow."""
     try:
         version = await _get_recaptcha_version(ss)
         if not version:
-            return None, "Failed to fetch reCAPTCHA version from api.js"
+            return None, "Failed to fetch reCAPTCHA version"
 
         anchor_url = (
             f"https://www.google.com/recaptcha/api2/anchor?"
@@ -287,7 +264,7 @@ async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[Non
 
         match = re.search(r'id="recaptcha-token"\s+value="([^"]+)"', resp_anchor.text)
         if not match:
-            return None, "Failed to extract anchor token from reCAPTCHA"
+            return None, "Failed to extract anchor token"
 
         anchor_token = match.group(1)
 
@@ -315,34 +292,21 @@ async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[Non
 
         rresp_match = re.search(r'"rresp","([^"]+)"', resp_reload.text)
         if not rresp_match:
-            return None, "Failed to extract response token from reCAPTCHA reload"
+            return None, "Failed to extract response token"
 
         return rresp_match.group(1), None
 
-    except Exception as error:
-        return None, f"reCAPTCHA token retrieval failed: {error}"
+    except RequestsError as error:
+        return None, f"reCAPTCHA retrieval failed: {error}"
 
 
 @pyscript_compile  # noqa: F821
 def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
-    """Parse violations from the resultHtml returned by the new csgt.vn API.
-
-    The new HTML structure uses Bootstrap cards with the following layout:
-    - Each violation is inside a ``div.violation-card``
-    - Status in ``span.status-badge``
-    - Info items in ``div.info-item`` containing ``span.label`` and ``span.value``
-
-    Args:
-        result_html: The HTML string from the ``resultHtml`` field in the JSON response.
-
-    Returns:
-        A dict with status (success/error), message, and violation details.
-    """
+    """Parse traffic violations from csgt.vn result HTML."""
     soup = BeautifulSoup(result_html, "html.parser")
     violation_cards = soup.find_all("div", class_="violation-card")
 
     if not violation_cards:
-        # Check if the page returns a "no violations" message
         text_content = soup.get_text(strip=True)
         if text_content:
             return {
@@ -360,24 +324,20 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
     for card in violation_cards:
         violation = {}
 
-        # Extract plate number from violation title
         title_div = card.find("div", class_="violation-title")
         if title_div:
             violation["Biển kiểm soát"] = title_div.get_text(strip=True)
 
-        # Extract status
         status_span = card.find("span", class_="status-badge")
         if status_span:
             violation["Trạng thái"] = status_span.get_text(strip=True)
 
-        # Extract info by section to handle duplicate "Địa chỉ" labels
         info_groups = card.find_all("div", class_="info-group")
         for group in info_groups:
             title_el = group.find("h6", class_="info-title")
             section = title_el.get_text(strip=True) if title_el else ""
 
             if section == "Thông tin xử lý":
-                # This section has two col-md-6 columns, each with "Đơn vị" + "Địa chỉ"
                 columns = group.find_all("div", class_="col-md-6")
                 resolution_items = []
                 for col in columns:
@@ -392,7 +352,6 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
                         resolution_items.append(col_data)
 
                 for col_data in resolution_items:
-                    # Prefix duplicate keys with their context label
                     unit_key = next(
                         (k for k in col_data if k.startswith("Đơn vị")), None
                     )
@@ -431,36 +390,21 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
 async def _check_license_plate(
     license_plate: str, vehicle_type: str, retry_count: int = 0
 ) -> dict[str, Any]:
-    """End-to-end lookup flow against csgt.vn with retries.
-
-    Performs: visit homepage → visit lookup page (get CSRF token + cookies) →
-    obtain reCAPTCHA v3 token → submit form → parse resultHtml.
-
-    Args:
-        license_plate: VN plate number (uppercase, validated by caller).
-        vehicle_type: One of ``car``, ``motorbike``, ``electricbike``.
-        retry_count: Current retry attempt (0-based, max ``RETRY_LIMIT`` retries).
-
-    Returns:
-        Parsed response dict with status and details, or error.
-    """
+    """Execute the end-to-end lookup flow against csgt.vn with retries."""
     async with AsyncSession(impersonate="chrome") as ss:
         try:
-            # Step 1: Visit homepage to establish session cookies
             await ss.get(BASE_URL, timeout=60)
             await asyncio.sleep(random.uniform(0.5, 1.5))
 
-            # Step 2: Visit lookup page to get CSRF token and session cookies
             resp_page = await ss.get(LOOKUP_URL, timeout=60)
             resp_page.raise_for_status()
 
             token_match = re.search(r'name="_token"\s+value="([^"]+)"', resp_page.text)
             if not token_match:
-                return {"error": "Failed to extract CSRF token from lookup page"}
+                return {"error": "Failed to extract CSRF token"}
 
             csrf_token = token_match.group(1)
 
-            # Step 3: Obtain reCAPTCHA token
             await asyncio.sleep(random.uniform(1.0, 2.0))
             recaptcha_token, error = await _get_recaptcha_token(ss)
             if not recaptcha_token:
@@ -472,9 +416,8 @@ async def _check_license_plate(
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
-                return {"error": f"reCAPTCHA token retrieval failed: {error}"}
+                return {"error": f"reCAPTCHA retrieval failed: {error}"}
 
-            # Step 4: Submit the lookup form
             xsrf_token = urllib.parse.unquote(dict(ss.cookies).get("XSRF-TOKEN", ""))
             headers = {
                 "Accept": "*/*",
@@ -516,13 +459,12 @@ async def _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
                 return {
-                    "error": f"Verification failed after {RETRY_LIMIT} retries: "
+                    "error": "Verification failed: "
                     + response_data.get("message", "Verification failed")
                 }
 
             resp.raise_for_status()
 
-            # Step 5: Parse the response
             response_data = orjson.loads(resp.content)
             result_html = response_data.get("resultHtml", "")
 
@@ -535,7 +477,7 @@ async def _check_license_plate(
 
             return _extract_violations_from_html(result_html)
 
-        except Exception as error:
+        except (RequestsError, orjson.JSONDecodeError) as error:
             if retry_count < RETRY_LIMIT:
                 print(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")
                 await asyncio.sleep(30)
@@ -547,7 +489,7 @@ async def _check_license_plate(
 
 @time_trigger("startup")  # noqa: F821
 async def build_cached_ctx() -> None:
-    """Run once at HA startup / Pyscript reload."""
+    """Initialize cache and prune expired entries on startup."""
     await _cache_prepare_db(force=True)
     await _prune_expired()
 

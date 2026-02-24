@@ -43,20 +43,7 @@ PARSE_MODES: tuple[str, ...] = (
 
 
 def _to_media_path(path: str) -> str:
-    """Normalize Home Assistant media source path to /media/ prefix.
-
-    Converts leading "local/" to "/media/". Leaves other paths unchanged but
-    validates that they resolve to a path inside /media/ to prevent traversal.
-
-    Args:
-        path: Input file path from UI or config.
-
-    Returns:
-        Normalized absolute path beginning with "/media/".
-
-    Raises:
-        ValueError: If the resolved path is outside the allowed /media directory.
-    """
+    """Normalize and validate a Home Assistant media path to start with /media/."""
     if path.startswith("local/"):
         path = "/media/" + path.removeprefix("local/")
 
@@ -72,35 +59,21 @@ def _to_media_path(path: str) -> str:
     media_root = Path("/media").resolve()
     if media_root not in resolved_path.parents and resolved_path != media_root:
         raise ValueError(
-            f"Security Error: Access to '{path}' (resolved to '{resolved_path}') "
-            "is denied. Path must be inside /media."
+            f"Security Error: Access to '{path}' (resolved to '{resolved_path}') is denied. Path must be inside /media."
         )
 
     return str(resolved_path)
 
 
 def _to_relative_path(path: str) -> str:
-    """Convert a /media/ path to Home Assistant local/ media source path.
-
-    Converts leading "/media/" to "local/". Leaves other paths unchanged.
-
-    Args:
-        path: Absolute media path.
-
-    Returns:
-        Path with leading "local/" when applicable.
-    """
+    """Convert an absolute /media/ path to a relative local/ media source path."""
     if path.startswith("/media/"):
         return "local/" + path.removeprefix("/media/")
     return path
 
 
 async def _ensure_session() -> aiohttp.ClientSession:
-    """Create or reuse a shared aiohttp session.
-
-    Returns:
-        An open `aiohttp.ClientSession` with a default timeout.
-    """
+    """Create or return a shared aiohttp ClientSession."""
     global _session
     if _session is None or _session.closed:
         _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
@@ -108,24 +81,12 @@ async def _ensure_session() -> aiohttp.ClientSession:
 
 
 async def _ensure_dir(path: str) -> None:
-    """Ensure a directory exists, creating it if missing.
-
-    Args:
-        path: Directory path to create if it does not exist.
-    """
+    """Ensure a directory exists, creating it if necessary."""
     await asyncio.to_thread(os.makedirs, path, exist_ok=True)
 
 
 async def _get_file(session: aiohttp.ClientSession, file_id: str) -> str | None:
-    """Resolve Telegram file path from a file_id.
-
-    Args:
-        session: Shared aiohttp session.
-        file_id: Telegram file identifier.
-
-    Returns:
-        File path on Telegram's file server, or None.
-    """
+    """Resolve a Telegram file identifier to its server path."""
     url = f"https://api.telegram.org/bot{TOKEN}/getFile"
     payload = {"file_id": file_id}
     data = orjson.dumps(payload).decode("utf-8")
@@ -141,15 +102,7 @@ async def _get_file(session: aiohttp.ClientSession, file_id: str) -> str | None:
 async def _download_file(
     session: aiohttp.ClientSession, file_id: str
 ) -> tuple[str, None] | tuple[None, str]:
-    """Download a file from Telegram and save it under DIRECTORY (streaming).
-
-    Args:
-        session: Shared aiohttp session.
-        file_id: Telegram file identifier.
-
-    Returns:
-        Full file path of the saved file, or None on failure.
-    """
+    """Download a file from Telegram and save it locally."""
     try:
         online_file_path = await _get_file(session, file_id)
         if not online_file_path:
@@ -180,8 +133,8 @@ async def _download_file(
                 await asyncio.to_thread(f.close)
 
             return file_path, None
-    except Exception as error:
-        return None, f"An unexpected error occurred during download: {error}"
+    except (aiohttp.ClientError, OSError) as error:
+        return None, f"Download failed: {error}"
 
 
 async def _send_message(
@@ -192,19 +145,7 @@ async def _send_message(
     message_thread_id: int | None = None,
     parse_mode: str | None = None,
 ) -> dict[str, Any]:
-    """Send a text message to a Telegram chat.
-
-    Args:
-        session: Shared aiohttp session.
-        chat_id: Target chat identifier.
-        message: Message text (truncated to 4096 chars).
-        reply_to_message_id: Optional message ID to reply to.
-        message_thread_id: Optional thread (topic) ID in supergroups.
-        parse_mode: Optional parse mode for formatting (HTML, MarkdownV2, Markdown).
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Send a text message via the Telegram API."""
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     text = message
     if len(text) > 4096:
@@ -238,20 +179,7 @@ async def _send_photo(
     message_thread_id: int | None = None,
     parse_mode: str | None = None,
 ) -> dict[str, Any]:
-    """Upload and send a local photo via Telegram using multipart/form-data.
-
-    Args:
-        session: Shared aiohttp session.
-        chat_id: Target chat identifier.
-        file_path: Local filesystem path to the image.
-        caption: Optional caption (Telegram limit ~1024 chars).
-        reply_to_message_id: Optional message ID to reply to.
-        message_thread_id: Optional thread (topic) ID in supergroups.
-        parse_mode: Optional parse mode for caption (HTML, MarkdownV2, Markdown).
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Upload and send a photo via the Telegram API."""
     file_path = _to_media_path(file_path)
 
     file_exists = await asyncio.to_thread(os.path.isfile, file_path)
@@ -296,14 +224,7 @@ async def _send_photo(
 
 
 async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
-    """Retrieve current Telegram bot webhook information.
-
-    Args:
-        session: Shared aiohttp session.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Retrieve current Telegram webhook status."""
     url = f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo"
     resp = await session.get(url)
     async with resp:
@@ -314,16 +235,7 @@ async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
 async def _set_webhook(
     session: aiohttp.ClientSession, base_url: str, webhook_id: str
 ) -> dict[str, Any]:
-    """Set the Telegram bot webhook URL.
-
-    Args:
-        session: Shared aiohttp session.
-        base_url: Base external URL for Home Assistant.
-        webhook_id: Unique webhook identifier path.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Configure the Telegram webhook URL."""
     url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
     params = {
         "url": f"{base_url}/api/webhook/{webhook_id}",
@@ -339,14 +251,7 @@ async def _set_webhook(
 
 
 async def _delete_webhook(session: aiohttp.ClientSession) -> dict[str, Any]:
-    """Delete the Telegram bot webhook.
-
-    Args:
-        session: Shared aiohttp session.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Remove the Telegram webhook configuration."""
     url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
     params = {"drop_pending_updates": True}
     data = orjson.dumps(params).decode("utf-8")
@@ -364,17 +269,7 @@ async def _get_updates(
     offset: int | None = None,
     limit: int | None = None,
 ) -> dict[str, Any]:
-    """Fetch updates with long polling.
-
-    Args:
-        session: Shared aiohttp session.
-        timeout: Long-poll timeout in seconds.
-        offset: Identifier of the first update to be returned.
-        limit: Limits the number of updates to be retrieved.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Fetch updates from Telegram using long polling."""
     url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
     params: dict[str, Any] = {"timeout": timeout}
     if offset is not None:
@@ -391,14 +286,7 @@ async def _get_updates(
 
 
 async def _get_me(session: aiohttp.ClientSession) -> dict[str, Any]:
-    """Get basic information about the bot.
-
-    Args:
-        session: Shared aiohttp session.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Retrieve basic bot account information."""
     url = f"https://api.telegram.org/bot{TOKEN}/getMe"
     resp = await session.get(url)
     async with resp:
@@ -412,17 +300,7 @@ async def _send_chat_action(
     message_thread_id: int | None = None,
     action: str = "typing",
 ) -> dict[str, Any]:
-    """Send a chat action (e.g., typing) to a chat.
-
-    Args:
-        session: Shared aiohttp session.
-        chat_id: Target chat identifier.
-        message_thread_id: Optional topic/thread ID.
-        action: One of: typing, upload_photo, record_video, upload_video, record_voice, upload_voice, upload_document, choose_sticker, find_location, record_video_note, upload_video_note.
-
-    Returns:
-        Telegram API JSON response as a dict.
-    """
+    """Broadcast a chat action status to a conversation."""
     if action not in ACTIONS_CHAT:
         raise ValueError(
             f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}"
@@ -444,11 +322,7 @@ async def _send_chat_action(
 
 
 def _internal_url() -> str | None:
-    """Return the internal Home Assistant URL, if available.
-
-    Returns:
-        Internal URL string or None when unavailable.
-    """
+    """Return the internal Home Assistant base URL."""
     try:
         return network.get_url(hass, allow_external=False)  # noqa: F821
     except network.NoURLAvailableError:
@@ -456,11 +330,7 @@ def _internal_url() -> str | None:
 
 
 def _external_url() -> str | None:
-    """Return the external HTTPS Home Assistant URL, if available.
-
-    Returns:
-        External URL string or None when unavailable.
-    """
+    """Return the external HTTPS Home Assistant base URL."""
     try:
         return network.get_url(
             hass,  # noqa: F821
@@ -475,31 +345,27 @@ def _external_url() -> str | None:
 
 @pyscript_compile  # noqa: F821
 def _open_file(path: str, mode: str):
-    """Open a file safely using native Python."""
+    """Safely open a file using native Python."""
     return open(path, mode)
 
 
 @pyscript_compile  # noqa: F821
 def _cleanup_disk_sync(directory: str, cutoff: float) -> None:
-    """Native Python function to perform disk cleanup safely."""
+    """Remove files from a directory older than a specified cutoff time."""
     path = Path(directory)
     if not path.exists():
         return
 
     for entry in path.iterdir():
         try:
-            if entry.is_file():
-                # Extracting variable for clarity
-                file_mtime = entry.stat().st_mtime
-                if file_mtime < cutoff:
-                    entry.unlink()
+            if entry.is_file() and entry.stat().st_mtime < cutoff:
+                entry.unlink()
         except OSError:
-            # Silently skip files that are locked or inaccessible
             pass
 
 
 async def _cleanup_old_files(directory: str, days: int = 30) -> None:
-    """Delete files in the directory older than the specified number of days."""
+    """Delete local files older than the specified number of days."""
     now = time.time()
     cutoff = now - (days * 86400)
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
@@ -507,7 +373,7 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
 
 @time_trigger("shutdown")  # noqa: F821
 async def _close_session() -> None:
-    """Close the aiohttp session on shutdown."""
+    """Close the shared ClientSession on service shutdown."""
     global _session
     if _session and not _session.closed:
         await _session.close()
@@ -516,7 +382,7 @@ async def _close_session() -> None:
 
 @time_trigger("cron(0 0 * * *)")  # noqa: F821
 async def _daily_cleanup() -> None:
-    """Run daily cleanup of old files."""
+    """Perform daily cleanup of archived media files."""
     await _cleanup_old_files(DIRECTORY, days=30)
 
 

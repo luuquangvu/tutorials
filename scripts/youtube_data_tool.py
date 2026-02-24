@@ -17,14 +17,14 @@ if not YOUTUBE_API_KEY:
 
 @pyscript_compile  # noqa: F821
 def _build_youtube_client() -> Any:
-    """Build the YouTube API client."""
+    """Initialize the Google API client for YouTube v3."""
     return build(
         YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUTUBE_API_KEY
     )
 
 
 async def _ensure_youtube_client() -> None:
-    """Ensure the global YouTube client is initialized once."""
+    """Ensure the YouTube client is initialized once using a thread lock."""
     global YOUTUBE_CLIENT
     if YOUTUBE_CLIENT is None:
         async with _YOUTUBE_LOCK:
@@ -40,19 +40,7 @@ def youtube_search(
     search_type: str = "video,channel,playlist",
     page_token: str = "",
 ) -> dict[str, Any]:
-    """
-    Performs a search on YouTube.
-
-    Args:
-        client: The initialized YouTube API client.
-        query: The search query string.
-        results: The maximum number of results to return.
-        search_type: The type of content to search for.
-        page_token: The page token to get other pages that could be retrieved.
-
-    Returns:
-        A dictionary containing the search results from the YouTube API.
-    """
+    """Execute a search query against the YouTube API."""
     search_response = (
         client.search()
         .list(
