@@ -88,7 +88,7 @@ def _dt_from_iso(s: str) -> datetime | None:
     """Parse an ISO string into datetime; return None if invalid."""
     try:
         return datetime.fromisoformat(s)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -339,7 +339,7 @@ async def _search_tag_candidates(
         else:
             try:
                 score_val = float(score_raw)
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 existing_tags_norm = _normalize_tags(item.get("tags"))
                 candidate_tokens = {
                     token for token in existing_tags_norm.split() if token
@@ -1004,7 +1004,7 @@ async def memory_set(
 
     try:
         expiration_days_i = int(expiration_days)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         expiration_days_i = 0
     if expiration_days_i < 0:
         expiration_days_i = 0
@@ -1222,7 +1222,7 @@ async def memory_search(query: str, limit: int = 5):
 
     try:
         lim = int(limit)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         lim = 5
     if lim < 1:
         lim = 1
@@ -1329,7 +1329,7 @@ async def memory_purge_expired(grace_days: int | None = None):
     else:
         try:
             grace = int(grace_days)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             grace = 0
     if grace < 0:
         grace = 0
