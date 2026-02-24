@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Control Music
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/control_music_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/control_music_full_llm.yaml
   description: |-
     # Tool for controlling music used for Voice Assistant
 

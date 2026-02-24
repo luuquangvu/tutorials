@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Set Device Timer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/device_control_timer_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/device_control_timer_full_llm.yaml
   description: |-
     # Tool for controlling on/off devices with adjustable delay timing used for Voice Assistant
 

@@ -1,7 +1,7 @@
 blueprint:
   name: Custom Zalo Bot Webhook
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/zalo_custom_bot_webhook.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/zalo_custom_bot_webhook.yaml
   description: |-
     # A Zalo bot enabling seamless two-way communication with Home Assistant.
 

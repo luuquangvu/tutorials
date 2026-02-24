@@ -1,7 +1,7 @@
 blueprint:
   name: Telegram Bot Webhook
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/telegram_bot_webhook.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/telegram_bot_webhook.yaml
   description: |-
     # A Telegram bot enabling seamless two-way communication with Home Assistant.
 

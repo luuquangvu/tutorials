@@ -1,7 +1,7 @@
 blueprint:
   name: Voice - Get YouTube Video Info
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/get_youtube_video_info_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/get_youtube_video_info_full_llm.yaml
   description: |-
     # Tool gets YouTube video info used for Voice Assistant
 
