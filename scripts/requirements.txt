@@ -6,7 +6,5 @@ orjson
 google-api-python-client
 
 # traffic_fine_lookup_tool
-pillow
 beautifulsoup4
-google-genai
-google-api-core
+curl-cffi

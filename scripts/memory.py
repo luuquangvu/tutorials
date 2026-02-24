@@ -3,12 +3,11 @@ import re
 import sqlite3
 import threading
 import time
+import unicodedata
 from contextlib import closing
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-
-import unicodedata
 
 DB_PATH = Path("/config/memory.db")
 RESULT_ENTITY = "sensor.memory_result"
@@ -24,7 +23,7 @@ BM25_WEIGHT = 0.5
 EXTRA_CHAR_REPLACEMENTS = {
     "đ": "d",
     "Đ": "d",
-    "ı": "i",
+    "ı": "i",  # noqa: RUF001
     "İ": "i",
     "ñ": "n",
     "Ñ": "n",
@@ -81,7 +80,7 @@ def _ensure_result_entity_name(force: bool = False) -> None:
 @pyscript_compile  # noqa: F821
 def _utcnow_iso() -> str:
     """Return the current UTC time as an ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 @pyscript_compile  # noqa: F821
@@ -476,7 +475,7 @@ def _fetch_with_expiry(
     expires_at = row["expires_at"]
     if expires_at:
         dt = _dt_from_iso(expires_at)
-        if dt and datetime.now(timezone.utc) > dt:
+        if dt and datetime.now(UTC) > dt:
             return True, row
     return False, row
 
@@ -736,7 +735,7 @@ def _memory_forget_db_sync(key_norm: str) -> int:
 def _memory_purge_expired_db_sync(grace_days: int = 0) -> int:
     """Remove expired rows older than the grace period and report how many were purged."""
     grace = max(int(grace_days), 0)
-    cutoff_dt = datetime.now(timezone.utc) - timedelta(days=grace)
+    cutoff_dt = datetime.now(UTC) - timedelta(days=grace)
     cutoff_iso = cutoff_dt.isoformat()
     for attempt in range(2):
         try:
@@ -1021,13 +1020,10 @@ async def memory_set(
     try:
         scope_norm = ("" if scope is None else str(scope).strip()).lower() or "user"
         value_norm = _normalize_value(value)
-        if tags:
-            tags_raw = _normalize_value(tags)
-        else:
-            tags_raw = _normalize_value(key)
+        tags_raw = _normalize_value(tags) if tags else _normalize_value(key)
         tags_search = _normalize_tags(tags_raw)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_iso = now.isoformat()
         expires_at = (
             (now + timedelta(days=expiration_days_i)).isoformat()

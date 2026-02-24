@@ -1115,9 +1115,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
                 "days_remaining" if days >= 0 else "days_elapsed"
             )
             response["relative_to"] = datetime.date.today().isoformat()
-            response["lunar_date_meta"] = {
-                "leap_month": True if lunar_date[3] == 1 else False
-            }
+            response["lunar_date_meta"] = {"leap_month": lunar_date[3] == 1}
             response["full_lunar_date_vi"] = (
                 f"{DAYS[get_day_of_week(day, month, year)]} ngày {lunar_date[0]} tháng {lunar_month} năm {can_chi_year}"
             )

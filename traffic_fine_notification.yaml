@@ -14,19 +14,12 @@ blueprint:
     - Cần sao chép tập tin `scripts/requirements.txt` vào thư mục `config/pyscript`.
     - Các tệp được đề cập bên trên đều có sẵn trong kho lưu trữ Github.
     - Cần kích hoạt hai tùy chọn Pyscript thông qua giao diện người dùng hoặc qua YAML để cho phép nhập tất cả các gói Python và để biến hass thành một biến toàn cục.
-    - Cần cấu hình 1 khóa Gemini API trong `config/configuration.yaml` và `config/secrets.yaml` sử dụng cho việc giải mã CAPTCHA.
 
     ```
     # File configuration.yaml
     pyscript:
       allow_all_imports: true
       hass_is_global: true
-      gemini_api_key: !secret gemini_api_key
-    ```
-
-    ```
-    # File secrets.yaml
-    gemini_api_key: XXXXXX      # Retrieve the key from the Google Cloud Console.
     ```
 
     ## Hướng dẫn cài đặt
@@ -57,7 +50,7 @@ blueprint:
           - action: pyscript.traffic_fine_lookup_tool
             data:
               license_plate: 30G12345     # Biển số xe
-              vehicle_type: "1"     # Kiểu phương tiện
+              vehicle_type: car     # Kiểu phương tiện
             response_variable: response
         sensor:
           - name: 30G12345      # Biển số xe
@@ -70,13 +63,13 @@ blueprint:
 
     - Thay biển số bằng biển số xe của bạn, lưu ý phân biệt chữ hoa chữ thường.
     - vehicle_type:
-      - "1": Ô tô
-      - "2": Xe máy
-      - "3": Xe máy điện
+      - car: Ô tô
+      - motorbike: Xe máy
+      - electricbike: Xe điện
     - icon (tùy chọn):
       - "mdi:car": Ô tô
       - "mdi:motorbike": Xe máy
-      - "mdi:motorbike-electric": Xe máy điện
+      - "mdi:motorbike-electric": Xe điện
     - Lưu lại cấu hình.
     - Developer Tools - YAML - Reload Template Entities.
     - Dữ liệu phạt nguội có thể không có luôn mà sẽ có sau khi đến thời gian tra cứu.
@@ -110,7 +103,7 @@ blueprint:
 mode: queued
 max_exceeded: silent
 variables:
-  version: 20250923
+  version: 20260223
 triggers:
   - trigger: state
     entity_id: !input vehicles

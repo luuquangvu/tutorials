@@ -14,19 +14,12 @@ blueprint:
     - The `scripts/requirements.txt` file needs to be copied into the `config/pyscript` folder.
     - The mentioned file(s) is/are included in the repository.
     - You need to enable two Pyscript options through the UI or via YAML to allow importing all Python packages and to make hass available as a global variable.
-    - A Gemini API key needs to be configured in `config/configuration.yaml` and `config/secrets.yaml`, as it's required for solving CAPTCHAs.
 
     ```
     # File configuration.yaml
     pyscript:
       allow_all_imports: true
       hass_is_global: true
-      gemini_api_key: !secret gemini_api_key
-    ```
-
-    ```
-    # File secrets.yaml
-    gemini_api_key: XXXXXX      # Retrieve the key from the Google Cloud Console.
     ```
 
     ### Optional
@@ -64,12 +57,12 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. exact value: '1' (car), '2' (motorbike), '3' (electric bicycle). Do not guess.
+            Mandatory. exact value: 'car', 'motorbike', or 'electricbike'. Do not guess.
 mode: parallel
 max_exceeded: silent
 description: Queries traffic violation databases using a license plate and vehicle type to retrieve fine details accurately.
 variables:
-  version: 20260207
+  version: 20260223
 fields:
   license_plate:
     name: License Plate
@@ -84,13 +77,13 @@ fields:
       select:
         options:
           - label: Car
-            value: "1"
+            value: car
           - label: Motorbike
-            value: "2"
-          - label: Electric Bicycle
-            value: "3"
+            value: motorbike
+          - label: Electric Bike
+            value: electricbike
     required: true
-    default: "1"
+    default: car
 sequence:
   - variables:
       license_plate: "{{ license_plate | default('') | trim }}"
