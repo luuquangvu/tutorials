@@ -457,6 +457,7 @@ async def send_telegram_message(
             return {"error": "Failed to send message"}
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -501,6 +502,7 @@ async def get_telegram_file(file_id: str) -> dict[str, Any]:
             response["supported"] = False
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -515,6 +517,7 @@ async def get_telegram_webhook() -> dict[str, Any]:
         session = await _ensure_session()
         return await _get_webhook_info(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -545,6 +548,7 @@ async def set_telegram_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             response["webhook_id"] = webhook_id
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -559,6 +563,7 @@ async def delete_telegram_webhook() -> dict[str, Any]:
         session = await _ensure_session()
         return await _delete_webhook(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -609,6 +614,7 @@ async def get_telegram_updates(
             }
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -623,6 +629,7 @@ async def get_telegram_bot_info() -> dict[str, Any]:
         session = await _ensure_session()
         return await _get_me(session)
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -688,6 +695,7 @@ async def send_telegram_chat_action(
             return {"error": "Failed to send message"}
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -768,4 +776,5 @@ async def send_telegram_photo(
             return {"error": "Failed to send photo"}
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}

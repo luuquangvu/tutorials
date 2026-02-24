@@ -180,6 +180,7 @@ async def get_zalo_file_custom_bot(url: str) -> dict[str, Any]:
             response["supported"] = False
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
 
 
@@ -209,4 +210,5 @@ async def generate_webhook_id() -> dict[str, Any]:
             )
         return response
     except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
