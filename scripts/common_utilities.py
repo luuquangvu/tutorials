@@ -54,7 +54,7 @@ def _acquire_index_lock(key: str):
 
 @pyscript_compile  # noqa: F821
 def _get_db_connection() -> sqlite3.Connection:
-    """Establish a database connection with optimized settings."""
+    """Create a configured SQLite connection with optimized PRAGMAs."""
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA temp_store=MEMORY;")
@@ -64,7 +64,7 @@ def _get_db_connection() -> sqlite3.Connection:
 
 @pyscript_compile  # noqa: F821
 def _ensure_cache_db() -> None:
-    """Create the cache database directory, SQLite file, and schema if they do not already exist."""
+    """Initialize the cache database schema and directory."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with closing(_get_db_connection()) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -99,21 +99,21 @@ def _ensure_cache_db_once(force: bool = False) -> None:
 
 @pyscript_compile  # noqa: F821
 def _reset_cache_ready() -> None:
-    """Mark the cache database schema as stale so it will be recreated."""
+    """Mark the cache database schema as stale."""
     global _CACHE_READY
     with _CACHE_READY_LOCK:
         _CACHE_READY = False
 
 
 def _cache_prepare_db_sync(force: bool = False) -> bool:
-    """Ensure the cache database is ready for use."""
+    """Synchronously ensure the cache database is ready."""
     _ensure_cache_db_once(force=force)
     return True
 
 
 @pyscript_compile  # noqa: F821
 def _prune_expired_sync() -> int:
-    """Prune expired entries from the cache database."""
+    """Remove expired entries from the cache database."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once()
@@ -136,7 +136,7 @@ def _prune_expired_sync() -> int:
 
 @pyscript_compile  # noqa: F821
 def _cache_get_sync(key: str) -> str | None:
-    """Retrieve the cached value for a key if it exists and has not expired."""
+    """Fetch a cache record synchronously by key."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -166,7 +166,7 @@ def _cache_get_sync(key: str) -> str | None:
 
 @pyscript_compile  # noqa: F821
 def _cache_set_sync(key: str, value: str, ttl_seconds: int) -> bool:
-    """Persist a cache entry with the provided TTL."""
+    """Persist or update a cache entry synchronously."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -196,7 +196,7 @@ def _cache_set_sync(key: str, value: str, ttl_seconds: int) -> bool:
 
 @pyscript_compile  # noqa: F821
 def _cache_delete_sync(key: str) -> int:
-    """Remove the cache entry identified by key if it exists."""
+    """Remove a cache entry synchronously by key."""
     for attempt in range(2):
         try:
             _ensure_cache_db_once(force=attempt == 1)
@@ -231,18 +231,18 @@ async def _cache_set(key: str, value: str, ttl_seconds: int) -> bool:
 
 
 async def _cache_delete(key: str) -> int:
-    """Remove the cache entry identified by key if it exists."""
+    """Remove a cache entry by key."""
     return await asyncio.to_thread(_cache_delete_sync, key)
 
 
 async def _prune_expired() -> int:
-    """Async wrapper for pruning expired entries."""
+    """Async wrapper for pruning expired cache entries."""
     return await asyncio.to_thread(_prune_expired_sync)
 
 
 @time_trigger("startup")  # noqa: F821
 async def initialize_cache_db() -> None:
-    """Run once at startup to create the cache database and schema before services execute."""
+    """Initialize cache and prune expired entries on startup."""
     await _cache_prepare_db(force=True)
     await _prune_expired()
 
@@ -369,8 +369,8 @@ async def memory_cache_set(
             mode: box
     """
     ttl = ttl_seconds if ttl_seconds is not None and ttl_seconds > 0 else TTL
-    stored_value = orjson.dumps(value).decode("utf-8")
     try:
+        stored_value = orjson.dumps(value).decode("utf-8")
         async with _acquire_index_lock(key):
             success = await _cache_set(key, stored_value, ttl)
         if not success:
