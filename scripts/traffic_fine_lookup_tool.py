@@ -236,7 +236,7 @@ async def _get_recaptcha_version(ss: AsyncSession) -> str | None:
     """Fetch the current reCAPTCHA JS version from Google's API."""
     try:
         api_url = f"https://www.google.com/recaptcha/api.js?render={RECAPTCHA_SITEKEY}"
-        resp = await ss.get(api_url, timeout=60)
+        resp = await ss.get(api_url)
         resp.raise_for_status()
         match = re.search(r"/recaptcha/releases/([^/]+)/", resp.text)
         return match.group(1) if match else None
@@ -259,7 +259,7 @@ async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[Non
             f"&size=invisible&cb={int(time.time() * 1000)}"
         )
 
-        resp_anchor = await ss.get(anchor_url, timeout=60)
+        resp_anchor = await ss.get(anchor_url)
         resp_anchor.raise_for_status()
 
         match = re.search(r'id="recaptcha-token"\s+value="([^"]+)"', resp_anchor.text)
@@ -286,7 +286,7 @@ async def _get_recaptcha_token(ss: AsyncSession) -> tuple[str, None] | tuple[Non
         }
 
         resp_reload = await ss.post(
-            reload_url, data=reload_data, headers=reload_headers, timeout=60
+            reload_url, data=reload_data, headers=reload_headers
         )
         resp_reload.raise_for_status()
 
@@ -391,12 +391,13 @@ async def _check_license_plate(
     license_plate: str, vehicle_type: str, retry_count: int = 0
 ) -> dict[str, Any]:
     """Execute the end-to-end lookup flow against csgt.vn with retries."""
-    async with AsyncSession(impersonate="chrome") as ss:
+    browsers = ["chrome", "safari", "safari_ios"]
+    async with AsyncSession(impersonate=random.choice(browsers), timeout=60) as ss:
         try:
-            await ss.get(BASE_URL, timeout=60)
-            await asyncio.sleep(random.uniform(0.5, 1.5))
+            await ss.get(BASE_URL)
+            await asyncio.sleep(random.uniform(3, 6))
 
-            resp_page = await ss.get(LOOKUP_URL, timeout=60)
+            resp_page = await ss.get(LOOKUP_URL)
             resp_page.raise_for_status()
 
             token_match = re.search(r'name="_token"\s+value="([^"]+)"', resp_page.text)
@@ -406,14 +407,14 @@ async def _check_license_plate(
 
             csrf_token = token_match.group(1)
 
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            await asyncio.sleep(random.uniform(3, 6))
             recaptcha_token, error = await _get_recaptcha_token(ss)
             if not recaptcha_token:
                 if retry_count < RETRY_LIMIT:
                     log.warning(  # noqa: F821
                         f"reCAPTCHA failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}"
                     )
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(random.uniform(30, 60))
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
@@ -438,7 +439,7 @@ async def _check_license_plate(
                 }
             )
 
-            resp = await ss.post(POST_URL, data=form_data, headers=headers, timeout=60)
+            resp = await ss.post(POST_URL, data=form_data, headers=headers)
 
             if resp.status_code == 429:
                 try:
@@ -454,7 +455,7 @@ async def _check_license_plate(
                     log.warning(  # noqa: F821
                         f"Rate limited (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
-                    await asyncio.sleep(60)
+                    await asyncio.sleep(random.uniform(30, 60))
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
@@ -467,7 +468,7 @@ async def _check_license_plate(
                     log.warning(  # noqa: F821
                         f"Verification failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(random.uniform(30, 60))
                     return await _check_license_plate(
                         license_plate, vehicle_type, retry_count + 1
                     )
@@ -493,7 +494,7 @@ async def _check_license_plate(
         except (RequestsError, orjson.JSONDecodeError) as error:
             if retry_count < RETRY_LIMIT:
                 log.warning(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")  # noqa: F821
-                await asyncio.sleep(30)
+                await asyncio.sleep(random.uniform(30, 60))
                 return await _check_license_plate(
                     license_plate, vehicle_type, retry_count + 1
                 )
