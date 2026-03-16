@@ -1,12 +1,12 @@
 # Unique Home Assistant Blueprints & Tutorials
 
+**[ 🇺🇸 English | [🇻🇳 Tiếng Việt](README.md) ]**
+
 **Google has recently significantly cut back on the free Gemini API, making it almost impossible to meet the usage needs of Home Assistant. You can find [a completely free alternative solution here](https://github.com/luuquangvu/ha-addons).**
 
 _All blueprints in this collection are fine-tuned to work best with **Gemini Flash** models. Other models may require minor adjustments to behave as expected._
 
 Transform Home Assistant into a fully-fledged personal teammate with this curated collection of blueprints and guides. Every scenario has been proven in real homes, backed by clear explanations, example voice prompts, and deployment tips so you can bring each idea to life right away.
-
-**[🇻🇳 Tiếng Việt](README.md)**
 
 ---
 
