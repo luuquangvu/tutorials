@@ -26,19 +26,23 @@ blueprint:
 
     ### Thêm Template Sensor cho từng xe theo mẫu bên dưới vào trong `config/configuration.yaml` của Home Assistant
 
-    - Trong đó Sensor Time to Check để khai báo thời gian ngẫu nhiên thực hiện tra cứu, tối thiểu ngày 2 lần.
+    - Trong đó Sensor Time to Check để khai báo thời gian ngẫu nhiên thực hiện tra cứu.
     - Sensor Biển Số sẽ lưu thông tin phạt nguội của xe.
+    - Do trang csgt.vn có hệ thống chống bot sử dụng reCAPTCHA v3 cực kỳ phức tạp, đồng thời giới hạn số lần tra cứu/ngày, nên việc tra cứu sẽ được thực hiện ngẫu nhiên để tăng khả năng tra cứu thành công.
+    - Nếu bạn có nhiều xe, hãy thêm nhiều sensor theo mẫu, thay đổi Biển Số và Sensor Time to Check tương ứng. Lưu ý rằng số lượng xe càng nhiều thì tần suất tra cứu cần được điều chỉnh giảm (ví dụ: từ 2 lần/ngày xuống còn 1 lần/ngày), cũng như thay đổi khoảng thời gian tra cứu ngẫu nhiên (ví dụ: mỗi xe cách nhau mỗi 3 giờ) để tránh bị hệ thống chặn.
 
     ```
     # File configuration.yaml
     template:
       - triggers:
-          - trigger: time_pattern
-            hours: /6
+          - trigger: time
+            at:
+              - "06:00:00"      # Mốc thời gian tra cứu, được cộng thêm ngẫu nhiên trong khoảng 1-180 phút để tránh bị hệ thống chặn.
+              - "18:00:00"      # Không nên tra cứu quá nhiều lần trong ngày, ví dụ: 2 lần/ngày, mỗi lần cách nhau ít nhất 6 giờ.
           - trigger: event
             event_type: event_template_reloaded
         sensor:
-          - name: Time to Check 30G12345      # Biển số xe
+          - name: Time to Check 30G12345          # Biển số xe
             unique_id: time_to_check_30g12345     # Biển số xe
             icon: mdi:clock-digital
             device_class: timestamp
@@ -50,10 +54,10 @@ blueprint:
           - action: pyscript.traffic_fine_lookup_tool
             data:
               license_plate: 30G12345     # Biển số xe
-              vehicle_type: car     # Kiểu phương tiện
+              vehicle_type: car           # Kiểu phương tiện
             response_variable: response
         sensor:
-          - name: 30G12345      # Biển số xe
+          - name: 30G12345          # Biển số xe
             unique_id: 30g12345     # Biển số xe
             icon: mdi:car
             state: "{{ response.message if response.get('status') else response.get('error') }}"

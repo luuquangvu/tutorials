@@ -1,12 +1,12 @@
 # Bộ sưu tập Blueprint và Hướng dẫn độc đáo cho Home Assistant
 
+**[ [🇺🇸 English](README.en.md) | 🇻🇳 Tiếng Việt ]**
+
 **Gần đây, Google đã cắt giảm đáng kể API Gemini miễn phí, khiến nó gần như không thể đáp ứng nhu cầu sử dụng của Home Assistant. Các bạn có thể tham khảo [một giải pháp thay thế hoàn toàn miễn phí tại đây](https://github.com/luuquangvu/ha-addons).**
 
 _Tất cả blueprint trong bộ sưu tập này được tinh chỉnh để hoạt động tối ưu với các mô hình (model) **Gemini Flash**. Các mô hình ngôn ngữ khác có thể cần điều chỉnh nhỏ để đạt hiệu quả tương tự._
 
 Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ sưu tập blueprint và hướng dẫn chi tiết. Mọi kịch bản đều đã được kiểm chứng trong thực tế, đi kèm giải thích rõ ràng, ví dụ lệnh thoại và mẹo triển khai để bạn có thể áp dụng ngay cho ngôi nhà thông minh của mình.
-
-**[🇺🇸 English](README.en.md)**
 
 ---
 
