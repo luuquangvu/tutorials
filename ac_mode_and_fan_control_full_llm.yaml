@@ -75,7 +75,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Provide AC names to control. Use semicolons (;) to separate multiple names.
+            Required: AC names to control. Separate multiple with semicolon (;).
         hvac_mode_prompt:
           name: HVAC Mode Prompt
           description: The prompt which will be used for the LLM can provide the AC mode.
@@ -83,7 +83,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Set AC mode (auto, cool, heat, dry, fan_only, off). Include ONLY if explicitly requested. Return error if unsupported; do not guess.
+            AC mode (`auto`, `cool`, `heat`, `dry`, `fan_only`, `off`). Only if requested. Error if unsupported; no guessing.
         temperature_prompt:
           name: Temperature Prompt
           description: The prompt which will be used for the LLM can provide the target temperature.
@@ -91,7 +91,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Target temperature as a number (e.g. 24). Convert F to C if needed. Omit units (C/F). Include ONLY for explicit requests.
+            Target temp as number (e.g. `24`). Convert F to C. No units. Only if requested.
         fan_mode_prompt:
           name: Fan Mode Prompt
           description: The prompt which will be used for the LLM can provide the fan speed/mode of the AC.
@@ -99,7 +99,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Set fan speed (auto, low/1, lowmid/2, mid/3, highmid/4, high/5). Map to the closest supported mode. Include ONLY if requested. Error if no match; do not guess.
+            Fan speed (`auto`, `low`/`1`, `lowmid`/`2`, `mid`/`3`, `highmid`/`4`, `high`/`5`). Map to closest. Only if requested. No guessing.
 mode: parallel
 max_exceeded: silent
 description: Controls mode, temperature, and fan speed for air conditioners. Supports auto, cool, heat, dry, and fan_only modes.

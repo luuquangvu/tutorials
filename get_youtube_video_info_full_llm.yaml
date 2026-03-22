@@ -89,7 +89,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. YouTube channel names. Semicolon-separated if multiple. Silence-correct mispronunciations. After results, ask to play; use ordinal numbers, omit Media IDs.
+            Required: Channel names (semicolon-separated). Silence-correct. After results, ask to play using ordinals, omit Media IDs.
         period_length_prompt:
           name: Period Length Prompt
           description: The prompt which will be used for the LLM can provide the length of the period for the query.
@@ -97,7 +97,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional. Days since published (1-30). Default: 3. Today=1, Week=7, Month=30.
+            Optional: Days since published (1-30). Default: 3. Today=1, Week=7, Month=30.
 mode: parallel
 max_exceeded: silent
 description: Fetches a list of the most recent video uploads from one or more specified YouTube channels within a set timeframe.

@@ -49,7 +49,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Alphanumeric, no spaces. Silence-correct mispronunciations. Correct to most likely intended plate.
+            Required: Alphanumeric, no spaces. Silence-correct mispronunciations.
         vehicle_type_prompt:
           name: Vehicle Type Prompt
           description: The prompt which will be used for the LLM can provide the type of vehicle for the query.
@@ -57,7 +57,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. exact value: 'car', 'motorbike', or 'electricbike'. Do not guess.
+            Required: `car`, `motorbike`, or `electricbike`. No guessing.
 mode: parallel
 max_exceeded: silent
 description: Queries traffic violation databases using a license plate and vehicle type to retrieve fine details accurately.

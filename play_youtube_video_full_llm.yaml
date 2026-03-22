@@ -51,7 +51,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. YouTube video ID. Do not guess.
+            Required: YouTube video ID. No guessing.
 mode: parallel
 max_exceeded: silent
 description: Initiates playback of a specific YouTube video (by ID) on a supported media player device.

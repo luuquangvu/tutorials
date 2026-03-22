@@ -108,35 +108,35 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. exactly one: start (queue), cancel (stop latest), cancel_all (stop every), extend (add duration), pause (freeze), resume (restart), list (report). Output bare keyword only.
+            Required: `start`, `cancel`, `cancel_all`, `extend`, `pause`, `resume`, `list`. Keyword only.
         entities_prompt:
           name: Entities prompt
           selector:
             text:
               multiline: true
           default: |-
-            Entities to control (name/ID/alias). Semicolon-separated. Required for start, cancel, extend, pause, resume. Optional for list, cancel_all. Remove duplicates.
+            Entities (name/ID/alias). Semicolon-separated. Required for start/cancel/extend/pause/resume. Deduplicate.
         action_prompt:
           name: Action prompt
           selector:
             text:
               multiline: true
           default: |-
-            Required for start. use snake_case: turn_on/off, set_brightness/fan_speed/temperature/humidity/hvac_mode/volume, activate (scene), run_script, open/close, stop_cover, set_position, media_play/pause/stop, start/return_vacuum, press (button), announce (TTS).
+            Required for `start`. Snake_case action (`turn_on`/`off`, `set_brightness`, etc).
         value_prompt:
           name: Value prompt
           selector:
             text:
               multiline: true
           default: |-
-            Required for start if action needs value: 0-100 (pct/vol), numeric (temp), hvac_mode (cool/heat/etc), color name, boolean (oscillation), or text (announce). Empty if not needed.
+            Required for `start` if action needs value. Empty if not.
         duration_prompt:
           name: Duration prompt
           selector:
             text:
               multiline: true
           default: |-
-            Required for start or extend. Formats: HH:MM:SS, MM:SS, or seconds (e.g., 00:10:00, 600). Empty if not needed.
+            Required for `start`/`extend`. Format: `HH:MM:SS`, `MM:SS`, or seconds. Empty if not.
 mode: parallel
 max_exceeded: silent
 description: Advanced controller for managing multiple device timers. Can start, cancel, pause, resume, or list scheduled actions for various entities.

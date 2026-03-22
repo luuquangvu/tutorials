@@ -75,7 +75,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. 'daily' for full days (today, weekend, etc.); 'hourly' for partial days (this morning, at 3 PM, etc.). Output exactly: daily|hourly.
+            Required: `daily` (full days) or `hourly` (partial days). Exact output.
         time_period_length_prompt:
           name: Time period length prompt
           description:
@@ -86,7 +86,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. Integer length. Number of days (if daily) or hours (if hourly). E.g., 1 (today), 2 (weekend), 6 (afternoon/evening periods).
+            Required: Integer length. Days (if daily) or hours (if hourly).
         date_prompt:
           name: Date prompt
           description:
@@ -97,7 +97,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. Start date (YYYY-MM-DD). Default today. For 'night' requests, use next day's date unless current time is < 05:00:00.
+            Required: Start date (`YYYY-MM-DD`). Default today. `Night` = next day if >=`05:00:00`.
         time_prompt:
           name: Time prompt
           description:
@@ -108,7 +108,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. Start time (HH:MM:SS). Full day = 00:00:00. Morning = 06:00:00, Afternoon = 12:00:00, Evening = 18:00:00, Night = 00:00:00.
+            Required: Start time (`HH:MM:SS`). Morning=`06:00:00`, Afternoon=`12:00:00`, Evening=`18:00:00`, Night/Full day=`00:00:00`.
 mode: parallel
 max_exceeded: silent
 description: Retrieves home weather forecasts for specific periods (hourly or daily). Mandatory input for period type, length, start date, and time. Use 'daily' for full days and 'hourly' for partial day requests.

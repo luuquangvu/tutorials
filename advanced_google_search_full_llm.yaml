@@ -56,7 +56,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Search query. Silence-correct misspellings if likely intended. Do not ask for clarification.
+            Required: Search query. Silence-correct misspellings. No clarification.
         language_prompt:
           name: Language Prompt
           description: The prompt which will be used for the LLM can provide the language for the query.
@@ -64,7 +64,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Language tag (e.g. vi-VN, en-US). Must match user language.
+            Required: Language tag (e.g. `en-US`). Match user language.
 mode: parallel
 max_exceeded: silent
 description: Searches Google to retrieve real-time information, facts, or answers from the web. Use when local knowledge is insufficient.

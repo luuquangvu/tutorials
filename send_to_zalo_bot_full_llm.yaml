@@ -68,7 +68,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. ≤10 words overview (person/object/location). If image, write caption. Plain text only. For multiple items, use separate tool calls.
+            Required: <=10 words overview/caption. Plain text. Multiple items = multiple calls.
         detail_prompt:
           name: Detail Prompt
           description: The prompt which will be used for the LLM can provide the message detail.
@@ -76,7 +76,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional. Full details. No links/markdown/emojis. Plain text only. For multiple items, use separate tool calls.
+            Optional: Full details. No links/markdown/emojis. Multiple items = multiple calls.
         content_type_prompt:
           name: Content Type Prompt
           description: The prompt which will be used for the LLM can specify the type of content for the message.
@@ -84,8 +84,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. exactly one: information, location, image. location=place/address/map. image=visual media (+ image_path).
-            When submitting multiple items, use separate tool calls for each.
+            Required: `information`, `location`, or `image`. Multiple items = multiple calls.
         location_prompt:
           name: Location Prompt
           description: The prompt which will be used for the LLM can provide the location for the place.
@@ -93,7 +92,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional for location. Address only. No commas/punctuation. Regular spaces.
+            Optional for `location`: Address only. No commas/punctuation.
         image_path_prompt:
           name: Image Path Prompt
           description: Prompt shown to the LLM to request the media path when sending an image.
@@ -101,7 +100,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional for image. Existing path (local/ or /media/). Do not guess if unknown.
+            Optional for `image`: Existing path (`local/`, `/media/`). No guessing.
         chat_id_override_prompt:
           name: Chat ID Override Prompt
           description: Prompt shown to the LLM to request an alternate chat when needed.
@@ -109,7 +108,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional. User-specified Zalo ID. No spaces/commentary.
+            Optional: User-specified Zalo ID. No spaces.
 mode: queued
 max: 30
 max_exceeded: silent

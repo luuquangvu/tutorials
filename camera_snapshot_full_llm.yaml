@@ -100,7 +100,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Camera friendly name. If unclear, determine from context or suggest. For multiple cameras, use separate tool calls. Returns local image path.
+            Required: Camera friendly name. Multiple cameras = multiple calls. Returns local image path.
 mode: parallel
 max_exceeded: silent
 description: Captures and saves a camera snapshot. Returns the local file path for analysis or messaging tools. Useful for visual verification of a scene.
