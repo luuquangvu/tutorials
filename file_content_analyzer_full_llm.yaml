@@ -52,7 +52,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Specify exact data to extract from image/video/audio/doc. Returns plain text only. Do not invent details.
+            Required: Exact data to extract. Returns plain text. Do not invent.
         file_path_prompt:
           name: File Path Prompt
           description: The prompt which will be used for the LLM can provide the file path for the query.
@@ -60,7 +60,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Relative path starting with `local/`. Must be precise.
+            Required: Relative path (`local/*`). Precise.
         mime_type_prompt:
           name: MIME Type Prompt
           description: The prompt which will be used for the LLM can provide the MIME type of file for the query.
@@ -68,7 +68,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. File MIME type (e.g., image/jpeg, video/mp4, application/pdf). Must match file content.
+            Required: MIME type (e.g., `image/jpeg`). Must match content.
 mode: parallel
 max_exceeded: silent
 description: Processes and analyzes file content (images, video, audio, or text) to provide summaries, transcriptions, or visual recognition based on instructions.

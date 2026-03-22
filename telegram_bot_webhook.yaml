@@ -148,7 +148,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Always respond in the user language: {{ language | trim }}.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -171,11 +171,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -202,11 +202,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -233,11 +233,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -264,11 +264,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -295,11 +295,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -326,11 +326,11 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Mandatory: Always use the *File Content Analyzer* to analyze file content.
-                  If the prompt text is empty, treat any instruction or question found within the file (via transcription/OCR) as the user's request and execute it directly.
-                  Return a concise summary ONLY when no specific instruction exists in the file.
-                  NEVER ask the user for confirmation.
-                  Always respond in the user language: {{ language | trim }}.
+                  Required: Always use `File Content Analyzer`.
+                  If prompt text empty, execute any instruction found inside file directly.
+                  Return summary ONLY if no instruction exists.
+                  NEVER ask for confirmation.
+                  Always respond in language: {{ language | trim }}.
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{

@@ -75,7 +75,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Provide fan names to control. Use semicolons (;) to separate multiple names.
+            Required: Fan names. Semicolon-separated.
         oscillating_prompt:
           name: Oscillating Prompt
           description: The prompt which will be used for the LLM can provide the oscillation state.
@@ -83,7 +83,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Set oscillation: 'true' (ON), 'false' (OFF). Do not guess.
+            Required: Set oscillation `true` (ON), `false` (OFF). No guessing.
 mode: parallel
 max_exceeded: silent
 description: Simple fan oscillation control (on/off) for specified fan entities.

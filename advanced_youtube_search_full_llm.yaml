@@ -71,7 +71,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Search query. Silence-correct misspellings. For results, use ordinal numbers for selection; omit Media IDs. Confirm before proceeding if query is ambiguous.
+            Required: Search query. Silence-correct misspellings. Use ordinals for results, omit Media IDs. Confirm if ambiguous.
         page_token_prompt:
           name: Page Token Prompt
           description: The prompt which will be used for the LLM can provide the page token to get additional videos that could be obtained.
@@ -79,7 +79,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional. Use to fetch more videos if initial results are unsatisfactory.
+            Optional: Token to fetch more videos.
 mode: parallel
 max_exceeded: silent
 description: Searches YouTube for videos and returns a list of matching results with titles and descriptions. Use to find specific content or playlists.

@@ -82,7 +82,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. Values: track (single/list), album, artist, playlist, radio. Default to 'track' for genre/mood requests and list matching songs in media_id.
+            Required: track, album, artist, playlist, radio. Default: `track` for genre/mood/list.
         artist_prompt:
           name: Artist Prompt
           description: The prompt that the LLM will use to provide the artist.
@@ -90,8 +90,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            Requested artist or track artist. Empty string if unknown or multiple artists requested.
+          default: |-
+            Requested artist(s). Empty if unknown/multiple.
         album_prompt:
           name: Album Prompt
           description: The prompt that the LLM will use to provide the album.
@@ -99,8 +99,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            Requested album. Empty string if unknown or multiple albums requested.
+          default: |-
+            Requested album. Empty if unknown/multiple.
         media_id_prompt:
           name: Media ID Prompt
           description: The prompt that the LLM will use to provide the media_id.
@@ -109,9 +109,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Mandatory. Specific name(s).
-            - Tracks/Albums: Provide names (semicolon separated). If ambiguous, use "Artist - Track".
-            - Artists/Playlists/Radio: Provide exact name. Remove "playlist" keyword (e.g., "Favorites").
+            Required: Specific name(s). Tracks/Albums: semicolon separated. Artists/Playlists/Radio: exact name (omit `playlist` keyword).
         media_description_prompt:
           name: Media Description Prompt
           description: The prompt that the LLM will use to provide the media description.
@@ -119,12 +117,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            The "media_description" key is used to describe the media which
-            will be played. This can be taken from the voice command query, but it
-            should be only the part which is relevant for the media. So if the voice
-            request is "Play the best Queen songs on the living room player" the value
-            for "media_description" should be "the best Queen songs"
+          default: |-
+            Required: Extracted media description from query (e.g. `the best Queen songs`). Omit area/player details.
         area_prompt:
           name: Area Prompt
           description: The prompt that the LLM will use to provide the area.
@@ -132,8 +126,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            Requested area(s). Default to the area of the initiating device. Omit if player is specified unless both are explicitly named.
+          default: |-
+            Requested area(s). Default to initiating device area. Omit if player specified.
         media_player_prompt:
           name: Media Player Prompt
           description: The prompt that the LLM will use to provide the media player.
@@ -141,8 +135,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            Target Music Assistant media_player entity_id(s). Use ONLY if specifically mentioned.
+          default: |-
+            Target Music Assistant `media_player` entity_id(s). ONLY if explicitly mentioned.
         shuffle_prompt:
           name: Shuffle Prompt
           description: The prompt that the LLM will use to determine whether to turn on shuffle or not.
@@ -150,8 +144,8 @@ blueprint:
             text:
               multiline: true
               multiple: false
-          default:
-            Mandatory. Boolean. Set true ONLY if the user specifically mentions shuffling. Otherwise false. Do not guess.
+          default: |-
+            Required: `true` or `false`. `true` ONLY if shuffling explicitly requested. No guessing.
     addition_conditions_actions:
       name: Additional actions
       icon: mdi:wrench

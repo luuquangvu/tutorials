@@ -81,7 +81,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Provide names of tracked devices (phones, tags, etc.). Use semicolons (;) if multiple. If none specified, provide all relevant tracked devices. Prompt to ring if supported.
+            Required: Tracked device names (semicolon-separated). Ring if supported.
 mode: parallel
 max_exceeded: silent
 description: Retrieves real-time device locations (phones, tags, etc.) within the home. Use to find missing devices or check room presence.

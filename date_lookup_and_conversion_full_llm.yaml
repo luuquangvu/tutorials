@@ -48,7 +48,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. 's2l' (Solar to Lunar) or 'l2s' (Lunar to Solar). Response must include: day of week, both dates, and days remaining/elapsed.
+            Required: `s2l` (Solar->Lunar) or `l2s` (Lunar->Solar). Output day of week, both dates, days diff.
         date_prompt:
           name: Date Prompt
           description: The prompt which will be used for the LLM can provide the input date for the conversion.
@@ -56,7 +56,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Date (YYYY-MM-DD). If year unspecified, use current year. Use today/tomorrow as needed.
+            Required: Date (`YYYY-MM-DD`). If no year, use current.
         leap_month_prompt:
           name: Leap Month Prompt
           description: The prompt which will be used for the LLM can provide the leap month for the conversion.
@@ -64,7 +64,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional for l2s. 'true' for leap month, 'false' for regular. Do not use for s2l.
+            Optional for `l2s`: `true`=leap month, `false`=regular. Skip for `s2l`.
 mode: parallel
 max_exceeded: silent
 description: Converts dates between Solar and Lunar calendars, looks up auspicious days, and determines the day of the week.

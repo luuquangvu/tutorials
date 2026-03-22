@@ -63,7 +63,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Subject or title of the event.
+            Required: Event subject/title.
         description_prompt:
           name: Description Prompt
           description: Detailed description of the event.
@@ -71,7 +71,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional. Full details of the event.
+            Optional: Event details.
         start_date_time_prompt:
           name: Start Time Prompt
           description: Start date and time for timed events.
@@ -79,7 +79,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Use ONLY for timed events (YYYY-MM-DD HH:MM:SS). Excludes start_date.
+            For timed events only (`YYYY-MM-DD HH:MM:SS`). No `start_date`.
         end_date_time_prompt:
           name: End Time Prompt
           description: End date and time for timed events.
@@ -87,7 +87,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory for timed events. Default: start + 2h. Excludes end_date.
+            Required for timed events. Default: start + 2h. No `end_date`.
         start_date_prompt:
           name: Start Date Prompt
           description: Start date for all-day events.
@@ -95,7 +95,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Use ONLY for all-day events (YYYY-MM-DD). Excludes start_date_time.
+            For all-day events only (`YYYY-MM-DD`). No `start_date_time`.
         end_date_prompt:
           name: End Date Prompt
           description: End date for all-day events.
@@ -103,7 +103,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory for all-day events. Default: start + 1 day. Excludes end_date_time.
+            Required for all-day events. Default: start + 1d. No `end_date_time`.
 mode: queued
 max: !input simultaneous
 max_exceeded: silent

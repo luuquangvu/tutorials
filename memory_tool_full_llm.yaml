@@ -49,7 +49,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Choose one: set (save), get (retrieve), search (find), forget (delete). Output exactly: set|get|search|forget.
+            Required: `set`, `get`, `search`, `forget`. Output exact word.
         key_prompt:
           name: Key Prompt
           description: Instruction shown to the LLM for providing the key.
@@ -57,7 +57,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for set|get|forget. Concise key in user language. No translation/paraphrase. Output only the key. Use 'search' if unsure.
+            Required for `set`/`get`/`forget`. Concise key in user language. No translation. Use `search` if unsure.
         value_prompt:
           name: Value Prompt
           description: Instruction shown to the LLM for providing the value.
@@ -65,7 +65,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for set. Raw value only (text/JSON). No quotes/explanations.
+            Required for `set`. Raw value only. No quotes/explanations.
         scope_prompt:
           name: Scope Prompt
           description: Instruction shown to the LLM for choosing the scope.
@@ -73,7 +73,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for set. user|household|session. One token only. Default: user.
+            Required for `set`: `user`, `household`, `session`. Default: `user`.
         expiration_days_prompt:
           name: Expiration (days) Prompt
           description: Instruction shown to the LLM for providing expiration.
@@ -81,7 +81,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for set. Days before expiry (0 = forever). Default: 180. Range 0-3650.
+            Required for `set`: Days before expiry (0=forever). Default: 180. Range 0-3650.
         tags_prompt:
           name: Tags Prompt
           description: Instruction shown to the LLM for providing tags.
@@ -89,7 +89,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for set. Meaningful keywords in user language. Use phrase/key if no keywords.
+            Required for `set`: Keywords in user language. Use phrase/key if none.
         force_new_prompt:
           name: Force New Prompt
           description: Instruction shown to the LLM for deciding whether to override duplicate-tag protection.
@@ -97,7 +97,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Optional for set. true|false. Output 'true' ONLY if user confirms duplicate override. Default: false.
+            Optional for `set`: `true`/`false`. `true` ONLY if user confirms override. Default: false.
         query_prompt:
           name: Query Prompt
           description: Instruction shown to the LLM for providing the search query.
@@ -105,7 +105,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for search. Search term or keywords. No translation/paraphrase. Output only query text.
+            Required for `search`: Search term/keywords. No translation.
         search_limit_prompt:
           name: Search Limit Prompt
           description: Instruction shown to the LLM for providing the search limit.
@@ -113,7 +113,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Required for search. Integer 1-50. Default: 5. Integer only.
+            Required for `search`: Integer 1-50. Default: 5.
 fields:
   operation:
     name: Operation

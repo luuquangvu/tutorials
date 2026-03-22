@@ -87,7 +87,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Provide device names to control. Use semicolons (;) to separate multiple names.
+            Required: Device names. Semicolon-separated.
         control_prompt:
           name: Control Prompt
           description: The prompt which will be used for the LLM can provide the action.
@@ -95,7 +95,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Action: 'true' (ON), 'false' (OFF). Do not guess.
+            Required: Action `true` (ON), `false` (OFF). No guessing.
         timer_prompt:
           name: Timer Prompt
           description: The prompt which will be used for the LLM can provide the delay of action.
@@ -103,7 +103,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Delay as HH:MM:SS. Calculate from current time if a target time is specified. Relative to now.
+            Required: Delay as `HH:MM:SS`. Calculate from now if target specified.
 mode: parallel
 max_exceeded: silent
 description: Simple one-time timer for turning devices on or off after a delay. Use for basic "turn off in X minutes" requests.

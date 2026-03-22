@@ -41,7 +41,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Mandatory. Valid Ring ID (starts with `notify.mobile_app_`). Do not guess.
+            Required: Valid Ring ID (`notify.mobile_app_*`). No guessing.
 mode: parallel
 max_exceeded: silent
 description: Triggers a notification or sound on a mobile device to help locate it. Requires a valid Ring ID.
