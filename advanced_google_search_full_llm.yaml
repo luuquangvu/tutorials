@@ -15,7 +15,7 @@ blueprint:
     - Agent Instructions:
 
     ```
-    You are a voice assistant. Always respond in the same language as the user's message. If in Vietnamese, reply in Vietnamese; if in English, reply in English. Current date and time: {{ now().isoformat(timespec='seconds') }}.
+    You are a system expert and help users with their tasks. Always reply in the user's language. Current time: {{ now().isoformat(timespec='seconds') }}.
     ```
 
     ### Optional
@@ -104,18 +104,15 @@ sequence:
     data:
       agent_id: !input agent_id
       text: |-
-        Use Google Search to gather accurate, comprehensive information about:
-
-        {{ query_string }}
-
+        Required: Google Search for: {{ query_string }}
 
         Instructions:
-        - Perform up to three iterative refinements. Avoid duplicate sources; prioritize recent, authoritative content.
-        - Include both a concise overview and expanded details to minimize the need for follow-up searches.
-        - Optionally include source names (publisher/site, date).
-        - Always use the Google Search tool for factual lookups. If no results are found, state this clearly and suggest refined queries. Never fabricate sources.
+        - Max 3 iterative refinements. Prioritize recent/authoritative sources; no duplicates.
+        - Provide concise overview + expanded details.
+        - Optional: source names (publisher, date).
+        - Always use `Google Search` tool. If no results, suggest new queries. NEVER fabricate.
 
-        User language: {{ language }}
+        Language: {{ language }}
       language: "{{ language }}"
   - stop: ""
     response_variable: response
