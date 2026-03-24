@@ -17,7 +17,7 @@ blueprint:
     - Requires Home Assistant 2024.10.0 or newer.
   domain: automation
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     linked_entities:
       name: Entities

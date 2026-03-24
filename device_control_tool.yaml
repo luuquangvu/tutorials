@@ -15,7 +15,7 @@ blueprint:
     - Do not alter the default script name.
   domain: script
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     custom_settings:
       name: Custom Settings
