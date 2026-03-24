@@ -23,7 +23,7 @@ blueprint:
     - Special thanks to the original blueprint from [music-assistant/voice-support](https://github.com/music-assistant/voice-support). This version has been refined and optimized specifically for use with Gemini.
   domain: script
   homeassistant:
-    min_version: 2024.6.0
+    min_version: 2024.12.0
   input:
     music_assistant_settings:
       name: Settings for Music Assistant playback

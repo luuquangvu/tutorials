@@ -28,7 +28,7 @@ blueprint:
     - Google Calendar requires Read/Write access.
   domain: script
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     calendar_settings:
       name: Settings for Calendar

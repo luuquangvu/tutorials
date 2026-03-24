@@ -24,7 +24,7 @@ blueprint:
     - Once the script is created, click the three dots in the top right corner, choose "Edit in YAML," and remove the `description: ...` line to restore the default. This step is important because it helps the LLM better understand the script's purpose.
   domain: script
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     media_player_settings:
       name: Settings for Media Player

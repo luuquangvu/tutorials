@@ -2,6 +2,9 @@
 
 **[ [🇺🇸 English](README.en.md) | 🇻🇳 Tiếng Việt ]**
 
+> [!TIP]
+> **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: Một tích hợp cực kỳ hữu ích giúp tự động cập nhật các blueprint trong bộ sưu tập này. Khi bạn cài đặt nhiều blueprint từ nhiều nguồn khác nhau, việc theo dõi cập nhật từ các tác giả trở nên khó khăn - tích hợp này sẽ giải quyết vấn đề đó cho bạn hoàn toàn tự động.
+
 **Gần đây, Google đã cắt giảm đáng kể API Gemini miễn phí, khiến nó gần như không thể đáp ứng nhu cầu sử dụng của Home Assistant. Các bạn có thể tham khảo [một giải pháp thay thế hoàn toàn miễn phí tại đây](https://github.com/luuquangvu/ha-addons).**
 
 _Tất cả blueprint trong bộ sưu tập này được tinh chỉnh để hoạt động tối ưu với các mô hình (model) **Gemini Flash**. Các mô hình ngôn ngữ khác có thể cần điều chỉnh nhỏ để đạt hiệu quả tương tự._

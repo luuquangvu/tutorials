@@ -27,7 +27,7 @@ blueprint:
     - Special thanks to the original blueprint from [TheFes/ha-blueprints](https://github.com/TheFes/ha-blueprints). This version has been refined and optimized specifically for use with Gemini.
   domain: script
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     weather_settings:
       name: Weather settings

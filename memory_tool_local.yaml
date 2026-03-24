@@ -28,7 +28,7 @@ blueprint:
     - Check `sensor.memory_result` to quickly view the current status of the Memory Tool.
   domain: automation
   homeassistant:
-    min_version: 2024.10.0
+    min_version: 2024.12.0
   input:
     trigger_settings:
       name: Trigger settings
