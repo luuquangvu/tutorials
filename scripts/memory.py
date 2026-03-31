@@ -325,10 +325,10 @@ async def _search_tag_candidates(
     )
     dedup: dict[str, tuple[dict[str, Any], float]] = {}
     for item in raw_matches:
-        existing_key = _normalize_key(item.get("key"))
+        existing_key = _normalize_key(item.get("key", ""))
         if not existing_key or existing_key in exclude_norm or existing_key in dedup:
             continue
-        score_raw = item.get("match_score")
+        score_raw = item.get("match_score", "")
         score_val: float | None
         if isinstance(score_raw, (int, float)):
             score_val = float(score_raw)
@@ -336,7 +336,7 @@ async def _search_tag_candidates(
             try:
                 score_val = float(score_raw)
             except (TypeError, ValueError):
-                existing_tags_norm = _normalize_tags(item.get("tags"))
+                existing_tags_norm = _normalize_tags(item.get("tags", ""))
                 candidate_tokens = {
                     token for token in existing_tags_norm.split() if token
                 }
