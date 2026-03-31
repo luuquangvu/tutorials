@@ -428,7 +428,7 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
     """
     try:
         if not webhook_id:
-            webhook_id = secrets.token_urlsafe()
+            webhook_id: str = secrets.token_urlsafe()
         external_url = _external_url()
         if not external_url:
             return {

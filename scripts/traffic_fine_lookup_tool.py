@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 import orjson
-from bs4 import BeautifulSoup
 from curl_cffi.requests import AsyncSession, RequestsError
 
 TTL = 30
@@ -341,6 +340,8 @@ async def _get_recaptcha_clr(ss: AsyncSession) -> None:
 @pyscript_compile  # noqa: F821
 def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
     """Parse traffic violations from csgt.vn result HTML."""
+    from bs4 import BeautifulSoup
+
     soup = BeautifulSoup(result_html, "html.parser")
     violation_cards = soup.find_all("div", class_="violation-card")
 

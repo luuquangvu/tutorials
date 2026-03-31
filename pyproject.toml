@@ -9,7 +9,7 @@ dependencies = [
     "beautifulsoup4",
     "curl-cffi",
     "google-api-python-client",
-    "homeassistant>=2026.3",
+    "homeassistant",
     "orjson",
 ]
 

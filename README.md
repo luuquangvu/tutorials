@@ -1,667 +1,673 @@
-# Bộ sưu tập Blueprint và Hướng dẫn độc đáo cho Home Assistant
+# Unique Home Assistant Blueprints & Tutorials
 
-**[ [🇺🇸 English](README.en.md) | 🇻🇳 Tiếng Việt ]**
+**[ 🇺🇸 English | [🇻🇳 Tiếng Việt](README_vi.md) ]**
 
 > [!TIP]
-> **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: Một tích hợp cực kỳ hữu ích giúp tự động cập nhật các blueprint trong bộ sưu tập này. Khi bạn cài đặt nhiều blueprint từ nhiều nguồn khác nhau, việc theo dõi cập nhật từ các tác giả trở nên khó khăn - tích hợp này sẽ giải quyết vấn đề đó cho bạn hoàn toàn tự động.
+> **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: A highly useful integration that automatically updates blueprints in this collection. When you have many blueprints from different sources, keeping track of updates can be challenging - this integration handles it for you automatically.
 
-**Gần đây, Google đã cắt giảm đáng kể API Gemini miễn phí, khiến nó gần như không thể đáp ứng nhu cầu sử dụng của Home Assistant. Các bạn có thể tham khảo [một giải pháp thay thế hoàn toàn miễn phí tại đây](https://github.com/luuquangvu/ha-addons).**
+**Google has recently significantly cut back on the free Gemini API, making it almost impossible to meet the usage needs of Home Assistant. You can find [a completely free alternative solution here](https://github.com/luuquangvu/ha-addons).**
 
-_Tất cả blueprint trong bộ sưu tập này được tinh chỉnh để hoạt động tối ưu với các mô hình (model) **Gemini Flash**. Các mô hình ngôn ngữ khác có thể cần điều chỉnh nhỏ để đạt hiệu quả tương tự._
+_All blueprints in this collection are fine-tuned to work best with **Gemini Flash** models. Other models may require minor adjustments to behave as expected._
 
-Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ sưu tập blueprint và hướng dẫn chi tiết. Mọi kịch bản đều đã được kiểm chứng trong thực tế, đi kèm giải thích rõ ràng, ví dụ lệnh thoại và mẹo triển khai để bạn có thể áp dụng ngay cho ngôi nhà thông minh của mình.
-
----
-
-## Mục lục
-
-- [Bộ sưu tập Blueprint và Hướng dẫn độc đáo cho Home Assistant](#bộ-sưu-tập-blueprint-và-hướng-dẫn-độc-đáo-cho-home-assistant)
-  - [Mục lục](#mục-lục)
-  - [Voice Assist - Hẹn giờ \& Lên lịch Thông minh](#voice-assist---hẹn-giờ--lên-lịch-thông-minh)
-  - [Voice Assist - Ghi nhớ và Truy xuất Thông tin](#voice-assist---ghi-nhớ-và-truy-xuất-thông-tin)
-  - [Voice Assist - Phân tích Hình ảnh Camera](#voice-assist---phân-tích-hình-ảnh-camera)
-  - [Voice Assist - Quản lý Lịch trình \& Sự kiện](#voice-assist---quản-lý-lịch-trình--sự-kiện)
-    - [Tạo Sự kiện Lịch](#tạo-sự-kiện-lịch)
-    - [Tra cứu Sự kiện trong Lịch](#tra-cứu-sự-kiện-trong-lịch)
-  - [Voice Assist - Tra cứu \& Chuyển đổi Lịch Âm](#voice-assist---tra-cứu--chuyển-đổi-lịch-âm)
-    - [Tra cứu \& chuyển đổi Lịch Âm](#tra-cứu--chuyển-đổi-lịch-âm)
-    - [Tạo Sự kiện theo Lịch Âm](#tạo-sự-kiện-theo-lịch-âm)
-  - [Chatbot Tương tác \& Điều khiển Nhà thông minh](#chatbot-tương-tác--điều-khiển-nhà-thông-minh)
-  - [Voice Assist - Gửi Tin nhắn \& Hình ảnh](#voice-assist---gửi-tin-nhắn--hình-ảnh)
-  - [Voice Assist - Tra cứu Thông tin Internet](#voice-assist---tra-cứu-thông-tin-internet)
-  - [Voice Assist - Tìm kiếm \& Phát Video YouTube](#voice-assist---tìm-kiếm--phát-video-youtube)
-  - [Voice Assist - Theo dõi Kênh YouTube Yêu thích](#voice-assist---theo-dõi-kênh-youtube-yêu-thích)
-  - [Voice Assist - Điều khiển Quạt Thông minh](#voice-assist---điều-khiển-quạt-thông-minh)
-  - [Voice Assist - Điều khiển Điều hòa Thông minh](#voice-assist---điều-khiển-điều-hòa-thông-minh)
-  - [Voice Assist - Dự báo Thời tiết](#voice-assist---dự-báo-thời-tiết)
-  - [Voice Assist - Điều khiển Nhạc](#voice-assist---điều-khiển-nhạc)
-  - [Voice Assist - Định vị \& Tìm kiếm Thiết bị](#voice-assist---định-vị--tìm-kiếm-thiết-bị)
-  - [Voice Assist - Tra cứu Phạt nguội](#voice-assist---tra-cứu-phạt-nguội)
-  - [Tự động Cảnh báo Phạt nguội](#tự-động-cảnh-báo-phạt-nguội)
-  - [Đồng bộ Trạng thái Thiết bị](#đồng-bộ-trạng-thái-thiết-bị)
-  - [Các Blueprint đã lỗi thời](#các-blueprint-đã-lỗi-thời)
-    - [Voice Assist - Điều khiển Quạt (Cũ)](#voice-assist---điều-khiển-quạt-cũ)
-    - [Voice Assist - Hẹn giờ Bật/Tắt Thiết bị (Cũ)](#voice-assist---hẹn-giờ-bậttắt-thiết-bị-cũ)
-  - [Hướng dẫn Thêm](#hướng-dẫn-thêm)
-    - [Tùy chỉnh chỉ dẫn hệ thống (system instruction) cho Voice Assist](#tùy-chỉnh-chỉ-dẫn-hệ-thống-system-instruction-cho-voice-assist)
-    - [Phát video mới từ kênh YouTube yêu thích](#phát-video-mới-từ-kênh-youtube-yêu-thích)
-    - [Theo dõi các thiết bị mất kết nối (unavailable)](#theo-dõi-các-thiết-bị-mất-kết-nối-unavailable)
-    - [Tự động chuyển đổi giao diện (theme) sáng/tối](#tự-động-chuyển-đổi-giao-diện-theme-sángtối)
-    - [Hướng dẫn cài đặt tìm kiếm vị trí thiết bị](#hướng-dẫn-cài-đặt-tìm-kiếm-vị-trí-thiết-bị)
+Transform Home Assistant into a fully-fledged personal teammate with this curated collection of blueprints and guides. Every scenario has been proven in real homes, backed by clear explanations, example voice prompts, and deployment tips so you can bring each idea to life right away.
 
 ---
 
-**Lưu ý:** Hãy đọc kỹ mô tả và hướng dẫn đi kèm mỗi blueprint trước khi cài đặt hoặc cập nhật.
+## Table of Contents
+
+- [Unique Home Assistant Blueprints \& Tutorials](#unique-home-assistant-blueprints--tutorials)
+  - [Table of Contents](#table-of-contents)
+  - [Voice Assist - Smart Scheduling \& Timers](#voice-assist---smart-scheduling--timers)
+  - [Voice Assist - Memory \& Information Retrieval](#voice-assist---memory--information-retrieval)
+  - [Voice Assist - Camera Image Analysis](#voice-assist---camera-image-analysis)
+  - [Voice Assist - Calendar \& Event Management](#voice-assist---calendar--event-management)
+    - [Create Calendar Events](#create-calendar-events)
+    - [Calendar Events Lookup](#calendar-events-lookup)
+  - [Voice Assist - Lunar Calendar Lookup \& Conversion](#voice-assist---lunar-calendar-lookup--conversion)
+    - [Lunar Calendar Conversion \& Lookup](#lunar-calendar-conversion--lookup)
+    - [Create Lunar Calendar Events](#create-lunar-calendar-events)
+  - [Interactive Smart Home Chatbot](#interactive-smart-home-chatbot)
+  - [Voice Assist - Send Messages \& Images](#voice-assist---send-messages--images)
+  - [Voice Assist - Internet Knowledge Search](#voice-assist---internet-knowledge-search)
+  - [Voice Assist - YouTube Search \& Playback](#voice-assist---youtube-search--playback)
+  - [Voice Assist - Favorite YouTube Channels](#voice-assist---favorite-youtube-channels)
+  - [Voice Assist - Smart Fan Control](#voice-assist---smart-fan-control)
+  - [Voice Assist - Smart AC Control](#voice-assist---smart-ac-control)
+  - [Voice Assist - Weather Forecast](#voice-assist---weather-forecast)
+  - [Voice Assist - Music Control](#voice-assist---music-control)
+  - [Voice Assist - Device Location \& Find](#voice-assist---device-location--find)
+  - [Voice Assist - Traffic Fine Lookup](#voice-assist---traffic-fine-lookup)
+  - [Automatic Traffic Fine Notifications](#automatic-traffic-fine-notifications)
+  - [Device State Synchronization](#device-state-synchronization)
+  - [Obsolete Blueprints](#obsolete-blueprints)
+    - [Voice Assist - Smart Fan Control (Legacy)](#voice-assist---smart-fan-control-legacy)
+    - [Voice Assist - Device Control Timer (Legacy)](#voice-assist---device-control-timer-legacy)
+  - [Additional Tutorials](#additional-tutorials)
+    - [How to write custom system instructions for Voice Assist](#how-to-write-custom-system-instructions-for-voice-assist)
+    - [Play new videos from favorite YouTube channels](#play-new-videos-from-favorite-youtube-channels)
+    - [Monitor unavailable devices](#monitor-unavailable-devices)
+    - [Auto-switch iOS Themes](#auto-switch-ios-themes)
+    - [Device location lookup guide](#device-location-lookup-guide)
 
 ---
 
-## Voice Assist - Hẹn giờ & Lên lịch Thông minh
+**Note:** Please make sure to read each blueprint's description and follow its instructions when installing or updating.
 
-Bạn muốn bật điều hòa trong 30 phút rồi tự tắt? Hay muốn đèn ngủ tự động giảm độ sáng sau 1 tiếng?
-Blueprint này biến Voice Assist thành một trợ lý quản lý thời gian thực thụ. Bạn có thể ra lệnh giọng nói tự nhiên để **tạo, gia hạn, tạm dừng, tiếp tục hoặc hủy** lịch trình cho bất kỳ thiết bị nào.
+---
 
-**Tính năng nổi bật:**
+## Voice Assist - Smart Scheduling & Timers
 
-- **Hiểu ngôn ngữ tự nhiên:** Chỉ cần nói "Bật quạt 1 tiếng nữa tắt", không cần đúng cú pháp cứng nhắc.
-- **Quản lý toàn diện:** Hỗ trợ đầy đủ các lệnh như tạo mới, gia hạn thêm giờ, tạm dừng lịch đang chạy hoặc hủy bỏ.
-- **Bền bỉ & Tin cậy:** Mọi lịch trình đều được lưu lại và **tự động khôi phục** nếu Home Assistant khởi động lại. Bạn không lo bị mất hẹn giờ khi mất điện.
-- **Điều khiển đa dạng:** Hỗ trợ hầu hết các loại thiết bị: Đèn (độ sáng, màu), Rèm (đóng/mở/vị trí), Quạt (tốc độ/tuốc năng), Điều hòa, Robot hút bụi, Media Player, v.v.
-- **Nhận diện thông minh:** Tự động nhận diện thiết bị qua tên gọi thân mật (alias) mà bạn hay dùng.
-- **Phản hồi chi tiết:** Khi hỏi "Có lịch nào đang chạy không?", trợ lý sẽ liệt kê rõ ràng tên thiết bị và thời gian còn lại.
+Want to turn on the AC for 30 minutes and have it turn off automatically? Or dim the bedroom lights after an hour?
+This blueprint transforms Voice Assist into a true time management assistant. You can use natural voice commands to **create, extend, pause, resume, or cancel** schedules for any device.
 
-**Ví dụ lệnh thoại:**
+**Key Features:**
 
-- "Bật đèn phòng khách màu vàng 50% trong 2 tiếng."
-- "Mở rèm phòng ngủ 15 phút để thoáng khí rồi đóng lại."
-- "Gia hạn thêm 30 phút cho quạt phòng bé."
-- "Tạm dừng lịch tưới cây."
-- "Có thiết bị nào đang hẹn giờ không?"
+- **Natural Language Understanding:** Just say "Turn on the fan for 1 hour", no rigid syntax required.
+- **Comprehensive Management:** Full support for creating, extending, pausing, resuming, and canceling schedules.
+- **Reliable & Persistent:** All schedules are saved and **automatically restored** if Home Assistant restarts. No more lost timers due to power outages.
+- **Versatile Control:** Supports most device types: Lights (brightness, color), Covers (open/close/position), Fans (speed/oscillation), Climate, Vacuums, Media Players, etc.
+- **Smart Recognition:** Automatically identifies devices by the friendly aliases you use daily.
+- **Detailed Feedback:** Ask "Are there any running schedules?" and the assistant will list devices and remaining times clearly.
 
-**Ứng dụng thực tế:**
+**Example Voice Commands:**
 
-- **Bảo vệ Pin:** "Sạc điện thoại 2 tiếng rồi tắt ổ cắm" - Giúp bạn sạc qua đêm mà không lo chai pin.
-- **Nấu nướng rảnh tay:** "Bật hút mùi 20 phút nữa tắt" - Khi bạn kho cá xong và muốn ra ngoài đi dạo.
-- **Giấc ngủ ngon:** "Bật quạt số nhỏ nhất trong 1 tiếng rồi tắt hẳn" - Tránh bị lạnh hoặc khô họng khi về sáng.
+- "Turn on the living room lights to 50% warm white for 2 hours."
+- "Open the bedroom curtains for 15 minutes to air out the room, then close them."
+- "Extend the kids' room fan timer by 30 minutes."
+- "Pause the garden watering schedule."
+- "Which devices are currently on a timer?"
 
-Để sử dụng đầy đủ tính năng, bạn cần cài đặt **cả 3 blueprint** sau:
+**Use Cases:**
 
-1. **Blueprint Điều khiển (LLM):** Xử lý lệnh thoại và điều phối hành động.
+- **Battery Protection:** "Charge phone for 2 hours then turn off socket" - Helps you charge overnight without worrying about battery degradation.
+- **Hands-Free Cooking:** "Turn off the hood in 20 minutes" - Perfect when you've finished cooking and want to go for a walk.
+- **Sleep Comfort:** "Turn the fan to the lowest speed for 1 hour then turn off" - Avoid waking up cold or with a dry throat.
+
+For full functionality, you need to install **all 3 blueprints**:
+
+1. **Controller Blueprint (LLM):** Processes voice commands and coordinates actions.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_full_llm.yaml)
-2. **Blueprint Lõi Lịch trình:** Chịu trách nhiệm tạo và quản lý các lịch trình.
+2. **Core Schedule Blueprint:** Responsible for creating and managing the schedules.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules.yaml)
-3. **Blueprint Khôi phục:** Tự động khôi phục các lịch trình đang hoạt động khi Home Assistant khởi động lại.
+3. **Restore Blueprint:** Automatically restores active schedules when Home Assistant restarts.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_restart_handler.yaml)
 
 ---
 
-## Voice Assist - Ghi nhớ và Truy xuất Thông tin
+## Voice Assist - Memory & Information Retrieval
 
-Bạn hay quên mật khẩu Wi-Fi? Hay không nhớ đã để xe ở cột nào dưới hầm? Hãy để Voice Assist làm "bộ não thứ hai" của bạn.
+Forget where you parked the car? Keep forgetting the Wi-Fi password for guests? Let Voice Assist become your "Second Brain".
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Ghi nhớ mọi thứ:** Từ những việc nhỏ nhặt như "Chìa khóa để ở ngăn kéo bàn" đến những nhắc nhở cần thiết như "Mã số khách hàng của cửa hàng ABC".
-- **Truy xuất thông minh:** Không cần nhớ từ khóa chính xác. Chỉ cần hỏi "Xe đậu ở đâu?" hay "Pass wifi là gì?", trợ lý sẽ tự tìm thông tin liên quan nhất.
-- **Phân loại linh hoạt:**
-  - **Cá nhân (User):** Dành cho thông tin riêng (ví dụ: size quần áo, thực đơn ăn kiêng).
-  - **Gia đình (Household):** Chia sẻ cho cả nhà (ví dụ: mật khẩu cổng, lịch đổ rác).
-  - **Tạm thời (Session):** Chỉ nhớ trong lúc trò chuyện.
-- **Tự động dọn dẹp:** Thiết lập thời gian tự hủy cho các ghi nhớ ngắn hạn (ví dụ: vị trí đỗ xe tại trung tâm thương mại).
+- **Remember Everything:** From small details like "Keys are in the desk drawer" to important reminders like "The customer ID for store ABC".
+- **Smart Retrieval:** No need to remember exact keywords. Just ask "Where is the car?" or "What's the wifi pass?", and the assistant will find the most relevant info.
+- **Flexible Scopes:**
+  - **Personal (User):** For your personal details (e.g., clothing sizes, dietary preferences).
+  - **Household:** Shared with the whole family (e.g., gate code, trash schedule).
+  - **Temporary (Session):** Only remembered for the current conversation.
+- **Auto-Cleanup:** Set expiration dates for short-term memories (e.g., parking spot at the mall).
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Ghi nhớ mật khẩu Wi-Fi khách là `khachdenchoi123`."
-- "Lưu lại vị trí đỗ xe là hầm B2 cột D5, nhớ trong 1 ngày thôi."
-- "Nhắc tôi số điện thoại của bác sĩ là 0912345678."
-- "Tìm xem xe đang đỗ ở đâu?"
-- "Mật khẩu Wi-Fi khách là gì nhỉ?"
+- "Remember the guest Wi-Fi password is `guestshere123`."
+- "Save my parking spot as B2 column D5, remember for 1 day only."
+- "Remind me the doctor's phone number is 0912345678."
+- "Find where the car is parked."
+- "What was the guest Wi-Fi password?"
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Truy tìm đồ thất lạc:** "Hộ chiếu cất ở đâu?" - Cứu cánh cho những lúc cần gấp mà không nhớ đã cất ở ngăn kéo nào.
-- **Thông tin lắt léo:** Lưu mật khẩu Wifi dài ngoằng hoặc số tài khoản ngân hàng để khi khách hỏi là có ngay.
-- **Trợ lý mua sắm:** Lưu size quần áo, giày dép của vợ/chồng/con để order online chính xác mà không cần hỏi lại.
+- **Finding Lost Items:** "Where is the passport?" - A lifesaver when you need it urgently and can't remember which drawer it's in.
+- **Complex Info:** Store long Wi-Fi passwords or bank account numbers so you can provide them instantly when guests ask.
+- **Shopping Assistant:** Save clothing/shoe sizes for your spouse/kids to order online accurately without asking again.
 
-_Tùy chọn phiên bản bạn muốn sử dụng:_
+_Choose the version you want to use:_
 
-**Phiên bản LLM (Đa ngôn ngữ):**
+**LLM Version (Multi-language):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fmemory_tool_full_llm.yaml)
 
-**Phiên bản Local (Chỉ tiếng Anh, hoạt động offline):**
+**Local Version (English only, works offline):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fmemory_tool_local.yaml)
 
 ---
 
-## Voice Assist - Phân tích Hình ảnh Camera
+## Voice Assist - Camera Image Analysis
 
-Biến camera an ninh thành "đôi mắt" thông minh cho trợ lý ảo. Không cần mở ứng dụng soi từng góc, hãy để Voice Assist nhìn giúp bạn.
+Turn your security cameras into "smart eyes" for your virtual assistant. No need to open the app and check every angle-just let Voice Assist look for you.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Thị giác máy tính:** Voice Assist có thể "xem" hình ảnh từ camera và mô tả chi tiết những gì đang diễn ra.
-- **Quan sát toàn diện:** Hỗ trợ kết nối nhiều camera cùng lúc (cổng, sân, phòng khách...) để có cái nhìn bao quát.
-- **Phản hồi tức thì:** Chụp ảnh và phân tích ngay tại thời điểm bạn hỏi.
+- **Visual Intelligence:** Voice Assist can "see" images from your cameras and describe in detail what is happening.
+- **Comprehensive View:** Supports connecting multiple cameras at once (gate, yard, living room...) for a complete overview.
+- **Instant Response:** Captures and analyzes the image the moment you ask.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Xem camera cổng có ai đang đứng đó không?"
-- "Kiểm tra xem con mèo đang ở sân trước hay sân sau?"
-- "Nhìn xem cửa gara đã đóng chưa?"
-- "Ngoài sân có xe lạ nào không?"
+- "Check the gate camera, is anyone standing there?"
+- "Check if the cat is in the front yard or the back yard?"
+- "Look to see if the garage door is closed."
+- "Is there any strange car in the yard?"
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Shipper đến:** "Xem có gói hàng nào trước cửa không?" khi bạn đang ở tầng 3 ngại chạy xuống.
-- **Trị bệnh "Hay lo":** Đã lên giường đắp chăn nhưng chợt giật mình "Cổng đã đóng chưa?", chỉ cần hỏi để Assistant nhìn giúp.
-- **Trông chừng "Boss":** Xem thú cưng đang ngủ ngoan hay đang đào bới ngoài vườn.
+- **Delivery Check:** "Is there a package at the door?" when you're on the 3rd floor and too lazy to run down.
+- **Anxiety Relief:** Already in bed but suddenly panicked "Is the gate closed?", just ask Assistant to check for you.
+- **Pet Monitor:** Check if your pet is sleeping nicely or digging up the garden.
 
-Để sử dụng tính năng này, bạn cần cài đặt **cả 2 blueprint**:
+To use this feature, you need to install **both blueprints**:
 
-1. **Blueprint Chụp ảnh:** Chụp lại hình ảnh từ camera được yêu cầu.
+1. **Snapshot Blueprint:** Takes a picture from the requested camera.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcamera_snapshot_full_llm.yaml)
-2. **Blueprint Phân tích (LLM):** Gửi ảnh chụp cho mô hình ngôn ngữ để phân tích và trả lời.
+2. **Analyzer Blueprint (LLM):** Sends the snapshot to the language model for analysis and response.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffile_content_analyzer_full_llm.yaml)
 
 ---
 
-## Voice Assist - Quản lý Lịch trình & Sự kiện
+## Voice Assist - Calendar & Event Management
 
-Quản lý lịch trình cá nhân của bạn bằng giọng nói một cách tự nhiên và hiệu quả.
+Effortlessly manage your personal schedule using natural voice commands, making organization simpler and more intuitive.
 
-### Tạo Sự kiện Lịch
+### Create Calendar Events
 
-Sắp xếp lịch trình bằng giọng nói như đang trò chuyện với trợ lý. Blueprint tự động hóa việc tạo sự kiện cho mọi lời nhắc, cuộc họp hay chuyến du lịch vào lịch của bạn.
+Organize your schedule by voice as if you're conversing with an assistant. This blueprint automates event creation for all your reminders, meetings, and trips directly into your calendar.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Nhận diện ngôn ngữ tự nhiên:** Tự động phân tích ngày, giờ, và thời lượng từ câu lệnh của bạn.
-- **Tạo sự kiện nhanh:** Thêm sự kiện vào lịch mà không cần nhập liệu thủ công.
-- **Tích hợp liền mạch:** Hoạt động hoàn hảo với Lịch Google đã được cấu hình trong Home Assistant.
+- **Intuitive Language Recognition:** Automatically parses dates, times, and durations from your spoken commands.
+- **Rapid Event Creation:** Add events to your calendar without manual input.
+- **Seamless Integration:** Works perfectly with Google Calendars already configured in Home Assistant.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Tạo lịch 2 giờ chiều mai đi cắt tóc."
-- "Lên lịch 9 giờ sáng mai họp trong 3 tiếng."
-- "Thêm lịch thứ bảy này về quê."
+- "Schedule a haircut for tomorrow at 2 PM."
+- "Set up a 3-hour meeting tomorrow at 9 AM."
+- "Add an event this Saturday to visit family."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Lên kế hoạch mọi lúc:** Nhanh chóng tạo lời nhắc, lịch hẹn khi đang lái xe, nấu ăn hoặc ngay cả khi vừa nảy ra một ý tưởng bất chợt.
-- **Không bỏ lỡ:** Tự động hóa việc thêm các sự kiện quan trọng của gia đình hay công việc vào lịch mà không cần thao tác tay.
+- **Plan Anytime:** Quickly create reminders and appointments while driving, cooking, or when a sudden idea strikes.
+- **Never Miss Out:** Automate adding important family or work events to your calendar without manual input.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_calendar_event_full_llm.yaml)
 
-### Tra cứu Sự kiện trong Lịch
+### Calendar Events Lookup
 
-Hỏi và nhận thông tin về các sự kiện đã có trong lịch của bạn như sinh nhật, cuộc hẹn, ngày kỷ niệm.
+Inquire about and retrieve information regarding existing events in your calendar, such as birthdays, appointments, or anniversaries.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Tuần này có lịch gì không?"
-- "Tháng này có sự kiện gì đáng chú ý không?"
+- "What events are happening this week?"
+- "What's on the calendar for this month?"
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Trước khi ra khỏi nhà:** Nhanh chóng kiểm tra lịch trình trong ngày hoặc tuần mà không cần mở ứng dụng lịch trên điện thoại.
-- **Xác nhận kế hoạch:** Dễ dàng kiểm tra để đảm bảo không trùng lịch hoặc bỏ lỡ các sự kiện quan trọng.
+- **Before Leaving Home:** Quickly check your schedule for the day or week without needing to open your calendar app on your phone.
+- **Confirm Plans:** Easily verify to ensure no double-bookings or missed important events.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcalendar_events_lookup_full_llm.yaml)
 
 ---
 
-## Voice Assist - Tra cứu & Chuyển đổi Lịch Âm
+## Voice Assist - Lunar Calendar Lookup & Conversion
 
-Mang văn hóa truyền thống vào ngôi nhà thông minh. Tra cứu ngày âm, xem ngày tốt xấu hay đếm ngược đến Tết ngay trên Home Assistant.
+Bring traditional culture into your smart home. Lookup Lunar dates, check auspicious days, or countdown to Tet right on Home Assistant.
 
-### Tra cứu & chuyển đổi Lịch Âm
+### Lunar Calendar Conversion & Lookup
 
-Công cụ chuyển đổi lịch Âm - Dương mạnh mẽ, hoạt động hoàn toàn **Offline** (không cần internet), đảm bảo tốc độ phản hồi tức thì.
+A powerful Solar-Lunar calendar conversion tool that works completely **Offline** (no internet needed), ensuring instant response speeds.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Siêu tốc & Riêng tư:** Xử lý nội bộ, không phụ thuộc vào API bên ngoài.
-- **Thông tin chuyên sâu:** Cung cấp đầy đủ Can Chi (Giáp Thìn, Ất Tỵ...), Tiết khí, Giờ hoàng đạo.
-- **Tư vấn ngày tốt/xấu:** Biết ngay hôm nay nên làm gì, kiêng gì theo phong tục.
-- **Đếm ngược sự kiện:** Luôn biết chính xác còn bao nhiêu ngày nữa đến Tết Nguyên Đán hay các ngày lễ lớn.
+- **Fast & Private:** Processed locally, independent of external APIs.
+- **In-Depth Information:** Provides full Can Chi (Year/Month/Day stems and branches), Solar Terms, and Lucky Hours.
+- **Good/Bad Day Advice:** Know immediately what to do or avoid according to customs.
+- **Event Countdown:** Always know exactly how many days are left until Lunar New Year or major holidays.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Hôm nay là bao nhiêu âm?"
-- "Chủ nhật tuần này là ngày tốt hay xấu?"
-- "Còn bao nhiêu ngày nữa đến Tết?"
-- "Đổi ngày 20/11 dương lịch sang âm lịch."
+- "What is today's lunar date?"
+- "Is this Sunday a good or bad day?"
+- "How many days left until Tet?"
+- "Convert November 20th solar to lunar."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Phong thủy & Tâm linh:** Lên kế hoạch cho các công việc trọng đại (cưới hỏi, động thổ, khai trương) dựa trên ngày tốt/xấu, giờ hoàng đạo.
-- **Văn hóa truyền thống:** Theo dõi các ngày rằm, mùng 1, ngày giỗ chạp để chuẩn bị đồ cúng lễ tươm tất.
+- **Feng Shui & Spirituality:** Plan important events (weddings, groundbreakings, grand openings) based on auspicious days/hours.
+- **Traditional Observances:** Keep track of the 1st and 15th of the lunar month, or memorial days to prepare offerings.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdate_lookup_and_conversion_full_llm.yaml)
 
-### Tạo Sự kiện theo Lịch Âm
+### Create Lunar Calendar Events
 
-Tự động thêm các sự kiện quan trọng tính theo lịch Âm (giỗ, ngày kỷ niệm, cưới hỏi...) vào lịch của bạn.
+Automatically add important events based on the Lunar calendar (memorials, anniversaries, etc.) to your calendar, ensuring you never miss a traditional date.
 
-**Lưu ý:** Blueprint này được thiết kế để **chạy thủ công** hoặc thông qua tự động hóa, yêu cầu người dùng điền thông tin trực tiếp qua giao diện Home Assistant. Nó **không hỗ trợ lệnh thoại** qua Voice Assist.
+**Note:** This blueprint is designed for **manual execution** or via automation, requiring users to fill in information directly through the Home Assistant UI. It **does not support voice commands** via Voice Assist.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Chuyển đổi tự động:** Tự động tính toán và tạo sự kiện vào ngày dương lịch tương ứng hàng năm.
-- **Chính xác & Tiện lợi:** Không còn phải tự quy đổi thủ công hay sợ quên các ngày lễ truyền thống.
+- **Automatic Conversion:** Calculates and creates events on the corresponding solar date each year.
+- **Accurate & Convenient:** No more manual conversions or forgetting important traditional dates.
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Nhớ ngày giỗ chạp:** Đảm bảo không bao giờ bỏ lỡ các ngày giỗ, cúng bái quan trọng của gia đình.
-- **Sinh nhật âm lịch:** Tự động nhắc nhở các ngày kỷ niệm, sinh nhật tính theo lịch âm của người thân.
+- **Never Miss Memorials:** Ensure you never miss important family memorials or ceremonies.
+- **Lunar Birthdays:** Automatically get reminders for anniversaries or birthdays that are celebrated based on the lunar calendar for loved ones.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_lunar_events.yaml)
 
 ---
 
-## Chatbot Tương tác & Điều khiển Nhà thông minh
+## Interactive Smart Home Chatbot
 
-Đừng chỉ ra lệnh, hãy trò chuyện với ngôi nhà của bạn. Tạo Bot Telegram hoặc Zalo để điều khiển nhà từ xa với khả năng hiểu ngữ cảnh và phản hồi thông minh.
+Don't just command; converse with your home. Create Telegram or Zalo Bots to control your home remotely with contextual understanding and smart responses.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Hội thoại hai chiều:** Bot không chỉ nhận lệnh mà còn biết hỏi lại để làm rõ ý bạn (ví dụ: "Bạn muốn bật điều hòa phòng nào?").
-- **Nhận diện hình ảnh:** Gửi ảnh một thiết bị hỏng hay một loài cây lạ, bot sẽ phân tích và trả lời bạn.
-- **Điều khiển mọi lúc mọi nơi:** Tắt đèn, mở cổng hay kiểm tra camera ngay trên giao diện chat quen thuộc.
+- **Two-Way Conversation:** The Bot doesn't just receive commands but can ask clarifying questions (e.g., "Which room do you want the AC on in?")
+- **Image Recognition:** Send a photo of a broken device or an unknown plant, and the bot will analyze and respond.
+- **Anywhere, Anytime Control:** Turn off lights, open gates, or check cameras directly from your familiar chat interface.
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Kiểm tra từ xa:** Đang trên đường đi làm chợt không nhớ đã tắt bếp/tắt đèn chưa? Chỉ cần nhắn tin hỏi bot.
-- **Giám sát "thầm lặng":** Muốn biết con đã về nhà chưa (qua trạng thái thiết bị) mà không làm phiền? Hỏi bot thay vì gọi điện.
+- **Remote Check-ins:** On your way to work and can't remember if you turned off the stove/lights? Just message the bot to check.
+- **Silent Monitoring:** Want to know if your kids are home yet (via device status) without bothering them? Ask the bot instead of calling.
 
-_Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích hình ảnh, cài thêm blueprint Phân tích._
+_Install the webhook blueprint for your chosen platform. For image analysis, also install the Analyzer blueprint._
 
-**Webhook cho Telegram:**
+**Webhook for Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ftelegram_bot_webhook.yaml)
 
-**Webhook cho Zalo (Official Account):**
+**Webhook for Zalo (Official Account):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_bot_webhook.yaml)
 
-**Webhook cho Zalo (Custom Bot):**
+**Webhook for Zalo (Custom Bot):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_custom_bot_webhook.yaml)
 
-**(Tùy chọn) Blueprint Phân tích Hình ảnh:**
+**(Optional) Image Analyzer Blueprint:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffile_content_analyzer_full_llm.yaml)
 
 ---
 
-## Voice Assist - Gửi Tin nhắn & Hình ảnh
+## Voice Assist - Send Messages & Images
 
-Đang lái xe hoặc tay dính dầu mỡ? Hãy dùng giọng nói để gửi tin nhắn, chia sẻ vị trí hoặc hình ảnh camera tới người thân qua Telegram/Zalo.
+Driving or hands messy? Use your voice to send messages, share your location, or send camera images to loved ones via Telegram/Zalo.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Nhắn tin rảnh tay:** Đọc nội dung tin nhắn và Assistant sẽ gửi đi ngay lập tức.
-- **Chia sẻ thông minh:** Tự động đính kèm link Google Maps khi bạn nhắc đến một địa điểm.
-- **Báo cáo hình ảnh:** Ra lệnh chụp ảnh từ camera an ninh và gửi ngay vào nhóm chat gia đình.
+- **Hands-Free Messaging:** Dictate your message, and Assistant will send it immediately.
+- **Smart Sharing:** Automatically attach Google Maps links when you mention a location.
+- **Image Reporting:** Command to take a photo from a security camera and send it directly to a family chat group.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Gửi danh sách quán ăn ngon ở Nha Trang lên nhóm Telegram gia đình."
-- "Gửi vị trí Hoàng Thành Thăng Long qua Zalo cho vợ."
-- "Chụp ảnh camera cổng gửi vào nhóm chat."
+- "Send a list of good restaurants in Nha Trang to the Telegram family group."
+- "Send the Thang Long Citadel location via Zalo to my wife."
+- "Take a photo from the gate camera and send it to the chat group."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **An toàn khi lái xe:** "Nhắn cho vợ là anh về muộn khoảng 30 phút" - Gửi thông báo quan trọng mà không cần rời tay khỏi vô lăng, tập trung lái xe.
-- **Thông báo khẩn:** Về nhà muộn? "Gửi tin nhắn cho mẹ là con đang trên đường về" - Nhanh chóng thông báo mà không cần gõ phím.
-- **Chia sẻ khoảnh khắc:** "Chụp ảnh camera sân gửi vào nhóm gia đình" - Chia sẻ ngay lập tức những hình ảnh thú vị.
+- **Driving Safety:** "Message my wife I'll be home in 30 minutes" - Send important updates without taking your hands off the wheel, focusing on driving.
+- **Urgent Notifications:** Running late? "Message mom I'm on my way home" - Quickly inform without typing.
+- **Capture Moments:** "Take a photo from the yard camera and send it to the family group" - Instantly share interesting images.
 
-_Cài đặt blueprint cho nền tảng bạn muốn gửi tin đến:_
+_Install the blueprint for the platform you want to send messages to:_
 
-**Gửi đến Telegram:**
+**Send to Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_telegram_full_llm.yaml)
 
-**Gửi đến Zalo (Official Bot):**
+**Send to Zalo (Official Bot):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_bot_full_llm.yaml)
 
-**Gửi đến Zalo (Custom Bot):**
+**Send to Zalo (Custom Bot):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_custom_bot_full_llm.yaml)
 
 ---
 
-## Voice Assist - Tra cứu Thông tin Internet
+## Voice Assist - Internet Knowledge Search
 
-Đừng để Assistant chỉ biết tắt/bật đèn. Hãy biến nó thành một cuốn bách khoa toàn thư sống, sẵn sàng giải đáp mọi thắc mắc của bạn với dữ liệu cập nhật từ Google.
+Don't let Assistant just toggle lights. Turn it into a living encyclopedia, ready to answer any question with up-to-date data from Google.
 
-**Lưu ý:** Tính năng này chỉ áp dụng cho Gemini, vì nó được tích hợp với Google Tìm kiếm để truy cập và cung cấp thông tin cập nhật.
+**Note:** This feature is only applicable to Gemini, as it is integrated with Google Search to access and provide up-to-date information.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Kiến thức vô tận:** Truy cập kho dữ liệu khổng lồ của Google để trả lời mọi câu hỏi từ lịch sử, địa lý đến tin tức thời sự.
-- **Tóm tắt thông minh:** Không đọc một danh sách link dài dòng. Assistant sẽ tổng hợp và trả lời ngắn gọn, súc tích đúng trọng tâm.
-- **Cập nhật realtime:** Biết được giá vàng hôm nay, kết quả bóng đá tối qua hay sự kiện đang hot trên mạng xã hội.
+- **Infinite Knowledge:** Access Google's massive database to answer everything from history and geography to current news.
+- **Smart Summarization:** No reading through long lists of links. Assistant synthesizes and provides concise, to-the-point answers.
+- **Real-time Updates:** Know today's gold price, last night's football scores, or trending events on social media.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Điểm chuẩn Đại học Bách Khoa Hà Nội năm nay là bao nhiêu?"
-- "Tóm tắt diễn biến chính của trận chung kết World Cup vừa rồi."
-- "Giá iPhone 17 Pro Max hiện tại là bao nhiêu?"
-- "Công thức nấu món Phở bò chuẩn vị Bắc."
+- "What is the entry score for Hanoi University of Science and Technology this year?"
+- "Summarize the main events of the last World Cup final."
+- "What is the current price of iPhone 17 Pro Max?"
+- "Recipe for authentic Northern beef Pho."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Trọng tài gia đình:** Đang cãi nhau với vợ/chồng về một vấn đề gì đó? "Giá vàng hôm nay là bao nhiêu?" - Giải quyết tranh luận nhanh gọn.
-- **Fact-check nhanh:** Đang nấu ăn mà quên công thức? "Công thức làm bánh flan bằng nồi cơm điện?" - Tra cứu ngay mà không cần dừng tay.
-- **Tiện ích mọi lúc:** Đang lái xe hay bận tay vẫn có thể hỏi về thời tiết, tin tức, lịch sử...
+- **Family Arbitrator:** Arguing with your spouse about something? "What's the gold price today?" - Settle debates quickly.
+- **Quick Fact-Check:** Cooking and forgot a recipe? "Recipe for flan using a rice cooker?" - Look it up instantly without pausing your cooking.
+- **Convenience Anytime:** Driving or hands full? Still ask about weather, news, history, etc.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_google_search_full_llm.yaml)
 
 ---
 
-## Voice Assist - Tìm kiếm & Phát Video YouTube
+## Voice Assist - YouTube Search & Playback
 
-Biến TV của bạn thành rạp chiếu phim thông minh. Không cần remote, không cần gõ phím, chỉ cần nói những gì bạn muốn xem.
+Transform your TV into a smart home cinema. No remote needed, no typing required-just say what you want to watch.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Hiểu ý người xem:** Tìm video theo mô tả nội dung ("nhạc thư giãn buổi sáng", "review xe VinFast") thay vì từ khóa cứng nhắc.
-- **Chọn lọc thông minh:** Tự động chọn video phù hợp nhất (nhiều view, chất lượng cao) để phát.
-- **Học tập & Giải trí:** Tìm video bài giảng cho con hoặc video ca nhạc cho bố mẹ chỉ trong tích tắc.
+- **Understands Your Intent:** Find videos by describing content ("relaxing morning music," "VinFast car review") instead of rigid keywords.
+- **Smart Selection:** Automatically choose the most relevant video (high views, good quality) to play.
+- **Learn & Entertain:** Find lecture videos for your kids or music videos for your parents in an instant.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Mở video nhạc không lời nhẹ nhàng để đọc sách."
-- "Tìm phim tài liệu về chiến thắng Điện Biên Phủ."
-- "Xem review iPhone 17 Pro Max mới nhất."
+- "Play some soft instrumental music for reading."
+- "Find a documentary about the Battle of Dien Bien Phu."
+- "Show me the latest iPhone 17 Pro Max review."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Dỗ trẻ:** "Mở Baby Shark" ngay lập tức để dỗ bé đang khóc mà không cần tìm remote.
-- **Thân thiện với người lớn tuổi:** Ông bà muốn nghe Cải lương/Chèo nhưng mắt kém ngại gõ phím tìm kiếm, chỉ cần nói là có.
-- **Tập trung làm việc:** "Mở nhạc Lofi Chill" để tạo không gian làm việc mà không cần thao tác trên máy tính.
+- **Child Soothing:** "Play Baby Shark" instantly to calm a crying baby without hunting for the remote.
+- **Elderly Friendly:** Grandparents who can't type or see well can just ask to listen to their favorite traditional opera.
+- **Work Focus:** "Play Lofi Chill music" to set the mood for work without touching your computer.
 
-Để sử dụng tính năng này, bạn cần cài đặt **cả 2 blueprint**:
+To use this feature, you need to install **both blueprints**:
 
-1. **Blueprint Tìm kiếm (LLM):** Phân tích câu hỏi và tìm kiếm video phù hợp.
+1. **Search Blueprint (LLM):** Analyzes the query and finds the right video.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_youtube_search_full_llm.yaml)
-2. **Blueprint Phát video:** Lấy thông tin video và phát trên media player.
+2. **Player Blueprint:** Gets the video info and plays it on the media player.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fplay_youtube_video_full_llm.yaml)
 
 ---
 
-## Voice Assist - Theo dõi Kênh YouTube Yêu thích
+## Voice Assist - Favorite YouTube Channels
 
-Bạn là fan cứng của "Trực Tiếp Game" hay "MixiGaming"? Blueprint này giúp bạn không bao giờ bỏ lỡ video mới nhất từ các idol.
+Are you a die-hard fan of "MrBeast" or "Linus Tech Tips"? This blueprint ensures you never miss the latest videos from your favorite creators.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Cập nhật liên tục:** Tự động kiểm tra các kênh bạn theo dõi.
-- **Phát ngay lập tức:** Lệnh "Có video mới không?" sẽ tự động phát video vừa ra lò lên TV.
-- **Thông báo chủ động:** Nhận tin nhắn ngay khi kênh yêu thích đăng tải nội dung mới.
+- **Stay Updated:** Automatically check your subscribed channels for new content.
+- **Instant Playback:** A command like "Are there new videos?" will automatically play the latest release on your TV.
+- **Proactive Notifications:** Receive messages as soon as your favorite channels upload new content.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Kênh Khoai Lang Thang có gì mới không?"
-- "Mở video mới nhất của HOA BAN FOOD"
+- "Does Outdoor Boys have anything new?"
+- "Play the latest video from Gordon Ramsay."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Không bỏ lỡ idol:** Tự động thông báo khi kênh YouTube yêu thích của bạn (streamer, vlogger...) đăng tải video mới, không cần phải kiểm tra thủ công.
-- **Giải trí theo gu:** Vừa thức dậy đã có thể nói "Kênh VTV Thời sự có gì mới không?" để cập nhật tin tức hoặc "Mở video mới nhất của FAPTV" để thư giãn.
+- **Never Miss Your Favorite Creator:** Get notified automatically when your favorite YouTube channels (streamers, vloggers...) upload new videos, no manual checking needed.
+- **Personalized Entertainment:** Just woke up? "Is there anything new on VTV News?" for updates, or "Play the latest video from FAPTV" to relax.
 
-[**Xem hướng dẫn chi tiết**](/home_assistant_play_favorite_youtube_channel_videos.md)
+[**View the detailed guide**](/home_assistant_play_favorite_youtube_channel_videos_en.md)
 
-Để sử dụng tính năng này, bạn cần cài đặt **cả 2 blueprint**:
+To use this feature, you need to install **both blueprints**:
 
-1. **Blueprint Lấy thông tin (LLM):** Kiểm tra kênh và lấy thông tin video mới nhất.
+1. **Info Getter Blueprint (LLM):** Checks the channel and gets the latest video info.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fget_youtube_video_info_full_llm.yaml)
-2. **Blueprint Phát video:** Lấy thông tin video và phát trên media player (có thể tái sử dụng từ blueprint ở trên).
+2. **Player Blueprint:** Gets the video info and plays it on the media player (can be reused from the blueprint above).
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fplay_youtube_video_full_llm.yaml)
 
 ---
 
-## Voice Assist - Điều khiển Quạt Thông minh
+## Voice Assist - Smart Fan Control
 
-Nóng quá? Chỉ cần than thở một câu, quạt sẽ tự tăng tốc. Blueprint này là phiên bản nâng cấp toàn diện, kết hợp điều khiển tốc độ và tuốc năng (quay) trong một công cụ duy nhất.
+Feeling hot? Just say the word, and your fan will speed up. This blueprint is a comprehensive upgrade, combining speed and oscillation control into a single tool.
 
-**Tại sao nên dùng Blueprint này thay vì tính năng có sẵn (Built-in HassFanSetSpeed)?**
+**Why use this Blueprint instead of the built-in HassFanSetSpeed?**
 
-Mặc dù Home Assistant đã hỗ trợ điều khiển quạt cơ bản, nhưng blueprint này mang lại trải nghiệm tự nhiên và mạnh mẽ hơn:
+Although Home Assistant already supports basic fan control, this blueprint offers a more natural and powerful experience:
 
-- **Kết hợp 2 trong 1:** Điều khiển cả tốc độ và chế độ quay (oscillation) trong cùng một câu lệnh, điều mà công cụ mặc định chưa làm được.
-- **Điều chỉnh tương đối:** Hỗ trợ các lệnh "tăng số", "giảm số" thay vì chỉ cài đặt mức cố định.
-- **Nhận diện thông minh:** Tích hợp tra cứu alias nâng cao, giúp bạn gọi tên quạt theo ý thích (ví dụ "Quạt cây", "Quạt trần") mà không cần đổi tên entity gốc.
+- **2-in-1 Combination:** Controls both speed and oscillation in a single command, which the default tool cannot do.
+- **Relative Adjustment:** Supports commands like "increase speed" or "decrease speed" instead of only setting fixed levels.
+- **Smart Recognition:** Integrates advanced alias lookup, allowing you to refer to fans by your preferred names (e.g., "Standing fan," "Ceiling fan") without changing the original entity name.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Điều chỉnh linh hoạt:** Tăng/giảm tốc độ theo phần trăm, bước nhảy tùy chỉnh hoặc mức độ mong muốn.
-- **Kiểm soát toàn diện:** Bật/tắt tuốc năng và chỉnh gió cùng lúc.
-- **Đồng bộ:** Ra lệnh cho một quạt cụ thể hoặc tất cả quạt trong nhà.
+- **Flexible Adjustment:** Increase/decrease speed by a specific percentage, custom steps, or desired level.
+- **Comprehensive Control:** Turn oscillation on/off and adjust airflow simultaneously.
+- **Synchronized Control:** Command a specific fan or all fans in the house.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Tăng quạt phòng khách lên mạnh nhất và cho quay đi."
-- "Giảm tốc độ quạt trần xuống một chút."
-- "Bật tuốc năng cho tất cả quạt."
-- "Đặt quạt bàn mức 50%."
+- "Increase the living room fan to maximum and turn on oscillation."
+- "Reduce the ceiling fan speed a bit."
+- "Turn on oscillation for all fans."
+- "Set the table fan to 50%."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Thoải mái trên giường/sofa:** Điều chỉnh gió cho phù hợp với nhiệt độ phòng mà không cần rời khỏi vị trí thoải mái.
-- **Tạo "gió thoảng" nhanh:** Thiết lập nhanh chế độ "gió thoảng" (tốc độ thấp và quay) cho phòng ngủ khi đi ngủ.
+- **Comfort from Bed/Sofa:** Adjust the airflow to suit the room's temperature without leaving your comfy spot.
+- **Quick "Breeze" Setup:** Quickly set a "breeze" mode (low speed and oscillation) for the bedroom before going to sleep.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_and_oscillation_control_full_llm.yaml)
 
 ---
 
-## Voice Assist - Điều khiển Điều hòa Thông minh
+## Voice Assist - Smart AC Control
 
-Giữ không khí trong lành và nhiệt độ lý tưởng trong nhà chỉ bằng giọng nói. Blueprint này giúp bạn kiểm soát máy điều hòa một cách toàn diện, từ chế độ hoạt động, nhiệt độ đến tốc độ quạt.
+Maintain fresh air and ideal temperatures in your home using just your voice. This blueprint gives you comprehensive control over your air conditioner, from operating modes and temperature to fan speed.
 
-**Tại sao nên dùng Blueprint này thay vì tính năng có sẵn (Built-in)?**
+**Why use this Blueprint instead of built-in features?**
 
-Các action mặc định của Home Assistant (`HassClimateSetTemperature`, `HassTurnOn/Off`) thường chỉ tập trung vào việc bật/tắt hoặc chỉnh nhiệt độ. Chúng **không hỗ trợ chỉnh tốc độ gió (fan speed)** và rất hạn chế trong việc chuyển đổi linh hoạt giữa các chế độ (Cool, Dry, Heat...) trong cùng một câu lệnh.
+Home Assistant's default actions (`HassClimateSetTemperature`, `HassTurnOn/Off`) primarily focus on turning devices on/off or setting the temperature. They **do not support fan speed control** and are limited in handling flexible mode switching (Cool, Dry, Heat...) within a single command.
 
-Blueprint này giải quyết triệt để các hạn chế đó:
+This blueprint solves these limitations entirely:
 
-- **Điều khiển Toàn diện (Mode + Fan + Temp):** Bạn có thể ra lệnh trọn gói: _"Bật máy lạnh 24 độ, chế độ mát, gió to nhất"_ và hệ thống sẽ thực hiện chính xác chỉ trong **một lần xử lý**.
-- **Logic thông minh:**
-  - **Tự động làm tròn:** Nếu máy chỉ hỗ trợ tăng giảm 1 độ nhưng bạn lỡ nói "24.5 độ", script sẽ tự làm tròn thay vì báo lỗi.
-  - **Xử lý đơn vị:** Tự động nhận diện và xử lý khi người dùng nói độ F (Fahrenheit) cho máy dùng độ C (Celsius) và ngược lại, đảm bảo an toàn với các giới hạn min/max.
-  - **Kiểm tra trước khi lệnh:** Tự động kiểm tra xem nhiệt độ có nằm trong ngưỡng cho phép (min/max) của thiết bị không trước khi gửi lệnh.
-- **Hỗ trợ Alias:** Tìm kiếm thiết bị chính xác qua tên gọi tắt (alias) mà bạn tự định nghĩa, hoạt động tốt hơn cơ chế mặc định trong các tình huống phức tạp.
+- **All-in-One Control (Mode + Fan + Temp):** You can issue a complete command like _"Turn on the AC to 24 degrees, cool mode, max fan speed"_, and the system handles it perfectly in a **single turn**.
+- **Smart Logic:**
+  - **Auto-rounding:** If the device only supports 1-degree steps but you say "24.5 degrees", the script automatically rounds it instead of erroring out.
+  - **Unit Handling:** Automatically detects and handles Fahrenheit/Celsius conversions, ensuring safety with min/max limits.
+  - **Pre-check:** Validates if the requested temperature is within the device's allowed range before sending the command.
+- **Alias Support:** Identifies devices accurately via your custom friendly aliases, working better than the default mechanism in complex situations.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Kiểm soát chế độ:** Chuyển đổi giữa các chế độ làm mát, sưởi ấm, hút ẩm, chỉ quạt hoặc tự động.
-- **Điều chỉnh nhiệt độ:** Cài đặt nhiệt độ chính xác với các cơ chế bảo vệ thông minh.
-- **Điều chỉnh tốc độ quạt:** Thiết lập tốc độ quạt linh hoạt (thấp, trung, cao, tự động...).
-- **Xử lý nhiều thiết bị:** Điều khiển một hoặc nhiều điều hòa cùng lúc.
+- **Mode Control:** Easily switch between cooling, heating, dry, fan-only, or auto modes.
+- **Temperature Control:** Set precise temperatures with smart safety mechanisms.
+- **Fan Speed Adjustment:** Set fan speed to preset levels (low, medium, high) or qualitative values like "maximum," "minimum."
+- **Multi-Device Handling:** Control one or multiple air conditioners simultaneously.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Bật điều hòa phòng khách 24 độ và gió mạnh nhất."
-- "Chuyển điều hòa phòng ngủ sang chế độ hút ẩm."
-- "Tăng nhiệt độ điều hòa hành lang lên 26 độ."
-- "Tắt tất cả điều hòa."
+- "Set the living room AC to 24 degrees and max fan speed."
+- "Change the bedroom AC to dry mode."
+- "Increase the hallway AC temperature to 26 degrees."
+- "Turn off all air conditioners."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Chế độ "Đêm khuya":** Khi đang ngủ mà cảm thấy quá lạnh hoặc quá nóng, bạn chỉ cần nói buông quơ để điều chỉnh mà không cần mở mắt tìm remote hay bị lóa mắt bởi màn hình điện thoại.
-- **Thân thiện với người lớn tuổi & trẻ nhỏ:** Thay vì phải nhớ các biểu tượng rắc rối trên remote (bông tuyết, giọt nước, hình mặt trời...), người nhà chỉ cần ra lệnh bằng tiếng Việt tự nhiên: _"Bật chế độ hút ẩm"_.
-- **Rảnh tay tuyệt đối:** Vừa đi làm về, tay xách nách mang, chỉ cần nói một câu: _"Bật máy lạnh 20 độ gió to nhất"_ để tận hưởng không khí mát lạnh ngay lập tức mà không cần thao tác thủ công.
+- **"Night Mode":** When you're sleeping and feel too cold or hot, just say a command to adjust it without opening your eyes to find the remote or being blinded by your phone screen.
+- **Elderly & Child Friendly:** Instead of remembering complex symbols on the remote (snowflake, water drop...), family members can just use natural commands: _"Turn on dry mode"_.
+- **Totally Hands-Free:** Just got home with your hands full? Simply say: _"Turn on the AC to 20 degrees, max wind"_ to enjoy cool air instantly without manual operation.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fac_mode_and_fan_control_full_llm.yaml)
 
 ---
 
-## Voice Assist - Dự báo Thời tiết
+## Voice Assist - Weather Forecast
 
-Tra cứu dự báo thời tiết tại nhà cho các khoảng thời gian cụ thể (theo giờ hoặc theo ngày) bằng giọng nói.
+Retrieve home weather forecasts for specific periods (hourly or daily) using natural voice commands.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Thông tin chi tiết:** Hỗ trợ dự báo theo giờ (hourly) hoặc theo ngày (daily).
-- **Linh hoạt:** Hỏi về thời tiết hôm nay, ngày mai, cuối tuần, hoặc một thời điểm cụ thể như "chiều nay", "tối mai".
-- **Tính toán trung bình:** Tự động tổng hợp dữ liệu để trả lời ngắn gọn (ví dụ: nhiệt độ trung bình, tình trạng phổ biến nhất).
+- **Detailed Info:** Supports both hourly and daily forecasts.
+- **Flexible Queries:** Ask about weather for today, tomorrow, the weekend, or specific times like "this afternoon" or "tomorrow night".
+- **Smart Averaging:** Automatically summarizes data to provide concise responses (e.g., average temperature, most frequent condition).
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Thời tiết hôm nay thế nào?"
-- "Chiều nay có mưa không?"
-- "Dự báo thời tiết cuối tuần này."
+- "What's the weather like today?"
+- "Will it rain this afternoon?"
+- "What's the forecast for this weekend?"
 
 **Credit:**
 
-- Gửi lời cảm ơn đặc biệt đến blueprint gốc từ [TheFes/ha-blueprints](https://github.com/TheFes/ha-blueprints). Phiên bản này đã được tinh chỉnh và tối ưu hóa riêng cho Gemini.
+- Special thanks to the original blueprint from [TheFes/ha-blueprints](https://github.com/TheFes/ha-blueprints). This version has been refined and optimized specifically for use with Gemini.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fweather_forecast_full_llm.yaml)
 
 ---
 
-## Voice Assist - Điều khiển Nhạc
+## Voice Assist - Music Control
 
-Điều khiển âm nhạc qua Music Assistant bằng giọng nói. Hỗ trợ tìm kiếm theo bài hát, album, nghệ sĩ, danh sách phát và radio.
+Control music via Music Assistant using voice commands. Supports searching by track, album, artist, playlist, and radio.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Tìm kiếm thông minh:** Tìm và phát chính xác nội dung bạn yêu cầu.
-- **Hỗ trợ đa dạng:** Làm việc với track, album, artist, playlist và radio.
-- **Tùy chỉnh linh hoạt:** Hỗ trợ chọn khu vực phát (area), thiết bị phát (player) và chế độ trộn bài (shuffle).
+- **Smart Search:** Finds and plays the exact content you request.
+- **Broad Support:** Works with tracks, albums, artists, playlists, and radio stations.
+- **Flexible Customization:** Supports selecting playback areas, specific players, and shuffle mode.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Phát nhạc của Sơn Tùng M-TP ở phòng khách."
-- "Bật playlist Nhạc Trẻ Remix và cho trộn bài."
-- "Phát bài hát Lối Nhỏ."
+- "Play music by Queen in the living room."
+- "Start the 'Chill Hits' playlist and turn on shuffle."
+- "Play the song 'Bohemian Rhapsody'."
 
 **Credit:**
 
-- Gửi lời cảm ơn đặc biệt đến blueprint gốc từ [music-assistant/voice-support](https://github.com/music-assistant/voice-support). Phiên bản này đã được tinh chỉnh và tối ưu hóa riêng cho Gemini.
+- Special thanks to the original blueprint from [music-assistant/voice-support](https://github.com/music-assistant/voice-support). This version has been refined and optimized specifically for use with Gemini.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcontrol_music_full_llm.yaml)
 
 ---
 
-## Voice Assist - Định vị & Tìm kiếm Thiết bị
+## Voice Assist - Device Location & Find
 
-"Điện thoại mình đâu rồi?" - Câu hỏi kinh điển mỗi sáng. Hãy để Assistant giúp bạn tìm nó ngay lập tức.
+"Where's my phone?" - The classic morning question. Let Assistant help you find it instantly.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Định vị trong nhà:** Cho biết điện thoại đang ở phòng nào (dựa trên sóng Bluetooth/Wi-Fi).
-- **Kích hoạt chuông:** Bắt điện thoại đổ chuông ầm ĩ kể cả khi đang để chế độ im lặng.
-- **Hỗ trợ đa thiết bị:** Tìm iPhone, Android, iPad hay bất kỳ thiết bị nào có cài app Home Assistant.
+- **Indoor Positioning:** Tells you which room your phone is in (based on Bluetooth/Wi-Fi signals).
+- **Trigger Ringing:** Make your phone ring loudly, even if it's on silent mode.
+- **Multi-Device Support:** Find iPhones, Androids, iPads, or any device with the Home Assistant app installed.
 
-**Ví dụ lệnh thoại:**
+**Example Voice Commands:**
 
-- "Tìm xem điện thoại của bố đang ở đâu?"
-- "Làm cho cái iPad đổ chuông đi, mình tìm không thấy."
+- "Where is Dad's phone right now?"
+- "Make the iPad ring, I can't find it."
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Ác mộng "Chế độ im lặng":** Điện thoại rơi đâu đó trong khe sofa mà lại đang tắt chuông? Assistant sẽ bắt nó đổ chuông ầm ĩ ngay lập tức.
-- **Vội đi làm:** Sáng ra muộn giờ mà không thấy chìa khóa xe hay điện thoại đâu, chỉ cần hỏi để định vị phòng nào.
+- **The "Silent Mode" Nightmare:** Phone fell in the sofa and it's on silent? Assistant will make it ring loudly instantly.
+- **Morning Rush:** Late for work and can't find your car keys or phone? Just ask to locate which room they are in.
 
-[**Xem hướng dẫn chi tiết**](/home_assistant_device_location_lookup_guide.md)
+[**View the detailed guide**](/home_assistant_device_location_lookup_guide_en.md)
 
-Để sử dụng tính năng này, bạn cần cài đặt **cả 2 blueprint**:
+To use this feature, you need to install **both blueprints**:
 
-1. **Blueprint Tìm vị trí (LLM):** Xử lý yêu cầu và tìm vị trí thiết bị.
+1. **Location Finder Blueprint (LLM):** Processes the request and finds the device's location.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_location_lookup_full_llm.yaml)
-2. **Blueprint Đổ chuông (LLM):** Kích hoạt thiết bị đổ chuông.
+2. **Ringing Blueprint (LLM):** Triggers the device to ring.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_ringing_full_llm.yaml)
 
 ---
 
-## Voice Assist - Tra cứu Phạt nguội
+## Voice Assist - Traffic Fine Lookup
 
-Tra cứu tình trạng phạt nguội của bất kỳ phương tiện nào bằng giọng nói, sử dụng dữ liệu trực tiếp từ Cổng thông tin của Cục CSGT.
+Drive with peace of mind. Check traffic violation status for any vehicle by voice, using live data from the national traffic police portal.
 
-**Lưu ý:** Tính năng này chỉ áp dụng cho hệ thống tra cứu phạt nguội tại Việt Nam.
+**Note:** This feature is only applicable to the traffic fine system in Vietnam.
 
-**Ví dụ lệnh thoại:**
+**Key Features:**
 
-- "Kiểm tra phạt nguội ô tô 30G-123.45."
-- "Xe máy 29-T1 567.89 có bị phạt nguội không?"
+- **Real-time Checks:** Instantly query the official database for traffic violations.
+- **Any Vehicle:** Check fines for your car, motorbike, or even a vehicle you're considering buying.
+- **Proactive Awareness:** Stay informed and avoid accumulating late fees.
 
-**Ứng dụng thực tế:**
+**Example Voice Commands:**
 
-- **Kiểm tra định kỳ:** "Kiểm tra phạt nguội xe 30A-123.45" - Đảm bảo phương tiện của bạn không có vi phạm tồn đọng trước khi đi đăng kiểm hoặc làm thủ tục hành chính.
-- **Phòng tránh rắc rối:** Chủ động nắm bắt thông tin phạt nguội của bản thân hoặc người thân để xử lý kịp thời, tránh các phiền phức không đáng có.
+- "Check traffic fines for car 30G-123.45."
+- "Does motorbike 29-T1 567.89 have any fines?"
+
+**Use Cases:**
+
+- **Periodic Checks:** "Check fines for car 30A-123.45" - Ensure your vehicle has no outstanding violations before inspections or administrative procedures.
+- **Proactive Management:** Proactively check your or your family's traffic fine status to handle them promptly and avoid unnecessary complications.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ftraffic_fine_lookup_full_llm.yaml)
 
 ---
 
-## Tự động Cảnh báo Phạt nguội
+## Automatic Traffic Fine Notifications
 
-Nhận cảnh báo ngay khi có vi phạm giao thông mới được ghi nhận trên hệ thống của Cục CSGT cho xe của bạn.
+Never miss an important alert. Receive instant notifications the moment a new traffic violation is recorded for your vehicle in the national police system.
 
-**Lưu ý:** Tính năng này chỉ áp dụng cho hệ thống tra cứu phạt nguội tại Việt Nam.
+**Note:** This feature is only applicable to the traffic fine system in Vietnam.
 
-**Tính năng nổi bật:**
+**Key Features:**
 
-- **Tự động kiểm tra:** Định kỳ quét hệ thống để phát hiện vi phạm mới.
-- **Thông báo tức thì:** Gửi thông báo đến Home Assistant ngay khi có phạt nguội.
-- **Hỗ trợ nhiều xe:** Dễ dàng cấu hình để theo dõi nhiều biển số xe cùng lúc.
+- **Continuous Monitoring:** Periodically scans the system to detect new violations automatically.
+- **Instant Alerts:** Get a notification directly to Home Assistant as soon as a fine is detected.
+- **Multi-Vehicle Support:** Easily configure to monitor multiple license plates for your entire family.
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Nắm bắt sớm thông tin:** Nhận cảnh báo ngay lập tức để xử lý phạt nguội kịp thời, tránh tình trạng bị phạt chồng hoặc tăng nặng.
-- **Quản lý chủ động:** Tự động theo dõi và quản lý tình trạng phạt nguội cho tất cả phương tiện của gia đình mà không cần kiểm tra thủ công.
+- **Timely Awareness:** Receive immediate alerts to address traffic fines promptly, preventing accumulating penalties or escalated issues.
+- **Proactive Management:** Automatically monitor and manage the traffic fine status for all your household vehicles without manual checks.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ftraffic_fine_notification.yaml)
 
 ---
 
-## Đồng bộ Trạng thái Thiết bị
+## Device State Synchronization
 
-Đồng bộ trạng thái `on/off` giữa nhiều thiết bị, hoạt động tương tự như một công tắc cầu thang hai chiều ảo.
+Seamlessly synchronize the `on/off` state between multiple devices, acting like a virtual two-way staircase switch for enhanced control.
 
-**Ứng dụng thực tế:**
+**Use Cases:**
 
-- **Nhà cũ dùng công tắc thông minh:** Bật/tắt đèn ở cầu thang hoặc hành lang linh hoạt từ nhiều công tắc, kể cả công tắc cơ hoặc không dây.
-- **Ánh sáng theo nhóm:** Bật một công tắc vật lý sẽ kích hoạt toàn bộ đèn trong khu vực (đèn trần, đèn hắt, đèn trang trí) cùng lúc, tạo không gian ngay lập tức.
+- **Old House, Smart Switches:** Flexibly control lights in stairwells or hallways from multiple switches, including mechanical or wireless ones.
+- **Group Lighting:** Flipping one physical switch activates all lights in an area (ceiling light, accent lights, decorative lights) simultaneously, instantly creating the desired ambiance.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Flink_multiple_devices.yaml)
 
 ---
 
-## Các Blueprint đã lỗi thời
+## Obsolete Blueprints
 
-**Lưu ý quan trọng:** Để đảm bảo LLM hoạt động hiệu quả và tránh nhầm lẫn trong việc lựa chọn công cụ, KHÔNG NÊN cài đặt đồng thời các blueprint trong mục này với các phiên bản blueprint mới tương ứng. Hãy luôn ưu tiên sử dụng các blueprint mới nhất và được khuyến nghị.
+**Important Note:** To ensure optimal LLM performance and avoid confusion in tool selection, it is NOT RECOMMENDED to install blueprints in this section concurrently with their corresponding new versions. Always prioritize using the latest and recommended blueprints.
 
-### Voice Assist - Điều khiển Quạt (Cũ)
+### Voice Assist - Smart Fan Control (Legacy)
 
-**Sử dụng phiên bản mới [Voice Assist - Điều khiển Quạt Thông minh](#voice-assist---điều-khiển-quạt-thông-minh) tích hợp cả tốc độ và tuốc năng.**
+**Use the new [Voice Assist - Smart Fan Control](#voice-assist---smart-fan-control) that integrates both speed and oscillation.**
 
-**Điều khiển Tốc độ quạt:**
+**Fan Speed Control:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_control_full_llm.yaml)
 
-**Điều khiển Xoay quạt:**
+**Fan Oscillation Control:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_oscillation_control_full_llm.yaml)
 
-### Voice Assist - Hẹn giờ Bật/Tắt Thiết bị (Cũ)
+### Voice Assist - Device Control Timer (Legacy)
 
-**Sử dụng phiên bản mới [Voice Assist - Hẹn giờ & Lên lịch Thông minh](#voice-assist---hẹn-giờ--lên-lịch-thông-minh) để có nhiều tính năng hơn.**
+**Use the new [Voice Assist - Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers) for more features.**
 
-Để sử dụng, bạn cần cài đặt **cả 2 blueprint**:
+To use this, you need to install **both blueprints**:
 
-1. **Blueprint Điều khiển (LLM):**
+1. **Controller Blueprint (LLM):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_timer_full_llm.yaml)
-2. **Blueprint Công cụ Hẹn giờ:**
+2. **Timer Tool Blueprint:**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_tool.yaml)
 
 ---
 
-## Hướng dẫn Thêm
+## Additional Tutorials
 
-### [Tùy chỉnh chỉ dẫn hệ thống (system instruction) cho Voice Assist](/home_assistant_voice_instructions.md)
+### [How to write custom system instructions for Voice Assist](/home_assistant_voice_instructions_en.md)
 
-### [Phát video mới từ kênh YouTube yêu thích](/home_assistant_play_favorite_youtube_channel_videos.md)
+### [Play new videos from favorite YouTube channels](/home_assistant_play_favorite_youtube_channel_videos_en.md)
 
-### [Theo dõi các thiết bị mất kết nối (unavailable)](/home_assistant_unavailable_devices.md)
+### [Monitor unavailable devices](/home_assistant_unavailable_devices_en.md)
 
-### [Tự động chuyển đổi giao diện (theme) sáng/tối](/home_assistant_ios_themes.md)
+### [Auto-switch iOS Themes](/home_assistant_ios_themes_en.md)
 
-### [Hướng dẫn cài đặt tìm kiếm vị trí thiết bị](/home_assistant_device_location_lookup_guide.md)
+### [Device location lookup guide](/home_assistant_device_location_lookup_guide_en.md)
 
 ---
 
-**Nếu bạn thấy bộ sưu tập này hữu ích, đừng ngần ngại chia sẻ với cộng đồng Home Assistant nhé! Hãy theo dõi để cập nhật thêm nhiều blueprint độc đáo khác trong tương lai!**
+**If you find these blueprints helpful, please share them with the Home Assistant community! Be sure to follow along for more unique blueprints coming soon!**
