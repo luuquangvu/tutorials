@@ -101,7 +101,7 @@ Forget where you parked the car? Keep forgetting the Wi-Fi password for guests? 
 **Key Features:**
 
 - **Remember Everything:** From small details like "Keys are in the desk drawer" to important reminders like "The customer ID for store ABC".
-- **Smart Retrieval:** No need to remember exact keywords. Just ask "Where is the car?" or "What's the wifi pass?", and the assistant will find the most relevant info.
+- **Smart Retrieval:** No need to remember exact keywords. Just ask "Where is the car?" or "What's the Wi-Fi pass?", and the assistant will find the most relevant info.
 - **Flexible Scopes:**
   - **Personal (User):** For your personal details (e.g., clothing sizes, dietary preferences).
   - **Household:** Shared with the whole family (e.g., gate code, trash schedule).
@@ -145,7 +145,7 @@ Turn your security cameras into "smart eyes" for your virtual assistant. No need
 **Example Voice Commands:**
 
 - "Check the gate camera, is anyone standing there?"
-- "Check if the cat is in the front yard or the back yard?"
+- "Check if the cat is in the front yard or the backyard?"
 - "Look to see if the garage door is closed."
 - "Is there any strange car in the yard?"
 
@@ -347,7 +347,7 @@ Don't let Assistant just toggle lights. Turn it into a living encyclopedia, read
 
 - **Family Arbitrator:** Arguing with your spouse about something? "What's the gold price today?" - Settle debates quickly.
 - **Quick Fact-Check:** Cooking and forgot a recipe? "Recipe for flan using a rice cooker?" - Look it up instantly without pausing your cooking.
-- **Convenience Anytime:** Driving or hands full? Still ask about weather, news, history, etc.
+- **Convenience Anytime:** Driving or hands full? Still ask about the weather, news, history, etc.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_google_search_full_llm.yaml)
 
@@ -461,7 +461,7 @@ This blueprint solves these limitations entirely:
 
 - **All-in-One Control (Mode + Fan + Temp):** You can issue a complete command like _"Turn on the AC to 24 degrees, cool mode, max fan speed"_, and the system handles it perfectly in a **single turn**.
 - **Smart Logic:**
-  - **Auto-rounding:** If the device only supports 1-degree steps but you say "24.5 degrees", the script automatically rounds it instead of erroring out.
+  - **Auto-rounding:** If the device only supports 1-degree steps, but you say "24.5 degrees", the script automatically rounds it instead of erroring out.
   - **Unit Handling:** Automatically detects and handles Fahrenheit/Celsius conversions, ensuring safety with min/max limits.
   - **Pre-check:** Validates if the requested temperature is within the device's allowed range before sending the command.
 - **Alias Support:** Identifies devices accurately via your custom friendly aliases, working better than the default mechanism in complex situations.
@@ -497,7 +497,7 @@ Retrieve home weather forecasts for specific periods (hourly or daily) using nat
 **Key Features:**
 
 - **Detailed Info:** Supports both hourly and daily forecasts.
-- **Flexible Queries:** Ask about weather for today, tomorrow, the weekend, or specific times like "this afternoon" or "tomorrow night".
+- **Flexible Queries:** Ask about the weather for today, tomorrow, the weekend, or specific times like "this afternoon" or "tomorrow night".
 - **Smart Averaging:** Automatically summarizes data to provide concise responses (e.g., average temperature, most frequent condition).
 
 **Example Voice Commands:**
@@ -555,7 +555,7 @@ Control music via Music Assistant using voice commands. Supports searching by tr
 
 **Use Cases:**
 
-- **The "Silent Mode" Nightmare:** Phone fell in the sofa and it's on silent? Assistant will make it ring loudly instantly.
+- **The "Silent Mode" Nightmare:** Phone fell in the sofa, and it's on silent? Assistant will make it ring loudly instantly.
 - **Morning Rush:** Late for work and can't find your car keys or phone? Just ask to locate which room they are in.
 
 [**View the detailed guide**](/home_assistant_device_location_lookup_guide_en.md)

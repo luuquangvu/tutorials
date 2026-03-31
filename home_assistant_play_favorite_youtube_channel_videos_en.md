@@ -89,11 +89,11 @@ For Voice Assist to recognize and interact with your YouTube channels:
 1.  After restarting HA, go to **Settings** > **Voice assistants** > **Expose**.
 2.  Find and expose the newly created YouTube channel sensors.
 
-![image](images/20250527_gCfAcK.png)
+    ![image](images/20250527_gCfAcK.png)
 
 3.  Create additional **Aliases** for the channels (e.g., "Hoa Ban", "Son Tung") to make them easier to remember or pronounce, especially for foreign channels.
 
-![image](images/20250604_VhChze.png)
+    ![image](images/20250604_VhChze.png)
 
 ### 1.5. Configure Alias Support for Assist
 
@@ -167,9 +167,9 @@ This blueprint is responsible for playing the found video on your media player d
 
 That's it! Now you can try some of the following command patterns, or improvise as you wish:
 
-- "Are there any new YouTube videos today?" -> (Assist replies) -> "Open video XXX" (XXX is a small part of the video title).
+- "Are there any new YouTube videos today?" → (Assist replies) → "Open video XXX" (XXX is a small part of the video title).
 - "Has [Channel Name] released any new videos recently? Play it on the TV right now."
-- "Do [Channel Name 1] and [Channel Name 2] have new videos this week?" -> (Assist replies) -> "Open video XXX."
+- "Do [Channel Name 1] and [Channel Name 2] have new videos this week?" → (Assist replies) → "Open video XXX."
 - "Does [Channel Name 1] or [Channel Name 2] have any new videos this month? Play it on the TV now."
 
 ---
