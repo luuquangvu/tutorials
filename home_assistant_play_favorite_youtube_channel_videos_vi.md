@@ -89,11 +89,11 @@ sensor:
 1.  Sau khi khởi động lại HA, vào **Settings** > **Voice assistants** > **Expose**.
 2.  Tìm và expose các sensor kênh YouTube mới tạo.
 
-![image](images/20250527_gCfAcK.png)
+    ![image](images/20250527_gCfAcK.png)
 
 3.  Tạo thêm các **Alias** cho các kênh (ví dụ: "Hoa Ban", "Sơn Tùng") để dễ nhớ hoặc dễ phát âm bằng giọng nói, đặc biệt là với kênh nước ngoài.
 
-![image](images/20250604_VhChze.png)
+    ![image](images/20250604_VhChze.png)
 
 ### 1.5. Cấu hình hỗ trợ Alias cho Assist
 
@@ -167,9 +167,9 @@ Blueprint này có nhiệm vụ phát video đã tìm được lên thiết bị
 
 Vậy là xong! Bây giờ bạn có thể thử với một số mẫu câu lệnh sau, hoặc biến tấu theo ý muốn:
 
-- "Hôm nay có video YouTube nào mới không?" -> (Assist trả lời) -> "Mở video XXX nhé" (XXX là một phần nhỏ trong tiêu đề của video).
+- "Hôm nay có video YouTube nào mới không?" → (Assist trả lời) → "Mở video XXX nhé" (XXX là một phần nhỏ trong tiêu đề của video).
 - "Gần đây [Tên Kênh] có video nào mới không? Hãy phát nó lên TV ngay bây giờ."
-- "Tuần này [Tên Kênh 1] và [Tên Kênh 2] có video mới không?" -> (Assist trả lời) -> "Mở video XXX nhé."
+- "Tuần này [Tên Kênh 1] và [Tên Kênh 2] có video mới không?" → (Assist trả lời) → "Mở video XXX nhé."
 - "Tháng này [Tên Kênh 1] hay [Tên Kênh 2] có video nào mới không? Hãy phát nó lên TV ngay bây giờ."
 
 ---

@@ -43,10 +43,10 @@ Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ s
     - [Voice Assist - Điều khiển Quạt (Cũ)](#voice-assist---điều-khiển-quạt-cũ)
     - [Voice Assist - Hẹn giờ Bật/Tắt Thiết bị (Cũ)](#voice-assist---hẹn-giờ-bậttắt-thiết-bị-cũ)
   - [Hướng dẫn Thêm](#hướng-dẫn-thêm)
-    - [Tùy chỉnh chỉ dẫn hệ thống (system instruction) cho Voice Assist](#tùy-chỉnh-chỉ-dẫn-hệ-thống-system-instruction-cho-voice-assist)
+    - [Tùy chỉnh chỉ dẫn hệ thống cho Voice Assist](#tùy-chỉnh-chỉ-dẫn-hệ-thống-cho-voice-assist)
     - [Phát video mới từ kênh YouTube yêu thích](#phát-video-mới-từ-kênh-youtube-yêu-thích)
-    - [Theo dõi các thiết bị mất kết nối (unavailable)](#theo-dõi-các-thiết-bị-mất-kết-nối-unavailable)
-    - [Tự động chuyển đổi giao diện (theme) sáng/tối](#tự-động-chuyển-đổi-giao-diện-theme-sángtối)
+    - [Theo dõi các thiết bị mất kết nối](#theo-dõi-các-thiết-bị-mất-kết-nối)
+    - [Tự động chuyển đổi giao diện](#tự-động-chuyển-đổi-giao-diện)
     - [Hướng dẫn cài đặt tìm kiếm vị trí thiết bị](#hướng-dẫn-cài-đặt-tìm-kiếm-vị-trí-thiết-bị)
 
 ---
@@ -652,13 +652,13 @@ Nhận cảnh báo ngay khi có vi phạm giao thông mới được ghi nhận 
 
 ## Hướng dẫn Thêm
 
-### [Tùy chỉnh chỉ dẫn hệ thống (system instruction) cho Voice Assist](/home_assistant_voice_instructions_vi.md)
+### [Tùy chỉnh chỉ dẫn hệ thống cho Voice Assist](/home_assistant_voice_instructions_vi.md)
 
 ### [Phát video mới từ kênh YouTube yêu thích](/home_assistant_play_favorite_youtube_channel_videos_vi.md)
 
-### [Theo dõi các thiết bị mất kết nối (unavailable)](/home_assistant_unavailable_devices_vi.md)
+### [Theo dõi các thiết bị mất kết nối](/home_assistant_unavailable_devices_vi.md)
 
-### [Tự động chuyển đổi giao diện (theme) sáng/tối](/home_assistant_ios_themes_vi.md)
+### [Tự động chuyển đổi giao diện](/home_assistant_ios_themes_vi.md)
 
 ### [Hướng dẫn cài đặt tìm kiếm vị trí thiết bị](/home_assistant_device_location_lookup_guide_vi.md)
 
