@@ -251,9 +251,7 @@ def _normalize_key(s: str) -> str:
     return s
 
 
-def _condense_candidate_for_selection(
-    entry: dict[str, Any], *, score: float | None = None
-) -> dict[str, Any]:
+def _condense_candidate_for_selection(entry: dict[str, Any], *, score: float | None = None) -> dict[str, Any]:
     """Condense a database entry for inclusion in result lists."""
     value = entry.get("value")
     if isinstance(value, str) and len(value) > VALUE_PREVIEW_CHARS:
@@ -273,9 +271,7 @@ def _condense_candidate_for_selection(
 
 
 @pyscript_compile  # noqa: F821
-def _calculate_match_score(
-    source_tokens: set[str], candidate_tokens: set[str], bm25_raw: float | None
-) -> float:
+def _calculate_match_score(source_tokens: set[str], candidate_tokens: set[str], bm25_raw: float | None) -> float:
     """Calculate a combined match score using Jaccard similarity and BM25."""
     if not source_tokens or not candidate_tokens:
         jaccard_score = 0.0
@@ -307,9 +303,7 @@ async def _search_tag_candidates(
     tag_tokens = {token for token in tags_search.split() if token}
     if not tag_tokens:
         return []
-    limit_value = (
-        limit if limit is not None else min(CANDIDATE_CHECK_LIMIT, SEARCH_LIMIT_MAX)
-    )
+    limit_value = limit if limit is not None else min(CANDIDATE_CHECK_LIMIT, SEARCH_LIMIT_MAX)
     limit_value = max(1, min(limit_value, SEARCH_LIMIT_MAX))
     try:
         raw_matches = await _memory_search_db(tags_search, limit=limit_value)
@@ -318,11 +312,7 @@ async def _search_tag_candidates(
         return []
     if not raw_matches:
         return []
-    exclude_norm = (
-        {_normalize_key(item) for item in exclude_keys if item}
-        if exclude_keys
-        else set()
-    )
+    exclude_norm = {_normalize_key(item) for item in exclude_keys if item} if exclude_keys else set()
     dedup: dict[str, tuple[dict[str, Any], float]] = {}
     for item in raw_matches:
         existing_key = _normalize_key(item.get("key", ""))
@@ -337,9 +327,7 @@ async def _search_tag_candidates(
                 score_val = float(score_raw)
             except (TypeError, ValueError):
                 existing_tags_norm = _normalize_tags(item.get("tags", ""))
-                candidate_tokens = {
-                    token for token in existing_tags_norm.split() if token
-                }
+                candidate_tokens = {token for token in existing_tags_norm.split() if token}
                 score_val = _calculate_match_score(tag_tokens, candidate_tokens, None)
         if score_val is None or score_val <= 0:
             continue
@@ -365,10 +353,7 @@ async def _find_tag_matches_for_query(
     )
     if not candidates:
         return []
-    return [
-        _condense_candidate_for_selection(entry, score=score)
-        for entry, score in candidates
-    ]
+    return [_condense_candidate_for_selection(entry, score=score) for entry, score in candidates]
 
 
 @pyscript_compile  # noqa: F821
@@ -434,9 +419,7 @@ def _build_fts_queries(raw_query: str) -> list[str]:
 
 
 @pyscript_compile  # noqa: F821
-def _fetch_with_expiry(
-    cur: sqlite3.Cursor, key: str
-) -> tuple[bool, sqlite3.Row | None]:
+def _fetch_with_expiry(cur: sqlite3.Cursor, key: str) -> tuple[bool, sqlite3.Row | None]:
     """Retrieve a row and check if its expiration date has passed."""
     row = cur.execute(
         """
@@ -661,12 +644,8 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
             results: list[dict[str, Any]] = []
             for row in total_rows:
                 candidate_source = row["tags_search"] or _normalize_tags(row["tags"])
-                candidate_tokens = {
-                    token for token in candidate_source.split() if token
-                }
-                match_score = _calculate_match_score(
-                    query_tokens, candidate_tokens, row["rank"]
-                )
+                candidate_tokens = {token for token in candidate_source.split() if token}
+                match_score = _calculate_match_score(query_tokens, candidate_tokens, row["rank"])
                 results.append(
                     {
                         "key": row["key"],
@@ -916,7 +895,10 @@ async def memory_set(
     """
     yaml
     name: Memory Set
-    description: Create or update a memory entry with optional expiration and tags. When creating a brand-new key, tag overlaps trigger a duplicate_tags error; successful responses include key_exists to clarify whether the entry was updated or newly inserted.
+    description: >-
+      Create or update a memory entry with optional expiration and tags.
+      When creating a brand-new key, tag overlaps trigger a duplicate_tags error;
+      successful responses include key_exists to clarify whether the entry was updated or newly inserted.
     fields:
       key:
         name: Key
@@ -1005,11 +987,7 @@ async def memory_set(
 
         now = datetime.now(UTC)
         now_iso = now.isoformat()
-        expires_at = (
-            (now + timedelta(days=expiration_days_i)).isoformat()
-            if expiration_days_i
-            else None
-        )
+        expires_at = (now + timedelta(days=expiration_days_i)).isoformat() if expiration_days_i else None
 
         key_exists = await _memory_key_exists_db(key_norm)
 
@@ -1025,8 +1003,7 @@ async def memory_set(
         duplicate_options: list[dict[str, Any]] = []
         if duplicate_matches:
             duplicate_options = [
-                _condense_candidate_for_selection(match, score=score)
-                for match, score in duplicate_matches
+                _condense_candidate_for_selection(match, score=score) for match, score in duplicate_matches
             ]
 
         if duplicate_options and not key_exists:
@@ -1107,7 +1084,10 @@ async def memory_get(key: str):
     """
     yaml
     name: Memory Get
-    description: Get a memory entry by key, updating last_used_at; returns `ambiguous` when similar suggestions exist and `status=expired` with the stored payload so callers can reuse it when the record has expired.
+    description: >-
+      Get a memory entry by key, updating last_used_at;
+      returns `ambiguous` when similar suggestions exist and `status=expired`
+      with the stored payload so callers can reuse it when the record has expired.
     fields:
       key:
         name: Key
@@ -1143,9 +1123,7 @@ async def memory_get(key: str):
         return {"status": "expired", "op": "get", **attrs}
 
     if status == "not_found":
-        matches = await _find_tag_matches_for_query(
-            key or key_norm, exclude_keys={key_norm}
-        )
+        matches = await _find_tag_matches_for_query(key or key_norm, exclude_keys={key_norm})
         error_code = "ambiguous" if matches else "not_found"
         _set_result(
             "error",
@@ -1237,7 +1215,9 @@ async def memory_forget(key: str):
     """
     yaml
     name: Memory Forget
-    description: Delete a memory entry by key and remove it from the FTS index; returns `ambiguous` when nothing is removed but suggestions exist.
+    description: >-
+      Delete a memory entry by key and remove it from the FTS index;
+      returns `ambiguous` when nothing is removed but suggestions exist.
     fields:
       key:
         name: Key
@@ -1264,9 +1244,7 @@ async def memory_forget(key: str):
         return {"status": "error", "op": "forget", "key": key_norm, "error": str(e)}
 
     if deleted == 0:
-        matches = await _find_tag_matches_for_query(
-            key or key_norm, exclude_keys={key_norm}
-        )
+        matches = await _find_tag_matches_for_query(key or key_norm, exclude_keys={key_norm})
         error_code = "ambiguous" if matches else "not_found"
         _set_result(
             "error",
@@ -1292,7 +1270,9 @@ async def memory_purge_expired(grace_days: int | None = None):
     """
     yaml
     name: Memory Purge Expired
-    description: Remove expired rows older than the provided grace period; manual calls default to 0 days while daily housekeeping uses HOUSEKEEPING_GRACE_DAYS.
+    description: >-
+      Remove expired rows older than the provided grace period;
+      manual calls default to 0 days while daily housekeeping uses HOUSEKEEPING_GRACE_DAYS.
     fields:
       grace_days:
         name: Grace Days

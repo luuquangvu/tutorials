@@ -208,7 +208,7 @@ sequence:
       index_key: "{{ _index_key }}"
       add: "{{ _IDX_ALIVE }}"
       remove: "{{ _IDX_STALE }}"
-      ttl_seconds: 2592000 # 30 days
+      ttl_seconds: "2592000" # 30 days
     response_variable: cache_set_index
   - variables:
       _IDX_ALIVE: >-
@@ -454,7 +454,7 @@ sequence:
               index_key: "{{ _index_key }}"
               add: "{{ _IDX_ALIVE }}"
               remove: "{{ _IDX_DEDUPE_REMOVALS }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _IDX_ALIVE: >-
@@ -518,7 +518,7 @@ sequence:
             data:
               index_key: "{{ _index_key }}"
               add: "{{ _id }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _IDX_ALIVE: >-
@@ -626,7 +626,7 @@ sequence:
             data:
               index_key: "{{ _index_key }}"
               remove: "{{ _id }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _IDX_ALIVE: >-
@@ -717,7 +717,7 @@ sequence:
             data:
               index_key: "{{ _index_key }}"
               remove: "{{ _id_resolved }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _IDX_ALIVE: >-
@@ -802,7 +802,7 @@ sequence:
             data:
               index_key: "{{ _index_key }}"
               remove: "{{ _cancel_all_ids }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _IDX_ALIVE: >-
@@ -1249,7 +1249,7 @@ sequence:
             data:
               index_key: "{{ _index_key }}"
               remove: "{{ _id_resolved }}"
-              ttl_seconds: 2592000
+              ttl_seconds: "2592000"
             response_variable: cache_set_index
           - variables:
               _stop_result: >-

@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Create Calendar Event
+  name: Create Calendar Event
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/create_calendar_event_full_llm.yaml
   description: |-
@@ -58,58 +58,58 @@ blueprint:
       input:
         summary_prompt:
           name: Summary Prompt
-          description: Short summary of the event.
+          description: A brief title or summary of the calendar event, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Event subject/title.
+            Event subject/title
         description_prompt:
           name: Description Prompt
-          description: Detailed description of the event.
+          description: Detailed information about the calendar event, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Optional: Event details.
+            Event details
         start_date_time_prompt:
           name: Start Time Prompt
-          description: Start date and time for timed events.
+          description: The starting date and time for timed events (YYYY-MM-DD HH:MM:SS), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            For timed events only (`YYYY-MM-DD HH:MM:SS`). No `start_date`.
+            Timed events (YYYY-MM-DD HH:MM:SS)
         end_date_time_prompt:
           name: End Time Prompt
-          description: End date and time for timed events.
+          description: The ending date and time for timed events (YYYY-MM-DD HH:MM:SS), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for timed events. Default: start + 2h. No `end_date`.
+            End date/time (YYYY-MM-DD HH:MM:SS)
         start_date_prompt:
           name: Start Date Prompt
-          description: Start date for all-day events.
+          description: The starting date for all-day events (YYYY-MM-DD), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            For all-day events only (`YYYY-MM-DD`). No `start_date_time`.
+            All-day events (YYYY-MM-DD)
         end_date_prompt:
           name: End Date Prompt
-          description: End date for all-day events.
+          description: The ending date for all-day events (YYYY-MM-DD), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for all-day events. Default: start + 1d. No `end_date_time`.
+            End date (YYYY-MM-DD)
 mode: queued
 max: !input simultaneous
 max_exceeded: silent
-description: Adds a new event to a specified calendar. Handles both timed and all-day events with mandatory start/end details.
+description: Adds a new event to a specified calendar
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   summary:
     selector:

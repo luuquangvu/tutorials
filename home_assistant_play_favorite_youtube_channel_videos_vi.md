@@ -1,12 +1,13 @@
-# Hướng dẫn chi tiết cài đặt Voice Assist phát video Youtube lên Smart TV
+# Hướng dẫn chi tiết cài đặt Voice Assist phát video Youtube lên Smart TV hoặc loa
 
-Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát các video mới nhất từ các kênh YouTube yêu thích lên Smart TV của mình.
+Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát các video mới nhất từ các kênh YouTube yêu thích lên Smart TV hoặc loa của mình.
 
 ## Giới thiệu & Tính năng chính
 
 - **Mục đích:** Tự động phát video mới ra mắt gần đây từ một kênh YouTube bất kỳ mà bạn yêu thích.
+- **Hỗ trợ thiết bị:** Hoạt động tốt với Smart TV (Android, Samsung, Apple), Chromecast và các dòng loa Sonos.
 - **Hỗ trợ LLM:** Chỉ hoạt động với các LLM như Google hoặc OpenAI.
-- **Hỗ trợ Alias:** Bạn có thể tạo nhiều biệt danh (alias) cho tên kênh để dễ gọi tên hơn.
+- **Hỗ trợ Alias:** Bạn có thể tạo biệt danh (alias) cho cả kênh YouTube và thiết bị phát (TV/loa) để dễ gọi tên hơn.
 
 ### Hạn chế
 
@@ -18,15 +19,15 @@ Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát
 
 ## Bước 1: Lấy thông tin video từ các kênh YouTube yêu thích
 
-### 1.1. Cài đặt tích hợp Feedparser
+### 1.1. Cài đặt các tích hợp cần thiết
 
-Feedparser là một integration giúp Home Assistant đọc các nguồn cấp dữ liệu RSS/Atom, bao gồm cả feed video của YouTube.
+Để tính năng này hoạt động, bạn cần cài đặt hai tích hợp (một từ HACS và một có sẵn):
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
+1.  **Feedparser:** Dùng để đọc dữ liệu RSS từ YouTube.
+    [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
+2.  **Media Extractor:** Dùng để trích xuất link video/audio trực tiếp từ YouTube. Đây là một tích hợp **có sẵn (Built-in)** của Home Assistant. Vào **Settings** > **Devices & Services** > **Add Integration** và tìm từ khóa `Media extractor`.
 
-- Xem chi tiết tại: [github.com/custom-components/feedparser](https://github.com/custom-components/feedparser)
-- _Lưu ý:_ Tính đến thời điểm `2025-12-10`, tích hợp Feedparser vẫn chưa hỗ trợ `unique_id` một cách đầy đủ để tạo alias dễ dàng qua giao diện. Bạn có thể theo dõi tiến độ tại [pull request này](https://github.com/custom-components/feedparser/pull/143) hoặc tự sửa mã nếu muốn có tính năng này.
-- Sau khi cài đặt xong qua HACS, cần **khởi động lại** Home Assistant.
+- Sau khi cài đặt xong, hãy **khởi động lại** Home Assistant.
 
 ### 1.2. Lấy ID kênh YouTube
 
@@ -156,12 +157,10 @@ Blueprint này có nhiệm vụ phát video đã tìm được lên thiết bị
 - **Bước làm:**
   1.  Import blueprint.
   2.  Tạo một **Script** mới từ blueprint này.
-  3.  Chỉ định một Smart TV hoặc thiết bị media player sẽ phát video lên.
-  4.  **Quan trọng:** Giữ nguyên tên Script mặc định.
-
-![image](images/20250527_JC5AOg.png)
-
-- Sau khi tạo xong, **Expose** script đó cho Voice Assist.
+  3.  Chỉ định Template Sensor (`sensor.assist_entity_ids_and_aliases`) đã tạo ở bước 1.5.
+  4.  Chỉ định một Smart TV hoặc loa **mặc định** sẽ phát video lên (Assist sẽ dùng thiết bị này nếu bạn không chỉ định tên thiết bị cụ thể khi ra lệnh).
+  5.  **Quan trọng:** Giữ nguyên tên Script mặc định.
+  6.  Sau khi tạo xong, **Expose** script đó cho Voice Assist.
 
 ## 3. Ví dụ lệnh thoại
 

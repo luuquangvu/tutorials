@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Control AC Mode, Temp & Fan Speed
+  name: Control AC Mode, Temp & Fan Speed
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/ac_mode_and_fan_control_full_llm.yaml
   description: |-
@@ -70,41 +70,41 @@ blueprint:
       input:
         ac_entities_prompt:
           name: AC Entities Prompt
-          description: The prompt which will be used for the LLM can provide the name of ACs for controlling.
+          description: The prompt used by the AI to identify the AC units to control
           selector:
             text:
               multiline: true
           default: |-
-            Required: AC names to control. Separate multiple with semicolon (;).
+            AC names; separate with semicolon (;)
         hvac_mode_prompt:
           name: HVAC Mode Prompt
-          description: The prompt which will be used for the LLM can provide the AC mode.
+          description: The prompt used by the AI to identify the desired AC mode
           selector:
             text:
               multiline: true
           default: |-
-            AC mode (`auto`, `cool`, `heat`, `dry`, `fan_only`, `off`). Only if requested. Error if unsupported; no guessing.
+            AC mode. Only if requested
         temperature_prompt:
           name: Temperature Prompt
-          description: The prompt which will be used for the LLM can provide the target temperature.
+          description: The prompt used by the AI to identify the target temperature
           selector:
             text:
               multiline: true
           default: |-
-            Target temp as number (e.g. `24`). Convert F to C. No units. Only if requested.
+            Target temp (number). Convert F to C. Only if requested
         fan_mode_prompt:
           name: Fan Mode Prompt
-          description: The prompt which will be used for the LLM can provide the fan speed/mode of the AC.
+          description: The prompt used by the AI to identify the fan speed or mode
           selector:
             text:
               multiline: true
           default: |-
-            Fan speed (`auto`, `low`/`1`, `lowmid`/`2`, `mid`/`3`, `highmid`/`4`, `high`/`5`). Map to closest. Only if requested. No guessing.
+            Fan speed. Map to closest. Only if requested
 mode: parallel
 max_exceeded: silent
-description: Controls mode, temperature, and fan speed for air conditioners. Supports auto, cool, heat, dry, and fan_only modes.
+description: Controls AC mode, temperature, and fan speed
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   ac_entities:
     name: AC Entities
@@ -116,7 +116,14 @@ fields:
     name: HVAC Mode
     description: !input hvac_mode_prompt
     selector:
-      text:
+      select:
+        options:
+          - "auto"
+          - "cool"
+          - "heat"
+          - "dry"
+          - "fan_only"
+          - "off"
   temperature:
     name: Temperature
     description: !input temperature_prompt
@@ -126,7 +133,14 @@ fields:
     name: Fan Mode
     description: !input fan_mode_prompt
     selector:
-      text:
+      select:
+        options:
+          - "auto"
+          - "low"
+          - "lowmid"
+          - "mid"
+          - "highmid"
+          - "high"
 sequence:
   - variables:
       entity_aliases: !input entity_aliases

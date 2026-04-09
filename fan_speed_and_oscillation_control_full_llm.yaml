@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Control Fan Speed & Oscillation
+  name: Control Fan Speed & Oscillation
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/fan_speed_and_oscillation_control_full_llm.yaml
   description: |-
@@ -87,41 +87,41 @@ blueprint:
       input:
         fan_entities_prompt:
           name: Fan Entities Prompt
-          description: The prompt which will be used for the LLM can provide the name of fans for controlling.
+          description: The prompt used by the AI to identify the fans to control
           selector:
             text:
               multiline: true
           default: |-
-            Required: Fan names. Semicolon-separated.
+            Fan names; separate with semicolon (;)
         oscillating_prompt:
           name: Oscillating Prompt
-          description: The prompt which will be used for the LLM can provide the oscillation state.
+          description: The prompt used by the AI to identify the oscillation state
           selector:
             text:
               multiline: true
           default: |-
-            Oscillation `true` (ON), `false` (OFF). Only if requested.
+            Oscillation. Only if requested
         speed_adjustment_prompt:
           name: Speed Adjustment Prompt
-          description: The prompt which will be used for the LLM can provide speed adjustment.
+          description: The prompt used by the AI for stepwise speed adjustments (increase/decrease)
           selector:
             text:
               multiline: true
           default: |-
-            Adjust speed: `true` (increase), `false` (decrease). Only if no percentage. No guessing.
+            true (increase) or false (decrease). Only if no percentage
         percentage_prompt:
           name: Percentage Prompt
-          description: The prompt which will be used for the LLM can provide the speed percentage.
+          description: The prompt used by the AI to identify the target speed percentage
           selector:
             text:
               multiline: true
           default: |-
-            Speed 1-100%. Map (`min`=1, `low`=25, `med`=50, `high`=75, `max`=100). Only if no `speed_adjustment`.
+            Speed % (1-100). Map: min=1, low=25, med=50, high=75, max=100. Only if no adjustment
 mode: parallel
 max_exceeded: silent
-description: Comprehensive fan control for adjusting speed (percentage/relative) and oscillation state for specified fans.
+description: Controls fan speed and oscillation
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   fan_entities:
     name: Fan Entities

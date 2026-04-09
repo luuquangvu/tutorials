@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Send to Zalo
+  name: Send to Zalo (Custom)
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/send_to_zalo_custom_bot_full_llm.yaml
   description: |-
@@ -68,50 +68,50 @@ blueprint:
       input:
         summary_prompt:
           name: Summary Prompt
-          description: The prompt which will be used for the LLM can provide the message summary.
+          description: A brief overview or caption for the Zalo message/image
           selector:
             text:
               multiline: true
           default: |-
-            Required: <=10 words overview/caption. Plain text. Multiple items = multiple calls.
+            <=10 words overview/caption. Plain text. Multiple items = multiple calls
         detail_prompt:
           name: Detail Prompt
-          description: The prompt which will be used for the LLM can provide the message detail.
+          description: Additional supporting details for the Zalo message/image
           selector:
             text:
               multiline: true
           default: |-
-            Optional: Full details. No links/markdown/emojis. Multiple items = multiple calls.
+            Full details. No links/markdown/emojis. Multiple items = multiple calls
         content_type_prompt:
           name: Content Type Prompt
-          description: The prompt which will be used for the LLM can specify the type of content for the message.
+          description: The type of content to send (information, location, or image)
           selector:
             text:
               multiline: true
           default: |-
-            Required: `information`, `location`, or `image`. Multiple items = multiple calls.
+            information, location, or image. Multiple items = multiple calls
         location_prompt:
           name: Location Prompt
-          description: The prompt which will be used for the LLM can provide the location for the place.
+          description: The location/address to be sent via Zalo
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `location`: Address only. No commas/punctuation.
+            Address only. No commas/punctuation
         image_path_prompt:
           name: Image Path Prompt
-          description: Prompt shown to the LLM to request the media path when sending an image.
+          description: The file path of the image to be sent via Zalo
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `image`: Existing path (`local/`, `/media/`). No guessing.
+            Existing path (local/, /media/). No guessing
 mode: queued
 max: 30
 max_exceeded: silent
-description: Sends text messages, locations, or images via Zalo. Use for notifications, automated alerts, and sharing location or visual media.
+description: Sends messages, locations, or images via Zalo
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   summary:
     name: Summary

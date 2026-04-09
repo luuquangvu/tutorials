@@ -1,16 +1,41 @@
 blueprint:
-  name: Voice - Play YouTube Video
+  name: Play YouTube Video
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/play_youtube_video_full_llm.yaml
   description: |-
-    # Tool plays YouTube videos on a smart TV used for Voice Assistant
+    # Tool plays YouTube videos on a smart TV or speakers used for Voice Assistant
 
     ## Blueprint Setup
 
     ### Required
 
-    - A smart TV integrated into Home Assistant.
-    - Support only Android TV, Samsung TV, Apple TV.
+    - A smart TV or speakers integrated into Home Assistant.
+    - Support Android TV, Samsung TV, Apple TV, Chromecast, or Sonos.
+    - The **Media extractor** integration must be installed (Built-in integration).
+    - A template sensor stores all information about entity aliases needs to be configured in `config/configuration.yaml`; The sensor is required for friendly-name lookup.
+
+    ```
+    # File configuration.yaml
+    shell_command:
+      get_entity_alias: jq '[.data.entities[] | select(.options.conversation.should_expose == true and (.aliases | length > 0)) | {entity_id, aliases}]' ./.storage/core.entity_registry
+    template:
+      - triggers:
+          - trigger: homeassistant
+            event: start
+          - trigger: event
+            event_type: event_template_reloaded
+        actions:
+          - action: shell_command.get_entity_alias
+            response_variable: response
+        sensor:
+          - name: "Assist: Entity IDs and Aliases"
+            unique_id: entity_ids_and_aliases
+            icon: mdi:format-list-bulleted
+            device_class: timestamp
+            state: "{{ now().isoformat() }}"
+            attributes:
+              entities: "{{ response.stdout }}"
+    ```
 
     ### Optional
 
@@ -18,7 +43,7 @@ blueprint:
 
     ### Note
 
-    - Provide a concise and precise description for the script. This will be utilized by the LLM to understand it should use this script for playing YouTube videos on a smart TV.
+    - Provide a concise and precise description for the script. This will be utilized by the LLM to understand it should use this script for playing YouTube videos on a smart TV or speakers.
     - Make sure to expose the script to Assist after the script has been saved.
     - Do not alter the default script name.
     - Once the script is created, click the three dots in the top right corner, choose "Edit in YAML," and remove the `description: ...` line to restore the default. This step is important because it helps the LLM better understand the script's purpose.
@@ -26,38 +51,62 @@ blueprint:
   homeassistant:
     min_version: 2024.12.0
   input:
+    entity_aliases_settings:
+      name: Settings for Entity Aliases
+      icon: mdi:format-list-bulleted
+      description: You can use these settings to configure a template sensor that stores all information about entity aliases.
+      input:
+        entity_aliases:
+          name: Entity Aliases
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  integration: template
     media_player_settings:
       name: Settings for Media Player
       icon: mdi:television
-      description: You can use these settings to configure a smart TV.
+      description: Configure a default smart TV or speakers
       input:
         media_player:
-          name: Smart TV
+          name: Smart TV/Speakers
           selector:
             entity:
               filter:
                 - domain: media_player
-                  device_class: tv
     prompt_settings:
       name: Prompt settings for the LLM
       icon: mdi:robot
-      description: You can use these settings to finetune the prompts for your specific LLM (model). In most cases the defaults should be fine.
+      description: Finetune the prompts for your specific LLM. Defaults are usually fine.
       collapsed: true
       input:
-        media_id_prompt:
-          name: Media ID Prompt
-          description: The prompt which will be used for the LLM can provide the Media ID for the query.
+        media_player_name_prompt:
+          name: Media Player Name Prompt
+          description: The prompt used by the AI to identify the target media player name
           selector:
             text:
               multiline: true
           default: |-
-            Required: YouTube video ID. No guessing.
+            Device name (TV/Speakers). Omit if unclear
+        media_id_prompt:
+          name: Media ID Prompt
+          description: The prompt used by the AI to identify the YouTube video ID
+          selector:
+            text:
+              multiline: true
+          default: |-
+            YouTube video ID
 mode: parallel
 max_exceeded: silent
-description: Initiates playback of a specific YouTube video (by ID) on a supported media player device.
+description: Plays a specific YouTube video by ID on a TV
 variables:
-  version: 20260207
+  version: 20260409
 fields:
+  media_player:
+    name: Media Player
+    description: !input media_player_name_prompt
+    selector:
+      text:
   media_id:
     name: Media ID
     description: !input media_id_prompt
@@ -66,29 +115,44 @@ fields:
     required: true
 sequence:
   - variables:
+      entity_aliases: !input entity_aliases
       media_id: "{{ media_id | default('') | trim }}"
-      media_player_entity: !input media_player
-      media_player_name: "{{ state_attr(media_player_entity, 'friendly_name') | default('the selected TV') }}"
+      media_player_query: "{{ media_player | default('') | trim }}"
+      default_media_player: !input media_player
+  - alias: Resolve Target Media Player
+    variables:
+      media_player_entity: >-
+        {% if media_player_query %}
+          {% set matches = states.media_player | selectattr('attributes.friendly_name', 'eq', media_player_query) | map(attribute='entity_id') | list %}
+          {% if matches %}
+            {{ matches[0] }}
+          {% else %}
+            {% set alias_matches = state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'media_player\.') | selectattr('aliases', 'contains', media_player_query) | map(attribute='entity_id') | list %}
+            {{ alias_matches[0] if alias_matches else default_media_player }}
+          {% endif %}
+        {% else %}
+          {{ default_media_player }}
+        {% endif %}
+      media_player_name: "{{ state_attr(media_player_entity, 'friendly_name') | default('the selected device') }}"
   - alias: Check if variables were set correctly
     if:
       - condition: template
-        value_template: "{{ not media_id }}"
+        value_template: "{{ (not media_id) or (not media_player_entity) }}"
     then:
       - alias: Set variable for error message
         variables:
           response:
-            error: Unable to play the video because the media id is empty.
+            error: Unable to play the video because the media ID or media player is missing.
       - alias: Stop the script
-        stop: Unable to play the video because the media id is empty.
+        stop: Unable to play the video because inputs are invalid.
         response_variable: response
   - action: media_player.turn_on
     target:
       entity_id: "{{ media_player_entity }}"
-  - action: media_player.play_media
+  - action: media_extractor.play_media
     data:
       media_content_type: url
       media_content_id: "{{ 'https://www.youtube.com/watch?v=' ~ media_id }}"
-      enqueue: play
     target:
       entity_id: "{{ media_player_entity }}"
   - alias: Prepare success response for Assist

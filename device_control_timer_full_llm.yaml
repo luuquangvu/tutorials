@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Set Device Timer
+  name: Set Device Timer
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/device_control_timer_full_llm.yaml
   description: |-
@@ -82,33 +82,33 @@ blueprint:
       input:
         entities_prompt:
           name: Entities Prompt
-          description: The prompt which will be used for the LLM can provide the name of fans for controlling.
+          description: The names of the devices to be controlled, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Device names. Semicolon-separated.
+            Device names. Semicolon-separated
         control_prompt:
           name: Control Prompt
-          description: The prompt which will be used for the LLM can provide the action.
+          description: The desired state (ON or OFF) for the devices, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Action `true` (ON), `false` (OFF). No guessing.
+            Action true (ON), false (OFF). No guessing
         timer_prompt:
           name: Timer Prompt
-          description: The prompt which will be used for the LLM can provide the delay of action.
+          description: The delay duration (HH:MM:SS) before the action is executed, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Delay as `HH:MM:SS`. Calculate from now if target specified.
+            Delay as HH:MM:SS. Calculate from now if target specified
 mode: parallel
 max_exceeded: silent
-description: Simple one-time timer for turning devices on or off after a delay. Use for basic "turn off in X minutes" requests.
+description: Turns devices on or off after a specified delay
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   entities:
     name: Entities

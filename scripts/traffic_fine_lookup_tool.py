@@ -281,9 +281,7 @@ async def _get_recaptcha_reload(
 ) -> tuple[str, None] | tuple[None, str]:
     """Execute reCAPTCHA reload to obtain the action token."""
     try:
-        reload_url = (
-            f"https://www.google.com/recaptcha/api2/reload?k={RECAPTCHA_SITEKEY}"
-        )
+        reload_url = f"https://www.google.com/recaptcha/api2/reload?k={RECAPTCHA_SITEKEY}"
         reload_params = {
             "v": version,
             "reason": "q",
@@ -306,11 +304,7 @@ async def _get_recaptcha_reload(
         response_text = resp.text.lstrip(")]}'")
         try:
             rresp_data = orjson.loads(response_text)
-            if (
-                isinstance(rresp_data, list)
-                and len(rresp_data) > 1
-                and rresp_data[0] == "rresp"
-            ):
+            if isinstance(rresp_data, list) and len(rresp_data) > 1 and rresp_data[0] == "rresp":
                 token = rresp_data[1]
                 if token:
                     return token, None
@@ -391,9 +385,7 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
                         resolution_items.append(col_data)
 
                 for col_data in resolution_items:
-                    unit_key = next(
-                        (k for k in col_data if k.startswith("Đơn vị")), None
-                    )
+                    unit_key = next((k for k in col_data if k.startswith("Đơn vị")), None)
                     if unit_key:
                         violation[unit_key] = col_data[unit_key]
                         addr = col_data.get("Địa chỉ")
@@ -465,21 +457,15 @@ async def _check_license_plate(
 
             await asyncio.sleep(random.uniform(0.5, 2.5))
 
-            recaptcha_token, error = await _get_recaptcha_reload(
-                ss, anchor_token, version
-            )
+            recaptcha_token, error = await _get_recaptcha_reload(ss, anchor_token, version)
             if not recaptcha_token:
                 if retry_count < RETRY_LIMIT:
                     log.warning(  # noqa: F821
                         f"reCAPTCHA failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}"
                     )
                     next_browser = random.choice([b for b in BROWSERS if b != browser])
-                    await asyncio.sleep(
-                        random.uniform(*RETRY_DELAY) * (retry_count + 1)
-                    )
-                    return await _check_license_plate(
-                        license_plate, vehicle_type, retry_count + 1, next_browser
-                    )
+                    await asyncio.sleep(random.uniform(*RETRY_DELAY) * (retry_count + 1))
+                    return await _check_license_plate(license_plate, vehicle_type, retry_count + 1, next_browser)
                 log.error(f"reCAPTCHA failed for {license_plate}: {error}")  # noqa: F821
                 return {"error": f"reCAPTCHA retrieval failed: {error}"}
 
@@ -515,12 +501,8 @@ async def _check_license_plate(
                         f"Rate limited (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
                     next_browser = random.choice([b for b in BROWSERS if b != browser])
-                    await asyncio.sleep(
-                        random.uniform(*RETRY_DELAY) * (retry_count + 1)
-                    )
-                    return await _check_license_plate(
-                        license_plate, vehicle_type, retry_count + 1, next_browser
-                    )
+                    await asyncio.sleep(random.uniform(*RETRY_DELAY) * (retry_count + 1))
+                    return await _check_license_plate(license_plate, vehicle_type, retry_count + 1, next_browser)
                 return {"error": msg or f"Rate limited after {RETRY_LIMIT} retries"}
 
             if resp.status_code == 422:
@@ -531,16 +513,9 @@ async def _check_license_plate(
                         f"Verification failed (Retry {retry_count + 1}/{RETRY_LIMIT}): {msg}"
                     )
                     next_browser = random.choice([b for b in BROWSERS if b != browser])
-                    await asyncio.sleep(
-                        random.uniform(*RETRY_DELAY) * (retry_count + 1)
-                    )
-                    return await _check_license_plate(
-                        license_plate, vehicle_type, retry_count + 1, next_browser
-                    )
-                return {
-                    "error": "Verification failed: "
-                    + response_data.get("message", "Verification failed")
-                }
+                    await asyncio.sleep(random.uniform(*RETRY_DELAY) * (retry_count + 1))
+                    return await _check_license_plate(license_plate, vehicle_type, retry_count + 1, next_browser)
+                return {"error": "Verification failed: " + response_data.get("message", "Verification failed")}
 
             resp.raise_for_status()
 
@@ -561,9 +536,7 @@ async def _check_license_plate(
                 log.warning(f"Error (Retry {retry_count + 1}/{RETRY_LIMIT}): {error}")  # noqa: F821
                 next_browser = random.choice([b for b in BROWSERS if b != browser])
                 await asyncio.sleep(random.uniform(*RETRY_DELAY) * (retry_count + 1))
-                return await _check_license_plate(
-                    license_plate, vehicle_type, retry_count + 1, next_browser
-                )
+                return await _check_license_plate(license_plate, vehicle_type, retry_count + 1, next_browser)
             log.error(  # noqa: F821
                 f"Lookup failed for {license_plate} after {RETRY_LIMIT} retries: {error}"
             )
@@ -623,10 +596,7 @@ async def traffic_fine_lookup_tool(
         if vehicle_type not in VEHICLE_TYPES:
             return {"error": "The type of vehicle is invalid"}
 
-        if vehicle_type == "car":
-            pattern = r"^\d{2}[A-Z]{1,2}\d{4,5}$"
-        else:
-            pattern = r"^\d{2}[A-Z1-9]{2}\d{4,5}$"
+        pattern = r"^\d{2}[A-Z]{1,2}\d{4,5}$" if vehicle_type == "car" else r"^\d{2}[A-Z1-9]{2}\d{4,5}$"
         if not (license_plate and re.match(pattern, license_plate)):
             return {"error": "The license plate number is invalid"}
 

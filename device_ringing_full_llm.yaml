@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Ring Device
+  name: Ring Device
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/device_ringing_full_llm.yaml
   description: |-
@@ -36,17 +36,17 @@ blueprint:
       input:
         ring_id_prompt:
           name: Ring ID Prompt
-          description: The prompt which will be used for the LLM can provide the Ring ID for the query.
+          description: The specific Ring ID (notify.mobile_app_*) of the device to ring, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Valid Ring ID (`notify.mobile_app_*`). No guessing.
+            Valid Ring ID (notify.mobile_app_*). No guessing
 mode: parallel
 max_exceeded: silent
-description: Triggers a notification or sound on a mobile device to help locate it. Requires a valid Ring ID.
+description: Triggers a notification or sound on a mobile device to locate it
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   ring_id:
     name: Ring ID

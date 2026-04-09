@@ -90,18 +90,14 @@ async def _get_file(session: aiohttp.ClientSession, file_id: str) -> str | None:
     url = f"https://api.telegram.org/bot{TOKEN}/getFile"
     payload = {"file_id": file_id}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         data = await resp.json(loads=orjson.loads)
     return data.get("result", {}).get("file_path")
 
 
-async def _download_file(
-    session: aiohttp.ClientSession, file_id: str
-) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(session: aiohttp.ClientSession, file_id: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from Telegram and save it locally."""
     try:
         online_file_path = await _get_file(session, file_id)
@@ -157,14 +153,10 @@ async def _send_message(
         payload["message_thread_id"] = message_thread_id
     if parse_mode:
         if parse_mode not in PARSE_MODES:
-            raise ValueError(
-                f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"
-            )
+            raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
         payload["parse_mode"] = parse_mode
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(loads=orjson.loads)
@@ -196,9 +188,7 @@ async def _send_photo(
         form.add_field("caption", caption[:1024])
     if parse_mode:
         if parse_mode not in PARSE_MODES:
-            raise ValueError(
-                f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"
-            )
+            raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
         form.add_field("parse_mode", parse_mode)
     if reply_to_message_id:
         form.add_field("reply_to_message_id", str(reply_to_message_id))
@@ -232,9 +222,7 @@ async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
         return await resp.json(loads=orjson.loads)
 
 
-async def _set_webhook(
-    session: aiohttp.ClientSession, base_url: str, webhook_id: str
-) -> dict[str, Any]:
+async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id: str) -> dict[str, Any]:
     """Configure the Telegram webhook URL."""
     url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
     params = {
@@ -242,9 +230,7 @@ async def _set_webhook(
         "drop_pending_updates": True,
     }
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(loads=orjson.loads)
@@ -255,9 +241,7 @@ async def _delete_webhook(session: aiohttp.ClientSession) -> dict[str, Any]:
     url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
     params = {"drop_pending_updates": True}
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(loads=orjson.loads)
@@ -277,9 +261,7 @@ async def _get_updates(
     if limit is not None:
         params["limit"] = limit
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(loads=orjson.loads)
@@ -302,9 +284,7 @@ async def _send_chat_action(
 ) -> dict[str, Any]:
     """Broadcast a chat action status to a conversation."""
     if action not in ACTIONS_CHAT:
-        raise ValueError(
-            f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}"
-        )
+        raise ValueError(f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}")
     url = f"https://api.telegram.org/bot{TOKEN}/sendChatAction"
     params = {
         "chat_id": chat_id,
@@ -313,9 +293,7 @@ async def _send_chat_action(
     if message_thread_id:
         params["message_thread_id"] = message_thread_id
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(loads=orjson.loads)
@@ -440,9 +418,7 @@ async def send_telegram_message(
     if not all([chat_id, message]):
         return {"error": "Missing one or more required arguments: chat_id, message"}
     if parse_mode and parse_mode not in PARSE_MODES:
-        return {
-            "error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"
-        }
+        return {"error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"}
     try:
         session = await _ensure_session()
         response = await _send_message(
@@ -539,9 +515,7 @@ async def set_telegram_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             webhook_id: str = secrets.token_urlsafe()
         external_url = _external_url()
         if not external_url:
-            return {
-                "error": "The external Home Assistant URL is not found or incorrect."
-            }
+            return {"error": "The external Home Assistant URL is not found or incorrect."}
         session = await _ensure_session()
         response = await _set_webhook(session, external_url, webhook_id)
         if isinstance(response, dict) and response.get("ok"):
@@ -603,14 +577,13 @@ async def get_telegram_updates(
     """
     try:
         session = await _ensure_session()
-        response = await _get_updates(
-            session, timeout=timeout, offset=offset, limit=limit
-        )
+        response = await _get_updates(session, timeout=timeout, offset=offset, limit=limit)
         if not response:
             return {
                 "ok": True,
                 "result": [],
-                "description": "No updates found. Please send a message to the bot first to ensure there is data to retrieve.",
+                "description": "No updates found. Please send a message to "
+                "the bot first to ensure there is data to retrieve.",
             }
         return response
     except Exception as error:
@@ -680,9 +653,7 @@ async def send_telegram_chat_action(
     if not chat_id:
         return {"error": "Missing a required argument: chat_id"}
     if action not in ACTIONS_CHAT:
-        return {
-            "error": f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}"
-        }
+        return {"error": f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}"}
     try:
         session = await _ensure_session()
         response = await _send_chat_action(
@@ -758,9 +729,7 @@ async def send_telegram_photo(
     if not all([chat_id, file_path]):
         return {"error": "Missing one or more required arguments: chat_id, file_path"}
     if parse_mode and parse_mode not in PARSE_MODES:
-        return {
-            "error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"
-        }
+        return {"error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"}
     try:
         session = await _ensure_session()
         response = await _send_photo(

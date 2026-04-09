@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Get YouTube Video Info
+  name: Get YouTube Video Info
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/get_youtube_video_info_full_llm.yaml
   description: |-
@@ -84,25 +84,25 @@ blueprint:
       input:
         entities_prompt:
           name: Entities Prompt
-          description: The prompt which will be used for the LLM can provide the YouTube channel name for the query.
+          description: The prompt used by the AI to identify the YouTube channel names for the query
           selector:
             text:
               multiline: true
           default: |-
-            Required: Channel names (semicolon-separated). Silence-correct. After results, ask to play using ordinals, omit Media IDs.
+            Channel names (semicolon-separated). Silence-correct. After results, ask to play using ordinals, omit Media IDs
         period_length_prompt:
           name: Period Length Prompt
-          description: The prompt which will be used for the LLM can provide the length of the period for the query.
+          description: The prompt used by the AI to identify the lookback period in days
           selector:
             text:
               multiline: true
           default: |-
-            Optional: Days since published (1-30). Default: 3. Today=1, Week=7, Month=30.
+            Lookback days (1-30). Default: 3. Today=1, Week=7, Month=30
 mode: parallel
 max_exceeded: silent
-description: Fetches a list of the most recent video uploads from one or more specified YouTube channels within a set timeframe.
+description: Fetches recent video uploads from specified YouTube channels
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   entities:
     name: Entities

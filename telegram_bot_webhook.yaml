@@ -99,12 +99,11 @@ mode: queued
 max: 30
 max_exceeded: silent
 variables:
-  version: 20260207
+  version: 20260409
   chat_ids: !input chat_ids
   user_ids: !input user_ids
   language: !input language
-alias: Telegram bot webhook
-description: ""
+description: Telegram bot for two-way communication with Home Assistant
 triggers:
   - trigger: webhook
     allowed_methods:
@@ -148,7 +147,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Always respond in language: {{ language | trim }}.
+                  Respond in language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -171,11 +170,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -202,11 +197,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -233,11 +224,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -264,11 +251,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -295,11 +278,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{
@@ -326,11 +305,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {% if trigger.json.message.reply_to_message is defined %} {%
                   if trigger.json.message.reply_to_message.text is defined %} {{

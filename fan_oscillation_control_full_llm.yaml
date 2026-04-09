@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Set Fan Oscillation
+  name: Set Fan Oscillation
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/fan_oscillation_control_full_llm.yaml
   description: |-
@@ -70,25 +70,25 @@ blueprint:
       input:
         fan_entities_prompt:
           name: Fan Entities Prompt
-          description: The prompt which will be used for the LLM can provide the name of fans for controlling.
+          description: The prompt used by the AI to identify the fans to control
           selector:
             text:
               multiline: true
           default: |-
-            Required: Fan names. Semicolon-separated.
+            Fan names; separate with semicolon (;)
         oscillating_prompt:
           name: Oscillating Prompt
-          description: The prompt which will be used for the LLM can provide the oscillation state.
+          description: The prompt used by the AI to identify the oscillation state
           selector:
             text:
               multiline: true
           default: |-
-            Required: Set oscillation `true` (ON), `false` (OFF). No guessing.
+            true (ON) or false (OFF)
 mode: parallel
 max_exceeded: silent
-description: Simple fan oscillation control (on/off) for specified fan entities.
+description: Controls fan oscillation
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   fan_entities:
     name: Fan Entities

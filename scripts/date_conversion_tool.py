@@ -17,15 +17,7 @@ def jd_from_date(dd: int, mm: int, yy: int) -> int:
     a = int((14 - mm) / 12.0)
     y = yy + 4800 - a
     m = mm + 12 * a - 3
-    jd = (
-        dd
-        + int((153 * m + 2) / 5.0)
-        + 365 * y
-        + int(y / 4.0)
-        - int(y / 100.0)
-        + int(y / 400.0)
-        - 32045
-    )
+    jd = dd + int((153 * m + 2) / 5.0) + 365 * y + int(y / 4.0) - int(y / 100.0) + int(y / 400.0) - 32045
     if jd < 2299161:
         jd = dd + int((153 * m + 2) / 5.0) + 365 * y + int(y / 4.0) - 32083
     return jd
@@ -68,22 +60,10 @@ def new_moon(k: int) -> float:
     c1 = c1 - 0.0004 * math.sin(dr * 3 * mpr)
     c1 = c1 + 0.0104 * math.sin(dr * 2 * f) - 0.0051 * math.sin(dr * (m + mpr))
     c1 = c1 - 0.0074 * math.sin(dr * (m - mpr)) + 0.0004 * math.sin(dr * (2 * f + m))
-    c1 = (
-        c1 - 0.0004 * math.sin(dr * (2 * f - m)) - 0.0006 * math.sin(dr * (2 * f + mpr))
-    )
-    c1 = (
-        c1
-        + 0.0010 * math.sin(dr * (2 * f - mpr))
-        + 0.0005 * math.sin(dr * (2 * mpr + m))
-    )
+    c1 = c1 - 0.0004 * math.sin(dr * (2 * f - m)) - 0.0006 * math.sin(dr * (2 * f + mpr))
+    c1 = c1 + 0.0010 * math.sin(dr * (2 * f - mpr)) + 0.0005 * math.sin(dr * (2 * mpr + m))
     if t < -11:
-        deltat = (
-            0.001
-            + 0.000839 * t
-            + 0.0002261 * t2
-            - 0.00000845 * t3
-            - 0.000000081 * t * t3
-        )
+        deltat = 0.001 + 0.000839 * t + 0.0002261 * t2 - 0.00000845 * t3 - 0.000000081 * t * t3
     else:
         deltat = -0.000278 + 0.000265 * t + 0.000262 * t2
     jd_new = jd1 + c1 - deltat
@@ -99,9 +79,7 @@ def sun_longitude(jdn: float) -> float:
     m = 357.52910 + 35999.05030 * t - 0.0001559 * t2 - 0.00000048 * t * t2
     l0 = 280.46645 + 36000.76983 * t + 0.0003032 * t2
     dl = (1.914600 - 0.004817 * t - 0.000014 * t2) * math.sin(dr * m)
-    dl += (0.019993 - 0.000101 * t) * math.sin(dr * 2 * m) + 0.000290 * math.sin(
-        dr * 3 * m
-    )
+    dl += (0.019993 - 0.000101 * t) * math.sin(dr * 2 * m) + 0.000290 * math.sin(dr * 3 * m)
     longitude = l0 + dl
     longitude = longitude * dr
     longitude = longitude - math.pi * 2 * (int(longitude / (math.pi * 2)))
@@ -1032,9 +1010,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
           boolean:
     """
     if not all([conversion_type, date]):
-        return {
-            "error": "Missing one or more required arguments: conversion_type, date"
-        }
+        return {"error": "Missing one or more required arguments: conversion_type, date"}
 
     if conversion_type not in ["s2l", "l2s"]:
         return {"error": "Wrong Conversion Type: conversion_type must be s2l or l2s"}
@@ -1048,34 +1024,20 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             response = {}
             lunar_date = solar_to_lunar(day, month, year)
             days = get_number_of_days(date)
-            lunar_month = MONTHS[lunar_date[1] - 1] + (
-                " nhuận" if lunar_date[3] == 1 else ""
-            )
-            can_chi_day = (
-                CAN[(lunar_date[4] + 9) % 10] + " " + CHI[(lunar_date[4] + 1) % 12]
-            )
-            can_chi_month = (
-                CAN[(lunar_date[2] * 12 + lunar_date[1] + 3) % 10]
-                + " "
-                + CHI[(lunar_date[1] + 1) % 12]
-            )
-            can_chi_year = (
-                CAN[(lunar_date[2] + 6) % 10] + " " + CHI[(lunar_date[2] + 8) % 12]
-            )
+            lunar_month = MONTHS[lunar_date[1] - 1] + (" nhuận" if lunar_date[3] == 1 else "")
+            can_chi_day = CAN[(lunar_date[4] + 9) % 10] + " " + CHI[(lunar_date[4] + 1) % 12]
+            can_chi_month = CAN[(lunar_date[2] * 12 + lunar_date[1] + 3) % 10] + " " + CHI[(lunar_date[1] + 1) % 12]
+            can_chi_year = CAN[(lunar_date[2] + 6) % 10] + " " + CHI[(lunar_date[2] + 8) % 12]
             auspicious_hours = get_auspicious_hours(lunar_date[4])
             auspicious_day = get_auspicious_day(lunar_date[1], lunar_date[4])
             twelve_day_officers = get_twelve_day_officers(lunar_date[4])
             twenty_eight_mansions = get_twenty_eight_mansions(lunar_date[4])
             response["mode"] = "s2l"
             response["solar_date"] = date
-            response["lunar_date"] = join_date(
-                lunar_date[0], lunar_date[1], lunar_date[2]
-            )
+            response["lunar_date"] = join_date(lunar_date[0], lunar_date[1], lunar_date[2])
             response["weekday_vi"] = f"{DAYS[get_day_of_week(day, month, year)]}"
             response["difference_days"] = abs(days)
-            response["difference_direction"] = (
-                "days_remaining" if days >= 0 else "days_elapsed"
-            )
+            response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
             response["relative_to"] = datetime.date.today().isoformat()
             response["lunar_date_meta"] = {"leap_month": lunar_date[3] == 1}
             response["full_lunar_date_vi"] = (
@@ -1083,7 +1045,8 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             )
             response["can_chi"] = {
                 "calendar": "lunar",
-                "full_can_chi_date_vi": f"{DAYS[get_day_of_week(day, month, year)]} ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
+                "full_can_chi_date_vi": f"{DAYS[get_day_of_week(day, month, year)]} "
+                f"ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
             }
             response["solar_term"] = SOLAR_TERM[get_solar_term(lunar_date[4] + 1, 7)]
             response["extras"] = {
@@ -1101,9 +1064,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             log.error(  # noqa: F821
                 f"{__name__}: Solar to Lunar conversion failed for {date}: {error}"
             )
-            return {
-                "error": f"Error converting Solar date {date} to Lunar date: {error}"
-            }
+            return {"error": f"Error converting Solar date {date} to Lunar date: {error}"}
     elif conversion_type == "l2s":
         if day > 30:
             return {"error": "Invalid date: Lunar day must be less than or equal to 30"}
@@ -1114,41 +1075,34 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             solar_date = lunar_to_solar(day, month, year, is_leap)
             if solar_date == [0, 0, 0]:
                 return {
-                    "error": f"Invalid lunar date: Day {day} Month {month} (Leap: {leap_month}) Year {year} does not exist."
+                    "error": f"Invalid lunar date: Day {day} Month {month} "
+                    f"(Leap: {leap_month}) Year {year} does not exist."
                 }
-            days = get_number_of_days(
-                join_date(solar_date[0], solar_date[1], solar_date[2])
-            )
+            days = get_number_of_days(join_date(solar_date[0], solar_date[1], solar_date[2]))
             day_number = jd_from_date(solar_date[0], solar_date[1], solar_date[2])
             can_chi_day = CAN[(day_number + 9) % 10] + " " + CHI[(day_number + 1) % 12]
-            can_chi_month = (
-                CAN[(year * 12 + month + 3) % 10] + " " + CHI[(month + 1) % 12]
-            )
+            can_chi_month = CAN[(year * 12 + month + 3) % 10] + " " + CHI[(month + 1) % 12]
             can_chi_year = CAN[(year + 6) % 10] + " " + CHI[(year + 8) % 12]
             auspicious_hours = get_auspicious_hours(day_number)
             auspicious_day = get_auspicious_day(month, day_number)
             twelve_day_officers = get_twelve_day_officers(day_number)
             twenty_eight_mansions = get_twenty_eight_mansions(day_number)
             response["mode"] = "l2s"
-            response["solar_date"] = join_date(
-                solar_date[0], solar_date[1], solar_date[2]
-            )
+            response["solar_date"] = join_date(solar_date[0], solar_date[1], solar_date[2])
             response["lunar_date"] = date
-            response["weekday_vi"] = (
-                f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]}"
-            )
+            response["weekday_vi"] = f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]}"
             response["difference_days"] = abs(days)
-            response["difference_direction"] = (
-                "days_remaining" if days >= 0 else "days_elapsed"
-            )
+            response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
             response["relative_to"] = datetime.date.today().isoformat()
             response["lunar_date_meta"] = {"leap_month": leap_month}
             response["full_solar_date_vi"] = (
-                f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} ngày {solar_date[0]} tháng {solar_date[1]} năm {solar_date[2]}"
+                f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} "
+                f"ngày {solar_date[0]} tháng {solar_date[1]} năm {solar_date[2]}"
             )
             response["can_chi"] = {
                 "calendar": "solar",
-                "full_can_chi_date_vi": f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
+                "full_can_chi_date_vi": f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} "
+                f"ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
             }
             response["solar_term"] = SOLAR_TERM[get_solar_term(day_number + 1, 7)]
             response["extras"] = {
@@ -1165,8 +1119,6 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             log.error(  # noqa: F821
                 f"{__name__}: Lunar to Solar conversion failed for {date}: {error}"
             )
-            return {
-                "error": f"Error converting Lunar date {date} {kwargs} to Solar date: {error}"
-            }
+            return {"error": f"Error converting Lunar date {date} {kwargs} to Solar date: {error}"}
     else:
         return {"error": "Failed to convert date"}

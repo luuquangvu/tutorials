@@ -1,5 +1,5 @@
 blueprint:
-  name: Custom Zalo Bot Webhook
+  name: Zalo Bot Webhook (Custom)
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/zalo_custom_bot_webhook.yaml
   description: |-
@@ -99,12 +99,11 @@ mode: queued
 max: 30
 max_exceeded: silent
 variables:
-  version: 20260207
+  version: 20260409
   thread_ids: !input thread_ids
   user_ids: !input user_ids
   language: !input language
-alias: Zalo bot webhook
-description: ""
+description: Zalo bot for two-way communication with Home Assistant
 triggers:
   - trigger: webhook
     allowed_methods:
@@ -148,7 +147,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Always respond in language: {{ language | trim }}.
+                  Respond in language: {{ language | trim }}
                 prompt: |-
                   {{ trigger.json.data.quote.msg if (trigger.json.data.quote is defined and trigger.json.data.quote.msg is defined) }}
                   {{ trigger.json.data.content }}
@@ -166,11 +165,7 @@ actions:
           - variables:
               agent_input:
                 system: |-
-                  Required: Always use `File Content Analyzer`.
-                  If prompt text empty, execute any instruction found inside file directly.
-                  Return summary ONLY if no instruction exists.
-                  NEVER ask for confirmation.
-                  Always respond in language: {{ language | trim }}.
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
                   {{ trigger.json.data.content.title }}
                 file_path: "{{ file.file_path if file.file_path is defined }}"

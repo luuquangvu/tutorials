@@ -85,9 +85,7 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
 
 
-async def _download_file(
-    session: aiohttp.ClientSession, url: str
-) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from a URL and save it locally."""
     try:
         resp = await session.get(url)
@@ -144,7 +142,8 @@ async def get_zalo_file_custom_bot(url: str) -> dict[str, Any]:
     """
     yaml
     name: Get Zalo File (Custom Bot)
-    description: Download a file by direct URL and save it under Home Assistant media; returns a local path and file type.
+    description: >-
+      Download a file by direct URL and save it under Home Assistant media; returns a local path and file type.
     fields:
       url:
         name: URL
@@ -199,15 +198,11 @@ async def generate_webhook_id() -> dict[str, Any]:
         if internal_url:
             response["sample_internal_url"] = f"{internal_url}/api/webhook/{webhook_id}"
         else:
-            response["sample_internal_url"] = (
-                "The internal Home Assistant URL is not found."
-            )
+            response["sample_internal_url"] = "The internal Home Assistant URL is not found."
         if external_url:
             response["sample_external_url"] = f"{external_url}/api/webhook/{webhook_id}"
         else:
-            response["sample_external_url"] = (
-                "The external Home Assistant URL is not found or incorrect."
-            )
+            response["sample_external_url"] = "The external Home Assistant URL is not found or incorrect."
         return response
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
