@@ -1,5 +1,6 @@
-.idea
-.vscode
-.venv
 .env
-*.db
+.venv/
+.idea/
+.vscode/
+__pycache__/
+.ruff_cache/

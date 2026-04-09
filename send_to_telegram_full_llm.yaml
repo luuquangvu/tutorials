@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Send to Telegram
+  name: Send to Telegram
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/send_to_telegram_full_llm.yaml
   description: |-
@@ -71,66 +71,66 @@ blueprint:
       input:
         summary_prompt:
           name: Summary Prompt
-          description: Prompt shown to the LLM to request the message summary or image caption.
+          description: A brief overview or caption for the Telegram message/image
           selector:
             text:
               multiline: true
           default: |-
-            Required: <=10 words overview/caption. Plain text. Multiple items = multiple calls.
+            <=10 words overview/caption. Plain text. Multiple items = multiple calls
         detail_prompt:
           name: Detail Prompt
-          description: Prompt shown to the LLM to request optional supporting details for the message or image.
+          description: Additional supporting details for the Telegram message/image
           selector:
             text:
               multiline: true
           default: |-
-            Optional: Full details. No links/markdown/emojis/repeats. Plain text.
+            Full details. No links/markdown/emojis/repeats. Plain text
         content_type_prompt:
           name: Content Type Prompt
-          description: Prompt shown to the LLM to decide if the tool should send information, a location, or an image.
+          description: The type of content to send (information, location, or image)
           selector:
             text:
               multiline: true
           default: |-
-            Required: `information`, `location`, or `image`. Multiple items = multiple calls.
+            information, location, or image. Multiple items = multiple calls
         location_prompt:
           name: Location Prompt
-          description: Prompt shown to the LLM to request the location value when sending a place.
+          description: The location/address to be sent via Telegram
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `location`: Address only. No commas/punctuation.
+            Address only. No commas/punctuation
         image_path_prompt:
           name: Image Path Prompt
-          description: Prompt shown to the LLM to request the media path when sending an image.
+          description: The file path of the image to be sent via Telegram
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `image`: Existing path (`local/`, `/media/`). No guessing.
+            Existing path (local/, /media/). No guessing
         chat_id_override_prompt:
           name: Chat ID Override Prompt
-          description: Prompt shown to the LLM to request an alternate chat when needed.
+          description: An alternate Telegram Chat ID specified by the user
           selector:
             text:
               multiline: true
           default: |-
-            Optional: User-specified Telegram ID. Digits only.
+            Alternate Telegram ID
         message_thread_id_override_prompt:
           name: Message Thread ID Override Prompt
-          description: Prompt shown to the LLM to request a different topic when needed.
+          description: An alternate Telegram Thread/Topic ID specified by the user
           selector:
             text:
               multiline: true
           default: |-
-            Optional: User-specified thread/topic ID. Digits only.
+            Alternate thread ID
 mode: queued
 max: 30
 max_exceeded: silent
-description: Sends text messages, locations, or images via Telegram. Use for notifications, automated alerts, and sharing location or visual media.
+description: Sends messages, locations, or images via Telegram
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   summary:
     name: Summary

@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Convert Calendar Dates
+  name: Convert Calendar Dates
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/date_lookup_and_conversion_full_llm.yaml
   description: |-
@@ -43,33 +43,33 @@ blueprint:
       input:
         conversion_type_prompt:
           name: Conversion Type Prompt
-          description: The prompt which will be used for the LLM can provide the type for the conversion.
+          description: The type of conversion (Solar to Lunar or Lunar to Solar), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: `s2l` (Solar->Lunar) or `l2s` (Lunar->Solar). Output day of week, both dates, days diff.
+            s2l or l2s
         date_prompt:
           name: Date Prompt
-          description: The prompt which will be used for the LLM can provide the input date for the conversion.
+          description: The input date (YYYY-MM-DD) for the conversion, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Date (`YYYY-MM-DD`). If no year, use current.
+            Date (YYYY-MM-DD). If no year, use current
         leap_month_prompt:
           name: Leap Month Prompt
-          description: The prompt which will be used for the LLM can provide the leap month for the conversion.
+          description: Indicates whether the Lunar date is in a leap month, determined by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `l2s`: `true`=leap month, `false`=regular. Skip for `s2l`.
+            true if leap month. Skip for s2l
 mode: parallel
 max_exceeded: silent
-description: Converts dates between Solar and Lunar calendars, looks up auspicious days, and determines the day of the week.
+description: Converts dates between Solar and Lunar calendars
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   conversion_type:
     name: Conversion Type

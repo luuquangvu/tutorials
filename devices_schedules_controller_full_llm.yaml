@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Devices Schedules Controller
+  name: Devices Schedules Controller
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/devices_schedules_controller_full_llm.yaml
   description: |-
@@ -104,44 +104,49 @@ blueprint:
       input:
         mode_prompt:
           name: Mode prompt
+          description: The operation mode (start, cancel, list, etc.) used by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: `start`, `cancel`, `cancel_all`, `extend`, `pause`, `resume`, `list`. Keyword only.
+            start, cancel, cancel_all, extend, pause, resume, or list
         entities_prompt:
           name: Entities prompt
+          description: The device names, IDs, or aliases to be controlled, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Entities (name/ID/alias). Semicolon-separated. Required for start/cancel/extend/pause/resume. Deduplicate.
+            Entities (name/ID/alias). Semicolon-separated. Duplicates allowed
         action_prompt:
           name: Action prompt
+          description: The specific action (turn_on, set_brightness, etc.) to be scheduled, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `start`. Snake_case action (`turn_on`/`off`, `set_brightness`, etc).
+            Action to schedule
         value_prompt:
           name: Value prompt
+          description: The parameter value (temperature, brightness level, etc.) for the action, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `start` if action needs value. Empty if not.
+            Parameter value (temp, brightness, etc.)
         duration_prompt:
           name: Duration prompt
+          description: The timer duration or delay (HH:MM:SS), provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `start`/`extend`. Format: `HH:MM:SS`, `MM:SS`, or seconds. Empty if not.
+            HH:MM:SS or seconds
 mode: parallel
 max_exceeded: silent
-description: Advanced controller for managing multiple device timers. Can start, cancel, pause, resume, or list scheduled actions for various entities.
+description: Manages device timers (start, cancel, pause, resume, list)
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   mode:
     name: Mode

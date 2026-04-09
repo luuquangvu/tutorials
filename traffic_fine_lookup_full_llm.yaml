@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Check Traffic Fine
+  name: Check Traffic Fine
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/traffic_fine_lookup_full_llm.yaml
   description: |-
@@ -44,25 +44,25 @@ blueprint:
       input:
         license_plate_prompt:
           name: License Plate Prompt
-          description: The prompt which will be used for the LLM can provide the license plate number of vehicle for the query.
+          description: The license plate number of the vehicle to check for fines, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Alphanumeric, no spaces. Silence-correct mispronunciations.
+            Alphanumeric, no spaces. Silence-correct mispronunciations
         vehicle_type_prompt:
           name: Vehicle Type Prompt
-          description: The prompt which will be used for the LLM can provide the type of vehicle for the query.
+          description: The type of vehicle (car, motorbike, or electric bike) to check, chosen by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: `car`, `motorbike`, or `electricbike`. No guessing.
+            car, motorbike, or electricbike
 mode: parallel
 max_exceeded: silent
-description: Queries traffic violation databases using a license plate and vehicle type to retrieve fine details accurately.
+description: Queries traffic violation databases using a license plate and vehicle type
 variables:
-  version: 20260223
+  version: 20260409
 fields:
   license_plate:
     name: License Plate

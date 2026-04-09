@@ -18,9 +18,7 @@ if not YOUTUBE_API_KEY:
 @pyscript_compile  # noqa: F821
 def _build_youtube_client() -> Any:
     """Initialize the Google API client for YouTube v3."""
-    return build(
-        YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUTUBE_API_KEY
-    )
+    return build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUTUBE_API_KEY)
 
 
 async def _ensure_youtube_client() -> None:
@@ -105,9 +103,7 @@ async def youtube_search_tool(query: str, **kwargs) -> dict[str, Any]:
         try:
             coerced = int(value)
         except (TypeError, ValueError) as err:
-            raise ValueError(
-                "The results value must be an integer between 1 and 50"
-            ) from err
+            raise ValueError("The results value must be an integer between 1 and 50") from err
         if not 1 <= coerced <= 50:
             raise ValueError("The results value must be between 1 and 50")
         return coerced
@@ -121,9 +117,7 @@ async def youtube_search_tool(query: str, **kwargs) -> dict[str, Any]:
         elif isinstance(value, (list, tuple, set)):
             items = [str(item) for item in value if str(item).strip()]
         else:
-            raise ValueError(
-                "The search_type value must be a string or list of strings"
-            )
+            raise ValueError("The search_type value must be a string or list of strings")
 
         cleaned: list[str] = []
         for item in items:

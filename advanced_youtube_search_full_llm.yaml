@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Perform YouTube Search
+  name: Perform YouTube Search
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/advanced_youtube_search_full_llm.yaml
   description: |-
@@ -66,25 +66,25 @@ blueprint:
       input:
         query_string_prompt:
           name: Query String Prompt
-          description: The prompt which will be used for the LLM can provide the search string for the query.
+          description: The search string used by the AI to find YouTube videos
           selector:
             text:
               multiline: true
           default: |-
-            Required: Search query. Silence-correct misspellings. Use ordinals for results, omit Media IDs. Confirm if ambiguous.
+            Search query. Silence-correct misspellings. Use ordinals for results, omit Media IDs. Confirm if ambiguous
         page_token_prompt:
           name: Page Token Prompt
-          description: The prompt which will be used for the LLM can provide the page token to get additional videos that could be obtained.
+          description: The token used by the AI to fetch the next page of YouTube results
           selector:
             text:
               multiline: true
           default: |-
-            Optional: Token to fetch more videos.
+            Token to fetch more videos
 mode: parallel
 max_exceeded: silent
-description: Searches YouTube for videos and returns a list of matching results with titles and descriptions. Use to find specific content or playlists.
+description: Searches YouTube for videos and returns matching results
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   query_string:
     name: Query String

@@ -1,12 +1,13 @@
-# Detailed Guide: Voice Assist to Play YouTube Videos on Smart TV
+# Detailed Guide: Voice Assist to Play YouTube Videos on Smart TV or Speakers
 
-This guide allows you to use Home Assistant Voice to play the latest videos from your favorite YouTube channels directly on your Smart TV.
+This guide allows you to use Home Assistant Voice to play the latest videos from your favorite YouTube channels directly on your Smart TV or speakers.
 
 ## Introduction & Key Features
 
 - **Purpose:** Automatically play the most recently released video from any YouTube channel you love.
+- **Support:** Works with Smart TVs (Android, Samsung, Apple), Chromecast, and Sonos speakers.
 - **LLM Support:** Only works with LLMs like Google or OpenAI.
-- **Alias Support:** You can create multiple aliases for channel names to make them easier to call by voice.
+- **Alias Support:** You can create aliases for both YouTube channels and media player devices to make them easier to call by voice.
 
 ### Limitations
 
@@ -18,15 +19,15 @@ This guide allows you to use Home Assistant Voice to play the latest videos from
 
 ## Step 1: Get Video Info from Favorite YouTube Channels
 
-### 1.1. Install Feedparser Integration
+### 1.1. Install Required Integrations
 
-Feedparser is an integration that helps Home Assistant read RSS/Atom feeds, including YouTube video feeds.
+To enable this feature, you need two custom/built-in integrations:
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
+1.  **Feedparser:** Reads YouTube RSS feeds.
+    [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
+2.  **Media Extractor:** Extracts direct video/audio URLs from YouTube. This is a **built-in** integration. Go to **Settings** > **Devices & Services** > **Add Integration** and search for `Media extractor`.
 
-- See details at: [github.com/custom-components/feedparser](https://github.com/custom-components/feedparser)
-- _Note:_ As of `December 10, 2025`, the Feedparser integration does not yet fully support `unique_id` to easily create aliases via the UI. You can follow the progress at [this pull request](https://github.com/custom-components/feedparser/pull/143) or modify the code yourself if you want this feature early.
-- After installing via HACS, you must **restart** Home Assistant.
+- After installing, **restart** Home Assistant.
 
 ### 1.2. Get YouTube Channel ID
 
@@ -156,12 +157,10 @@ This blueprint is responsible for playing the found video on your media player d
 - **Steps:**
   1.  Import the blueprint.
   2.  Create a new **Script** from this blueprint.
-  3.  Select a Smart TV or media player device to play the video on.
-  4.  **Important:** Keep the default Script name.
-
-![image](images/20250527_JC5AOg.png)
-
-- After creating, **Expose** that script to Voice Assist.
+  3.  Select the Template Sensor (`sensor.assist_entity_ids_and_aliases`) created in step 1.5.
+  4.  Select a **Default** Smart TV or speaker to play the video on (Assist will use this if you don't specify a device).
+  5.  **Important:** Keep the default Script name.
+  6.  After creating, **Expose** that script to Voice Assist.
 
 ## 3. Example Voice Commands
 

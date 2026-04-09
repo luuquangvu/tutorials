@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Find Device
+  name: Find Device
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/device_location_lookup_full_llm.yaml
   description: |-
@@ -76,17 +76,17 @@ blueprint:
       input:
         entities_prompt:
           name: Entities Prompt
-          description: The prompt which will be used for the LLM can provide the device's name for the query.
+          description: The name of the device (phone, tag, etc.) to locate, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Tracked device names (semicolon-separated). Ring if supported.
+            Tracked device names (semicolon-separated). Ring if supported
 mode: parallel
 max_exceeded: silent
-description: Retrieves real-time device locations (phones, tags, etc.) within the home. Use to find missing devices or check room presence.
+description: Locates devices (phones, tags, etc.) within the home
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   entities:
     name: Entities

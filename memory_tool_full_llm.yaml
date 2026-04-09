@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Memory Tool
+  name: Memory Tool
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/memory_tool_full_llm.yaml
   description: |-
@@ -44,76 +44,76 @@ blueprint:
       input:
         operation_prompt:
           name: Operation Prompt
-          description: Instruction shown to the LLM for selecting the operation.
+          description: The memory operation (set, get, search, forget) to perform, determined by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: `set`, `get`, `search`, `forget`. Output exact word.
+            set, get, search, or forget
         key_prompt:
           name: Key Prompt
-          description: Instruction shown to the LLM for providing the key.
+          description: The concise key in the user's language for identifying the memory, used by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `set`/`get`/`forget`. Concise key in user language. No translation. Use `search` if unsure.
+            Concise key. No translation. Use search if unsure
         value_prompt:
           name: Value Prompt
-          description: Instruction shown to the LLM for providing the value.
+          description: The raw content to be stored in memory, extracted by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `set`. Raw value only. No quotes/explanations.
+            Raw value only
         scope_prompt:
           name: Scope Prompt
-          description: Instruction shown to the LLM for choosing the scope.
+          description: The access level (user, household, session) for the memory, chosen by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `set`: `user`, `household`, `session`. Default: `user`.
+            Default: user
         expiration_days_prompt:
           name: Expiration (days) Prompt
-          description: Instruction shown to the LLM for providing expiration.
+          description: The number of days before the memory expires (0 for permanent), estimated by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `set`: Days before expiry (0=forever). Default: 180. Range 0-3650.
+            Days before expiry (0=forever). Default: 180
         tags_prompt:
           name: Tags Prompt
-          description: Instruction shown to the LLM for providing tags.
+          description: Keywords related to the memory for easier searching, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `set`: Keywords in user language. Use phrase/key if none.
+            Keywords. Same as key if none. Semicolon-separated
         force_new_prompt:
           name: Force New Prompt
-          description: Instruction shown to the LLM for deciding whether to override duplicate-tag protection.
+          description: Decides whether to override duplicate-tag protection, determined by the AI based on user intent
           selector:
             text:
               multiline: true
           default: |-
-            Optional for `set`: `true`/`false`. `true` ONLY if user confirms override. Default: false.
+            true ONLY if user confirms override
         query_prompt:
           name: Query Prompt
-          description: Instruction shown to the LLM for providing the search query.
+          description: The search term or keywords for memory retrieval, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `search`: Search term/keywords. No translation.
+            Search term/keywords. No translation
         search_limit_prompt:
           name: Search Limit Prompt
-          description: Instruction shown to the LLM for providing the search limit.
+          description: The maximum number of results to return for a search, specified by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required for `search`: Integer 1-50. Default: 5.
+            Integer 1-50. Default: 5
 fields:
   operation:
     name: Operation
@@ -187,9 +187,9 @@ fields:
         mode: box
 mode: restart
 max_exceeded: silent
-description: Manages personal and household memory. Use to save, retrieve, search, or delete persistent notes and facts reliably. Prefer search for recall.
+description: Saves, retrieves, searches, or deletes persistent notes and facts reliably
 variables:
-  version: 20260207
+  version: 20260409
 sequence:
   - variables:
       op: "{{ operation | default('set') }}"

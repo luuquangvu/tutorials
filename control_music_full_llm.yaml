@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Control Music
+  name: Control Music
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/control_music_full_llm.yaml
   description: |-
@@ -76,76 +76,76 @@ blueprint:
       input:
         media_type_prompt:
           name: Media Type Prompt
-          description: The prompt that the LLM will use to provide the media_type.
+          description: The type of media (track, album, artist, etc.) used by the AI to filter results
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: track, album, artist, playlist, radio. Default: `track` for genre/mood/list.
+            Default: track for genre/mood/list
         artist_prompt:
           name: Artist Prompt
-          description: The prompt that the LLM will use to provide the artist.
+          description: The artist name used by the AI to find music
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Requested artist(s). Empty if unknown/multiple.
+            Requested artist(s). Empty if unknown/multiple
         album_prompt:
           name: Album Prompt
-          description: The prompt that the LLM will use to provide the album.
+          description: The album name used by the AI to find music
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Requested album. Empty if unknown/multiple.
+            Requested album. Empty if unknown/multiple
         media_id_prompt:
           name: Media ID Prompt
-          description: The prompt that the LLM will use to provide the media_id.
+          description: The specific media name or ID used by the AI to identify content
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: Specific name(s). Tracks/Albums: semicolon separated. Artists/Playlists/Radio: exact name (omit `playlist` keyword).
+            Specific name(s). Tracks/Albums: semicolon separated. Artists/Playlists/Radio: exact name (omit playlist keyword)
         media_description_prompt:
           name: Media Description Prompt
-          description: The prompt that the LLM will use to provide the media description.
+          description: The descriptive information about the media provided by the AI
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: Extracted media description from query (e.g. `the best Queen songs`). Omit area/player details.
+            Extracted media description from query (e.g. the best Queen songs). Omit area/player details
         area_prompt:
           name: Area Prompt
-          description: The prompt that the LLM will use to provide the area.
+          description: The area(s) where the music should be played, provided by the AI
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Requested area(s). Default to initiating device area. Omit if player specified.
+            Requested area(s). Default to initiating device area. Omit if player specified
         media_player_prompt:
           name: Media Player Prompt
-          description: The prompt that the LLM will use to provide the media player.
+          description: The specific media player entity_id(s) where music should be played, provided by the AI
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Target Music Assistant `media_player` entity_id(s). ONLY if explicitly mentioned.
+            Target Music Assistant media_player entity_id(s). ONLY if explicitly mentioned
         shuffle_prompt:
           name: Shuffle Prompt
-          description: The prompt that the LLM will use to determine whether to turn on shuffle or not.
+          description: The shuffle state (on/off) determined by the AI based on the request
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: `true` or `false`. `true` ONLY if shuffling explicitly requested. No guessing.
+            true or false. true ONLY if shuffling explicitly requested. No guessing
     addition_conditions_actions:
       name: Additional actions
       icon: mdi:wrench
@@ -163,9 +163,9 @@ blueprint:
           default: []
 mode: parallel
 max_exceeded: silent
-description: Plays music via Music Assistant. Supports tracks, albums, artists, playlists, and radio. Requires media type, ID, and shuffle status.
+description: Plays music via Music Assistant. Supports tracks, albums, artists, and playlists
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   media_type:
     selector:

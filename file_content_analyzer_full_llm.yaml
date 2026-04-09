@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - File Content Analyzer
+  name: File Content Analyzer
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/file_content_analyzer_full_llm.yaml
   description: |-
@@ -47,33 +47,33 @@ blueprint:
       input:
         instructions_prompt:
           name: Instructions Prompt
-          description: The prompt which will be used for the LLM can provide the request for the query.
+          description: The specific request or query for the AI to analyze the file content
           selector:
             text:
               multiline: true
           default: |-
-            Required: Exact data to extract. Returns plain text. Do not invent.
+            Exact data to extract. Returns plain text. Do not invent
         file_path_prompt:
           name: File Path Prompt
-          description: The prompt which will be used for the LLM can provide the file path for the query.
+          description: The relative file path (local/*) of the document or media to analyze, provided by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: Relative path (`local/*`). Precise.
+            Relative path (local/*). Precise
         mime_type_prompt:
           name: MIME Type Prompt
-          description: The prompt which will be used for the LLM can provide the MIME type of file for the query.
+          description: The MIME type (e.g., image/jpeg) of the file to analyze, determined by the AI
           selector:
             text:
               multiline: true
           default: |-
-            Required: MIME type (e.g., `image/jpeg`). Must match content.
+            MIME type (e.g. image/jpeg). Must match content
 mode: parallel
 max_exceeded: silent
-description: Processes and analyzes file content (images, video, audio, or text) to provide summaries, transcriptions, or visual recognition based on instructions.
+description: Analyzes file content (images, video, audio, text) to extract information or provide summaries
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   instructions:
     name: Instructions

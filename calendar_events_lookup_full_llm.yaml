@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Get Calendar Events
+  name: Get Calendar Events
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/calendar_events_lookup_full_llm.yaml
   description: |-
@@ -46,41 +46,41 @@ blueprint:
       input:
         time_period_type_prompt:
           name: Time Period Type Prompt
-          description: The prompt which will be used for the LLM can provide the type for the period (days or hours).
+          description: The prompt used by the AI to identify the period type (daily or hourly) [Human-only]
           selector:
             text:
               multiline: true
           default: |-
-            Required: `daily` (full days) or `hourly` (partial). Output only day of week and start date.
+            daily or hourly
         time_period_length_prompt:
           name: Time Period Length Prompt
-          description: The prompt which will be used for the LLM can provide the length of the period.
+          description: The prompt used by the AI to identify the period length [Human-only]
           selector:
             text:
               multiline: true
           default: |-
-            Required: Length in days/hours (e.g. 1, 7, 6).
+            Length in days (daily) or hours (hourly)
         date_prompt:
           name: Date Prompt
-          description: The prompt which will be used for the LLM can provide the start date for the events period.
+          description: The prompt used by the AI to identify the starting date [Human-only]
           selector:
             text:
               multiline: true
           default: |-
-            Required: Start date (`YYYY-MM-DD`). Default today. `Night` = next day if >= `05:00:00`.
+            Start date (YYYY-MM-DD). Default today. Night=next day if >=05:00:00
         time_prompt:
           name: Time Prompt
-          description: The prompt which will be used for the LLM can provide the start time for the events period.
+          description: The prompt used by the AI to identify the starting time [Human-only]
           selector:
             text:
               multiline: true
           default: |-
-            Required: Start time (`HH:MM:SS`). Morning=`06:00:00`, Afternoon=`12:00:00`, Evening=`18:00:00`, Night/Full day=`00:00:00`.
+            Start time (HH:MM:SS)
 mode: parallel
 max_exceeded: silent
-description: Retrieves upcoming or past calendar events for a specific time period. Useful for checking schedules and appointments.
+description: Retrieves upcoming or past calendar events for a specific period
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   time_period_type:
     name: Time Period Type

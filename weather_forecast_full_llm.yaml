@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Get Home Weather Forecast
+  name: Get Home Weather Forecast
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/weather_forecast_full_llm.yaml
   description: |-
@@ -67,53 +67,45 @@ blueprint:
       input:
         time_period_type_prompt:
           name: Time period type prompt
-          description:
-            The prompt which will be used to the LLM can provide the type
-            for the time period (days or hours)
+          description: The prompt used by the AI to identify the period type (daily or hourly)
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: `daily` (full days) or `hourly` (partial days). Exact output.
+            daily or hourly
         time_period_length_prompt:
           name: Time period length prompt
-          description:
-            The prompt which will be used to the LLM can provide the length
-            of the time period.
+          description: The prompt used by the AI to identify the period length
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: Integer length. Days (if daily) or hours (if hourly).
+            Length in days (daily) or hours (hourly)
         date_prompt:
           name: Date prompt
-          description:
-            The prompt which will be used to the LLM can provide the start
-            date for the forecast period
+          description: The prompt used by the AI to identify the starting date
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: Start date (`YYYY-MM-DD`). Default today. `Night` = next day if >=`05:00:00`.
+            Start date (YYYY-MM-DD). Default today. Night=next day if >=05:00:00
         time_prompt:
           name: Time prompt
-          description:
-            The prompt which will be used to the LLM can provide the start
-            time for the forecast period
+          description: The prompt used by the AI to identify the starting time
           selector:
             text:
               multiline: true
               multiple: false
           default: |-
-            Required: Start time (`HH:MM:SS`). Morning=`06:00:00`, Afternoon=`12:00:00`, Evening=`18:00:00`, Night/Full day=`00:00:00`.
+            Start time (HH:MM:SS)
 mode: parallel
 max_exceeded: silent
-description: Retrieves home weather forecasts for specific periods (hourly or daily). Mandatory input for period type, length, start date, and time. Use 'daily' for full days and 'hourly' for partial day requests.
+description: Retrieves weather forecast for hourly or daily periods
 variables:
-  version: 20260222
+  version: 20260409
 fields:
   time_period_type:
     name: Time Period Type

@@ -8,7 +8,7 @@ from typing import Any
 
 import orjson
 
-TTL = 300  # The Conversation ID retention period in Home Assistant is set to a fixed 5 minutes of idle time and cannot be modified.
+TTL = 300  # Retention period in Home Assistant is set to a fixed 5 minutes of idle time.
 DB_PATH = Path("/config/cache.db")
 
 _CACHE_READY = False

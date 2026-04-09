@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Memory Tool Local
+  name: Memory Tool Local
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/memory_tool_local.yaml
   description: |-
@@ -175,7 +175,7 @@ mode: single
 max_exceeded: silent
 
 variables:
-  version: 20260222
+  version: 20260409
   store_key: "memory_tool"
   trigger_id: "{{ (trigger.id | string) if (trigger.id is defined and (trigger.id | length) > 0) else '' }}"
   key_phrase: "{{ trigger.slots.key_phrase | default('', true) }}"

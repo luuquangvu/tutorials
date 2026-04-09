@@ -97,9 +97,7 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
 
 
-async def _download_file(
-    session: aiohttp.ClientSession, url: str
-) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from a URL and save it locally."""
     try:
         resp = await session.get(url)
@@ -136,9 +134,7 @@ async def _download_file(
         return None, f"Download failed: {error}"
 
 
-async def _send_message(
-    session: aiohttp.ClientSession, chat_id: str, message: str
-) -> dict[str, Any]:
+async def _send_message(session: aiohttp.ClientSession, chat_id: str, message: str) -> dict[str, Any]:
     """Send a text message via the Zalo Bot API."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/sendMessage"
     text = message
@@ -146,9 +142,7 @@ async def _send_message(
         text = text[:1997] + "..."
     payload = {"chat_id": chat_id, "text": text}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(content_type=None, loads=orjson.loads)
@@ -166,9 +160,7 @@ async def _send_photo(
     if caption:
         payload["caption"] = caption
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(content_type=None, loads=orjson.loads)
@@ -183,9 +175,7 @@ async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
         return await resp.json(content_type=None, loads=orjson.loads)
 
 
-async def _set_webhook(
-    session: aiohttp.ClientSession, base_url: str, webhook_id: str
-) -> dict[str, Any]:
+async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id: str) -> dict[str, Any]:
     """Configure the Zalo bot webhook URL."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/setWebhook"
     params = {
@@ -193,9 +183,7 @@ async def _set_webhook(
         "secret_token": secrets.token_urlsafe(),
     }
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(content_type=None, loads=orjson.loads)
@@ -210,16 +198,12 @@ async def _delete_webhook(session: aiohttp.ClientSession) -> dict[str, Any]:
         return await resp.json(content_type=None, loads=orjson.loads)
 
 
-async def _get_updates(
-    session: aiohttp.ClientSession, timeout: int = 30
-) -> dict[str, Any]:
+async def _get_updates(session: aiohttp.ClientSession, timeout: int = 30) -> dict[str, Any]:
     """Fetch updates from Zalo using long polling."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/getUpdates"
     payload = {"timeout": timeout}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(content_type=None, loads=orjson.loads)
@@ -234,16 +218,12 @@ async def _get_me(session: aiohttp.ClientSession) -> dict[str, Any]:
         return await resp.json(content_type=None, loads=orjson.loads)
 
 
-async def _send_chat_action(
-    session: aiohttp.ClientSession, chat_id: str, action: str = "typing"
-) -> dict[str, Any]:
+async def _send_chat_action(session: aiohttp.ClientSession, chat_id: str, action: str = "typing") -> dict[str, Any]:
     """Broadcast a chat action status to a Zalo conversation."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/sendChatAction"
     params = {"chat_id": chat_id, "action": action}
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(
-        url, data=data, headers={"Content-Type": "application/json"}
-    )
+    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
     async with resp:
         resp.raise_for_status()
         return await resp.json(content_type=None, loads=orjson.loads)
@@ -358,7 +338,8 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
     """
     yaml
     name: Get Zalo File
-    description: Download a file by direct URL and save it under Home Assistant media; returns a local path and file type.
+    description: >-
+      Download a file by direct URL and save it under Home Assistant media; returns a local path and file type.
     fields:
       url:
         name: URL
@@ -431,9 +412,7 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             webhook_id: str = secrets.token_urlsafe()
         external_url = _external_url()
         if not external_url:
-            return {
-                "error": "The external Home Assistant URL is not found or incorrect."
-            }
+            return {"error": "The external Home Assistant URL is not found or incorrect."}
         session = await _ensure_session()
         response = await _set_webhook(session, external_url, webhook_id)
         if isinstance(response, dict) and response.get("ok"):
@@ -483,7 +462,8 @@ async def get_zalo_updates(timeout: int = 30) -> dict[str, Any]:
             return {
                 "ok": True,
                 "result": [],
-                "description": "No updates found. Please send a message to the bot first to ensure there is data to retrieve.",
+                "description": "No updates found. Please send a message to "
+                "the bot first to ensure there is data to retrieve.",
             }
         return response
     except Exception as error:
@@ -542,7 +522,9 @@ async def send_zalo_photo(
     """
     yaml
     name: Send Zalo Photo
-    description: Send a local image by temporarily publishing it to /local/zalo and posting its URL to Zalo; the published file is deleted after a successful send.
+    description: >-
+      Send a local image by temporarily publishing it to /local/zalo and posting its URL to Zalo;
+      the published file is deleted after a successful send.
     fields:
       chat_id:
         name: Chat ID

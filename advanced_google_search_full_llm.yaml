@@ -1,5 +1,5 @@
 blueprint:
-  name: Voice - Perform Google Search
+  name: Perform Google Search
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/advanced_google_search_full_llm.yaml
   description: |-
@@ -51,25 +51,25 @@ blueprint:
       input:
         query_string_prompt:
           name: Query String Prompt
-          description: The prompt which will be used for the LLM can provide the search string for the query.
+          description: The search string used by the AI to find information on Google
           selector:
             text:
               multiline: true
           default: |-
-            Required: Search query. Silence-correct misspellings. No clarification.
+            Search query. Silence-correct misspellings. No clarification
         language_prompt:
           name: Language Prompt
-          description: The prompt which will be used for the LLM can provide the language for the query.
+          description: The language tag (e.g., en-US) used by the AI for the Google search results
           selector:
             text:
               multiline: true
           default: |-
-            Required: Language tag (e.g. `en-US`). Match user language.
+            Language tag (e.g. en-US). Match user language
 mode: parallel
 max_exceeded: silent
-description: Searches Google to retrieve real-time information, facts, or answers from the web. Use when local knowledge is insufficient.
+description: Searches Google to retrieve real-time information or answers from the web
 variables:
-  version: 20260207
+  version: 20260409
 fields:
   query_string:
     name: Query String
