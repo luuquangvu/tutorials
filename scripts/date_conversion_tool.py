@@ -868,6 +868,24 @@ def join_date(day: int, month: int, year: int) -> str:
     return datetime.date(year, month, day).isoformat()
 
 
+def validate_lunar_date(date: str) -> bool:
+    """Validate if a string is in YYYY-MM-DD format with lunar-valid ranges."""
+    try:
+        parts = date.split("-")
+        if len(parts) != 3:
+            return False
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        return 1 <= month <= 12 and 1 <= day <= 30 and year > 0
+    except (ValueError, IndexError):
+        return False
+
+
+def split_lunar_date(date: str) -> tuple[int, int, int]:
+    """Split a lunar date string (YYYY-MM-DD) into day, month, and year."""
+    parts = date.split("-")
+    return int(parts[2]), int(parts[1]), int(parts[0])
+
+
 def get_day_of_week(day: int, month: int, year: int) -> int:
     """Get the ISO weekday (0=Monday, 6=Sunday) for a date."""
     return datetime.date(year, month, day).weekday()
@@ -1015,10 +1033,14 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
     if conversion_type not in ["s2l", "l2s"]:
         return {"error": "Wrong Conversion Type: conversion_type must be s2l or l2s"}
 
-    if not validate_date(date):
-        return {"error": "Invalid date format: YYYY-MM-DD"}
-
-    day, month, year = split_date(date)
+    if conversion_type == "l2s":
+        if not validate_lunar_date(date):
+            return {"error": "Invalid date format: YYYY-MM-DD (day 1-30, month 1-12)"}
+        day, month, year = split_lunar_date(date)
+    else:
+        if not validate_date(date):
+            return {"error": "Invalid date format: YYYY-MM-DD"}
+        day, month, year = split_date(date)
     if conversion_type == "s2l":
         try:
             response = {}
@@ -1034,7 +1056,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             twenty_eight_mansions = get_twenty_eight_mansions(lunar_date[4])
             response["mode"] = "s2l"
             response["solar_date"] = date
-            response["lunar_date"] = join_date(lunar_date[0], lunar_date[1], lunar_date[2])
+            response["lunar_date"] = f"{lunar_date[2]:04d}-{lunar_date[1]:02d}-{lunar_date[0]:02d}"
             response["weekday_vi"] = f"{DAYS[get_day_of_week(day, month, year)]}"
             response["difference_days"] = abs(days)
             response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
