@@ -57,7 +57,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Concise key. No translation. Use search if unsure
+            Concise key in user language. No translation. Use search if unsure
         value_prompt:
           name: Value Prompt
           description: The raw content to be stored in memory, extracted by the AI
@@ -89,7 +89,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Keywords. Same as key if none. Semicolon-separated
+            Keywords in user language. Same as key if none. Semicolon-separated
         force_new_prompt:
           name: Force New Prompt
           description: Decides whether to override duplicate-tag protection, determined by the AI based on user intent
@@ -185,11 +185,11 @@ fields:
         min: 1
         max: 50
         mode: box
-mode: restart
+mode: parallel
 max_exceeded: silent
 description: Saves, retrieves, searches, or deletes persistent notes and facts reliably
 variables:
-  version: 20260409
+  version: 20260414
 sequence:
   - variables:
       op: "{{ operation | default('set') }}"
