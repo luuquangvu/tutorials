@@ -1,7 +1,3 @@
-# Common packages are included in many tools.
-httpx[http2]
-orjson
-
 # youtube_data_tool
 google-api-python-client
 
