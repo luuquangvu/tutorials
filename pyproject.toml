@@ -8,11 +8,11 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-  "aiohttp",
   "beautifulsoup4",
   "curl-cffi",
   "google-api-python-client",
-  "homeassistant>=2026.4.0",
+  "homeassistant>=2026.4.2",
+  "httpx[http2]",
   "orjson",
   "ruff",
 ]
