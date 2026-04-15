@@ -9,6 +9,7 @@ from typing import Any
 import orjson
 
 TTL = 300  # Retention period in Home Assistant is set to a fixed 5 minutes of idle time.
+INDEX_TTL = 2592000  # 30 days
 DB_PATH = Path("/config/cache.db")
 
 _CACHE_READY = False
@@ -370,7 +371,10 @@ async def memory_cache_set(
             max: 2592000
             mode: box
     """
-    ttl = ttl_seconds if ttl_seconds is not None and ttl_seconds > 0 else TTL
+    try:
+        ttl = int(ttl_seconds) if ttl_seconds is not None and int(ttl_seconds) > 0 else TTL
+    except (ValueError, TypeError):
+        ttl = TTL
     try:
         stored_value = orjson.dumps(value).decode("utf-8")
         async with _acquire_index_lock(key):
@@ -436,7 +440,7 @@ async def memory_cache_index_update(
           object:
       ttl_seconds:
         name: TTL Seconds
-        description: Optional override for the index time to live (defaults to 30 days).
+        description: Optional override for the index time to live (defaults to INDEX_TTL constant).
         selector:
           number:
             min: 1
@@ -481,7 +485,10 @@ async def memory_cache_index_update(
             "error": "Nothing to add or remove",
         }
 
-    ttl = ttl_seconds if ttl_seconds is not None and ttl_seconds > 0 else 2592000
+    try:
+        ttl = int(ttl_seconds) if ttl_seconds is not None and int(ttl_seconds) > 0 else INDEX_TTL
+    except (ValueError, TypeError):
+        ttl = INDEX_TTL
 
     async with _acquire_index_lock(cleaned_key):
         try:
