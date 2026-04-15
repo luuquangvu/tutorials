@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-import aiohttp
+import httpx
 import orjson
 from homeassistant.helpers import network
 
@@ -19,7 +19,7 @@ TOKEN = pyscript.config.get("zalo_bot_token")  # noqa: F821
 if TOKEN:
     TOKEN = TOKEN.strip()
 
-_session: aiohttp.ClientSession | None = None
+_session: httpx.AsyncClient | None = None
 
 
 if not TOKEN:
@@ -56,11 +56,11 @@ def _to_relative_path(path: str) -> str:
     return path
 
 
-async def _ensure_session() -> aiohttp.ClientSession:
-    """Create or return a shared aiohttp ClientSession."""
+async def _ensure_session() -> httpx.AsyncClient:
+    """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
-    if _session is None or _session.closed:
-        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
+    if _session is None or _session.is_closed:
+        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
     return _session
 
 
@@ -97,17 +97,20 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
 
 
-async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from a URL and save it locally."""
     try:
-        resp = await session.get(url)
-        async with resp:
+        parsed_url = urlparse(url)
+        original_name = Path(parsed_url.path).name
+
+        f = await asyncio.to_thread(_open_file, os.devnull, "wb")
+        await asyncio.to_thread(f.close)
+
+        async with client.stream("GET", url) as resp:
             resp.raise_for_status()
             content_type = resp.headers.get("Content-Type", "")
             ext = mimetypes.guess_extension(content_type.split(";")[0].strip()) or ""
 
-            parsed_url = urlparse(url)
-            original_name = Path(parsed_url.path).name
             if not Path(original_name).suffix and ext:
                 original_name += ext
 
@@ -119,22 +122,19 @@ async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str,
 
             f = await asyncio.to_thread(_open_file, file_path, "wb")
             try:
-                while True:
-                    chunk = await resp.content.read(65536)
-                    if not chunk:
-                        break
+                async for chunk in resp.aiter_bytes(65536):
                     await asyncio.to_thread(f.write, chunk)
                 await asyncio.to_thread(f.flush)
                 await asyncio.to_thread(os.fsync, f.fileno())
             finally:
                 await asyncio.to_thread(f.close)
 
-            return file_path, None
-    except (aiohttp.ClientError, OSError) as error:
+        return file_path, None
+    except (httpx.HTTPError, OSError) as error:
         return None, f"Download failed: {error}"
 
 
-async def _send_message(session: aiohttp.ClientSession, chat_id: str, message: str) -> dict[str, Any]:
+async def _send_message(client: httpx.AsyncClient, chat_id: str, message: str) -> dict[str, Any]:
     """Send a text message via the Zalo Bot API."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/sendMessage"
     text = message
@@ -142,14 +142,13 @@ async def _send_message(session: aiohttp.ClientSession, chat_id: str, message: s
         text = text[:1997] + "..."
     payload = {"chat_id": chat_id, "text": text}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 async def _send_photo(
-    session: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     chat_id: str,
     photo_url: str,
     caption: str | None = None,
@@ -160,22 +159,20 @@ async def _send_photo(
     if caption:
         payload["caption"] = caption
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve current Zalo webhook status."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/getWebhookInfo"
-    resp = await session.get(url)
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id: str) -> dict[str, Any]:
+async def _set_webhook(client: httpx.AsyncClient, base_url: str, webhook_id: str) -> dict[str, Any]:
     """Configure the Zalo bot webhook URL."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/setWebhook"
     params = {
@@ -183,50 +180,45 @@ async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id
         "secret_token": secrets.token_urlsafe(),
     }
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _delete_webhook(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _delete_webhook(client: httpx.AsyncClient) -> dict[str, Any]:
     """Remove the Zalo bot webhook configuration."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/deleteWebhook"
-    resp = await session.get(url)
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _get_updates(session: aiohttp.ClientSession, timeout: int = 30) -> dict[str, Any]:
+async def _get_updates(client: httpx.AsyncClient, timeout: int = 30) -> dict[str, Any]:
     """Fetch updates from Zalo using long polling."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/getUpdates"
     payload = {"timeout": timeout}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _get_me(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _get_me(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve basic Zalo bot account information."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/getMe"
-    resp = await session.get(url)
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _send_chat_action(session: aiohttp.ClientSession, chat_id: str, action: str = "typing") -> dict[str, Any]:
+async def _send_chat_action(client: httpx.AsyncClient, chat_id: str, action: str = "typing") -> dict[str, Any]:
     """Broadcast a chat action status to a Zalo conversation."""
     url = f"https://bot-api.zapps.me/bot{TOKEN}/sendChatAction"
     params = {"chat_id": chat_id, "action": action}
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(content_type=None, loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 async def _copy_to_www(file_path: str) -> tuple[str, str]:
@@ -285,10 +277,10 @@ def _external_url() -> str | None:
 
 @time_trigger("shutdown")  # noqa: F821
 async def _close_session() -> None:
-    """Close the shared ClientSession on service shutdown."""
+    """Close the shared AsyncClient on service shutdown."""
     global _session
-    if _session and not _session.closed:
-        await _session.close()
+    if _session and not _session.is_closed:
+        await _session.aclose()
         _session = None
 
 
@@ -323,8 +315,8 @@ async def send_zalo_message(chat_id: str, message: str) -> dict[str, Any]:
     if not all([chat_id, message]):
         return {"error": "Missing one or more required arguments: chat_id, message"}
     try:
-        session = await _ensure_session()
-        response = await _send_message(session, chat_id, message)
+        client = await _ensure_session()
+        response = await _send_message(client, chat_id, message)
         if not response:
             return {"error": "Failed to send message"}
         return response
@@ -351,10 +343,10 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
     if not url:
         return {"error": "Missing a required argument: url"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         await _ensure_dir(DIRECTORY)
 
-        file_path, error = await _download_file(session, url)
+        file_path, error = await _download_file(client, url)
         if not file_path:
             return {"error": f"Unable to download the file from Zalo. {error}"}
 
@@ -387,8 +379,8 @@ async def get_zalo_webhook() -> dict[str, Any]:
     description: Retrieve current webhook configuration and status.
     """
     try:
-        session = await _ensure_session()
-        return await _get_webhook_info(session)
+        client = await _ensure_session()
+        return await _get_webhook_info(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -413,8 +405,8 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
         external_url = _external_url()
         if not external_url:
             return {"error": "The external Home Assistant URL is not found or incorrect."}
-        session = await _ensure_session()
-        response = await _set_webhook(session, external_url, webhook_id)
+        client = await _ensure_session()
+        response = await _set_webhook(client, external_url, webhook_id)
         if isinstance(response, dict) and response.get("ok"):
             response["webhook_id"] = webhook_id
         return response
@@ -431,8 +423,8 @@ async def delete_zalo_webhook() -> dict[str, Any]:
     description: Remove the webhook configuration and stop webhook delivery.
     """
     try:
-        session = await _ensure_session()
-        return await _delete_webhook(session)
+        client = await _ensure_session()
+        return await _delete_webhook(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -456,8 +448,8 @@ async def get_zalo_updates(timeout: int = 30) -> dict[str, Any]:
         default: 30
     """
     try:
-        session = await _ensure_session()
-        response = await _get_updates(session, timeout=timeout)
+        client = await _ensure_session()
+        response = await _get_updates(client, timeout=timeout)
         if not response:
             return {
                 "ok": True,
@@ -479,8 +471,8 @@ async def get_zalo_bot_info() -> dict[str, Any]:
     description: Get basic bot profile and status.
     """
     try:
-        session = await _ensure_session()
-        return await _get_me(session)
+        client = await _ensure_session()
+        return await _get_me(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -503,8 +495,8 @@ async def send_zalo_chat_action(chat_id: str) -> dict[str, Any]:
     if not chat_id:
         return {"error": "Missing a required argument: chat_id"}
     try:
-        session = await _ensure_session()
-        response = await _send_chat_action(session, chat_id)
+        client = await _ensure_session()
+        response = await _send_chat_action(client, chat_id)
         if not response:
             return {"error": "Failed to send message"}
         return response
@@ -548,9 +540,9 @@ async def send_zalo_photo(
         return {"error": "Missing one or more required arguments: chat_id, file_path"}
     published_path = None
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         public_url, published_path = await _copy_to_www(file_path)
-        response = await _send_photo(session, chat_id, public_url, caption=caption)
+        response = await _send_photo(client, chat_id, public_url, caption=caption)
         return response
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821

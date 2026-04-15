@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import orjson
+from curl_cffi import CurlFollow, CurlHttpVersion
 from curl_cffi.requests import AsyncSession, RequestsError
 
 TTL = 30
@@ -428,7 +429,9 @@ async def _check_license_plate(
 
     if browser is None:
         browser = random.choice(BROWSERS)
-    async with AsyncSession(impersonate=browser, timeout=60) as ss:
+    async with AsyncSession(
+        impersonate=browser, timeout=60, allow_redirects=CurlFollow.SAFE, http_version=CurlHttpVersion.V2_0
+    ) as ss:
         try:
             homepage = await ss.get(BASE_URL)
             homepage.raise_for_status()

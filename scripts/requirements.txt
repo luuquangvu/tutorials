@@ -1,5 +1,5 @@
 # Common packages are included in many tools.
-aiohttp
+httpx[http2]
 orjson
 
 # youtube_data_tool

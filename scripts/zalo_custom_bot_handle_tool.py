@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-import aiohttp
+import httpx
 from homeassistant.helpers import network
 
 DIRECTORY = "/media/zalo"
 
-_session: aiohttp.ClientSession | None = None
+_session: httpx.AsyncClient | None = None
 
 
 def _to_relative_path(path: str) -> str:
@@ -44,11 +44,11 @@ def _external_url() -> str | None:
         return None
 
 
-async def _ensure_session() -> aiohttp.ClientSession:
-    """Create or return a shared aiohttp ClientSession."""
+async def _ensure_session() -> httpx.AsyncClient:
+    """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
-    if _session is None or _session.closed:
-        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
+    if _session is None or _session.is_closed:
+        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
     return _session
 
 
@@ -85,17 +85,17 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
 
 
-async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from a URL and save it locally."""
     try:
-        resp = await session.get(url)
-        async with resp:
+        parsed_url = urlparse(url)
+        original_name = Path(parsed_url.path).name
+
+        async with client.stream("GET", url) as resp:
             resp.raise_for_status()
             content_type = resp.headers.get("Content-Type", "")
             ext = mimetypes.guess_extension(content_type.split(";")[0].strip()) or ""
 
-            parsed_url = urlparse(url)
-            original_name = Path(parsed_url.path).name
             if not Path(original_name).suffix and ext:
                 original_name += ext
 
@@ -107,27 +107,24 @@ async def _download_file(session: aiohttp.ClientSession, url: str) -> tuple[str,
 
             f = await asyncio.to_thread(_open_file, file_path, "wb")
             try:
-                while True:
-                    chunk = await resp.content.read(65536)
-                    if not chunk:
-                        break
+                async for chunk in resp.aiter_bytes(65536):
                     await asyncio.to_thread(f.write, chunk)
                 await asyncio.to_thread(f.flush)
                 await asyncio.to_thread(os.fsync, f.fileno())
             finally:
                 await asyncio.to_thread(f.close)
 
-            return file_path, None
-    except (aiohttp.ClientError, OSError) as error:
+        return file_path, None
+    except (httpx.HTTPError, OSError) as error:
         return None, f"Download failed: {error}"
 
 
 @time_trigger("shutdown")  # noqa: F821
 async def _close_session() -> None:
-    """Close the shared ClientSession on service shutdown."""
+    """Close the shared AsyncClient on service shutdown."""
     global _session
-    if _session and not _session.closed:
-        await _session.close()
+    if _session and not _session.is_closed:
+        await _session.aclose()
         _session = None
 
 
@@ -155,10 +152,10 @@ async def get_zalo_file_custom_bot(url: str) -> dict[str, Any]:
     if not url:
         return {"error": "Missing a required argument: url"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         await _ensure_dir(DIRECTORY)
 
-        file_path, error = await _download_file(session, url)
+        file_path, error = await _download_file(client, url)
         if not file_path:
             return {"error": f"Unable to download the file from Zalo. {error}"}
 

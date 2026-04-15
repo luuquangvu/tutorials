@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-import aiohttp
+import httpx
 import orjson
 from homeassistant.helpers import network
 
@@ -15,7 +15,7 @@ TOKEN = pyscript.config.get("telegram_bot_token")  # noqa: F821
 if TOKEN:
     TOKEN = TOKEN.strip()
 
-_session: aiohttp.ClientSession | None = None
+_session: httpx.AsyncClient | None = None
 
 
 if not TOKEN:
@@ -72,11 +72,11 @@ def _to_relative_path(path: str) -> str:
     return path
 
 
-async def _ensure_session() -> aiohttp.ClientSession:
-    """Create or return a shared aiohttp ClientSession."""
+async def _ensure_session() -> httpx.AsyncClient:
+    """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
-    if _session is None or _session.closed:
-        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300))
+    if _session is None or _session.is_closed:
+        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
     return _session
 
 
@@ -85,56 +85,51 @@ async def _ensure_dir(path: str) -> None:
     await asyncio.to_thread(os.makedirs, path, exist_ok=True)
 
 
-async def _get_file(session: aiohttp.ClientSession, file_id: str) -> str | None:
+async def _get_file(client: httpx.AsyncClient, file_id: str) -> str | None:
     """Resolve a Telegram file identifier to its server path."""
     url = f"https://api.telegram.org/bot{TOKEN}/getFile"
     payload = {"file_id": file_id}
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        data = await resp.json(loads=orjson.loads)
-    return data.get("result", {}).get("file_path")
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    result = orjson.loads(resp.content)
+    return result.get("result", {}).get("file_path")
 
 
-async def _download_file(session: aiohttp.ClientSession, file_id: str) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(client: httpx.AsyncClient, file_id: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from Telegram and save it locally."""
     try:
-        online_file_path = await _get_file(session, file_id)
+        online_file_path = await _get_file(client, file_id)
         if not online_file_path:
             return None, "Unable to retrieve the file_path from Telegram."
 
         url = f"https://api.telegram.org/file/bot{TOKEN}/{online_file_path}"
-        resp = await session.get(url)
-        async with resp:
-            resp.raise_for_status()
 
-            file_name = os.path.basename(online_file_path)
-            base, ext = os.path.splitext(file_name)
-            timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-            file_name = f"{base}_{timestamp}_{secrets.token_hex(4)}{ext}"
+        file_name = os.path.basename(online_file_path)
+        base, ext = os.path.splitext(file_name)
+        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
+        file_name = f"{base}_{timestamp}_{secrets.token_hex(4)}{ext}"
 
-            file_path = os.path.join(DIRECTORY, file_name)
+        file_path = os.path.join(DIRECTORY, file_name)
 
-            f = await asyncio.to_thread(_open_file, file_path, "wb")
-            try:
-                while True:
-                    chunk = await resp.content.read(65536)
-                    if not chunk:
-                        break
+        f = await asyncio.to_thread(_open_file, file_path, "wb")
+        try:
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes(65536):
                     await asyncio.to_thread(f.write, chunk)
-                await asyncio.to_thread(f.flush)
-                await asyncio.to_thread(os.fsync, f.fileno())
-            finally:
-                await asyncio.to_thread(f.close)
+            await asyncio.to_thread(f.flush)
+            await asyncio.to_thread(os.fsync, f.fileno())
+        finally:
+            await asyncio.to_thread(f.close)
 
-            return file_path, None
-    except (aiohttp.ClientError, OSError) as error:
+        return file_path, None
+    except (httpx.HTTPError, OSError) as error:
         return None, f"Download failed: {error}"
 
 
 async def _send_message(
-    session: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     chat_id: int | str,
     message: str,
     reply_to_message_id: int | None = None,
@@ -156,14 +151,13 @@ async def _send_message(
             raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
         payload["parse_mode"] = parse_mode
     data = orjson.dumps(payload).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 async def _send_photo(
-    session: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     chat_id: int | str,
     file_path: str,
     caption: str | None = None,
@@ -182,47 +176,40 @@ async def _send_photo(
     mime_type, _ = mimetypes.guess_file_type(filename)
     content_type = mime_type or "application/octet-stream"
 
-    form = aiohttp.FormData()
-    form.add_field("chat_id", str(chat_id))
+    form_data: dict[str, Any] = {
+        "chat_id": str(chat_id),
+    }
     if caption:
-        form.add_field("caption", caption[:1024])
+        form_data["caption"] = caption[:1024]
     if parse_mode:
         if parse_mode not in PARSE_MODES:
             raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
-        form.add_field("parse_mode", parse_mode)
+        form_data["parse_mode"] = parse_mode
     if reply_to_message_id:
-        form.add_field("reply_to_message_id", str(reply_to_message_id))
+        form_data["reply_to_message_id"] = str(reply_to_message_id)
     if message_thread_id:
-        form.add_field("message_thread_id", str(message_thread_id))
+        form_data["message_thread_id"] = str(message_thread_id)
 
     f = await asyncio.to_thread(_open_file, file_path, "rb")
     try:
-        form.add_field(
-            name="photo",
-            value=f,
-            filename=filename,
-            content_type=content_type,
-        )
-
+        files = {"photo": (filename, f, content_type)}
         url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
-        resp = await session.post(url, data=form)
-        async with resp:
-            resp.raise_for_status()
-            return await resp.json(loads=orjson.loads)
+        resp = await client.post(url, data=form_data, files=files)
+        resp.raise_for_status()
+        return orjson.loads(resp.content)
     finally:
         await asyncio.to_thread(f.close)
 
 
-async def _get_webhook_info(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve current Telegram webhook status."""
     url = f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo"
-    resp = await session.get(url)
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id: str) -> dict[str, Any]:
+async def _set_webhook(client: httpx.AsyncClient, base_url: str, webhook_id: str) -> dict[str, Any]:
     """Configure the Telegram webhook URL."""
     url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
     params = {
@@ -230,25 +217,23 @@ async def _set_webhook(session: aiohttp.ClientSession, base_url: str, webhook_id
         "drop_pending_updates": True,
     }
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _delete_webhook(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _delete_webhook(client: httpx.AsyncClient) -> dict[str, Any]:
     """Remove the Telegram webhook configuration."""
     url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
     params = {"drop_pending_updates": True}
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 async def _get_updates(
-    session: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     timeout: int = 30,
     offset: int | None = None,
     limit: int | None = None,
@@ -261,23 +246,21 @@ async def _get_updates(
     if limit is not None:
         params["limit"] = limit
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
-async def _get_me(session: aiohttp.ClientSession) -> dict[str, Any]:
+async def _get_me(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve basic bot account information."""
     url = f"https://api.telegram.org/bot{TOKEN}/getMe"
-    resp = await session.get(url)
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 async def _send_chat_action(
-    session: aiohttp.ClientSession,
+    client: httpx.AsyncClient,
     chat_id: int | str,
     message_thread_id: int | None = None,
     action: str = "typing",
@@ -293,10 +276,9 @@ async def _send_chat_action(
     if message_thread_id:
         params["message_thread_id"] = message_thread_id
     data = orjson.dumps(params).decode("utf-8")
-    resp = await session.post(url, data=data, headers={"Content-Type": "application/json"})
-    async with resp:
-        resp.raise_for_status()
-        return await resp.json(loads=orjson.loads)
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
 
 
 def _internal_url() -> str | None:
@@ -351,10 +333,10 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
 
 @time_trigger("shutdown")  # noqa: F821
 async def _close_session() -> None:
-    """Close the shared ClientSession on service shutdown."""
+    """Close the shared AsyncClient on service shutdown."""
     global _session
-    if _session and not _session.closed:
-        await _session.close()
+    if _session and not _session.is_closed:
+        await _session.aclose()
         _session = None
 
 
@@ -420,9 +402,9 @@ async def send_telegram_message(
     if parse_mode and parse_mode not in PARSE_MODES:
         return {"error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         response = await _send_message(
-            session,
+            client,
             chat_id,
             message,
             reply_to_message_id=reply_to_message_id,
@@ -454,10 +436,10 @@ async def get_telegram_file(file_id: str) -> dict[str, Any]:
     if not file_id:
         return {"error": "Missing a required argument: file_id"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         await _ensure_dir(DIRECTORY)
 
-        file_path, error = await _download_file(session, file_id)
+        file_path, error = await _download_file(client, file_id)
         if not file_path:
             return {"error": f"Unable to download the file from Telegram. {error}"}
 
@@ -490,8 +472,8 @@ async def get_telegram_webhook() -> dict[str, Any]:
     description: Retrieve current webhook configuration and status.
     """
     try:
-        session = await _ensure_session()
-        return await _get_webhook_info(session)
+        client = await _ensure_session()
+        return await _get_webhook_info(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -516,8 +498,8 @@ async def set_telegram_webhook(webhook_id: str | None = None) -> dict[str, Any]:
         external_url = _external_url()
         if not external_url:
             return {"error": "The external Home Assistant URL is not found or incorrect."}
-        session = await _ensure_session()
-        response = await _set_webhook(session, external_url, webhook_id)
+        client = await _ensure_session()
+        response = await _set_webhook(client, external_url, webhook_id)
         if isinstance(response, dict) and response.get("ok"):
             response["webhook_id"] = webhook_id
         return response
@@ -534,8 +516,8 @@ async def delete_telegram_webhook() -> dict[str, Any]:
     description: Remove the webhook configuration and stop webhook delivery.
     """
     try:
-        session = await _ensure_session()
-        return await _delete_webhook(session)
+        client = await _ensure_session()
+        return await _delete_webhook(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -576,8 +558,8 @@ async def get_telegram_updates(
             step: 1
     """
     try:
-        session = await _ensure_session()
-        response = await _get_updates(session, timeout=timeout, offset=offset, limit=limit)
+        client = await _ensure_session()
+        response = await _get_updates(client, timeout=timeout, offset=offset, limit=limit)
         if not response:
             return {
                 "ok": True,
@@ -599,8 +581,8 @@ async def get_telegram_bot_info() -> dict[str, Any]:
     description: Tool for getting Telegram bot basic information.
     """
     try:
-        session = await _ensure_session()
-        return await _get_me(session)
+        client = await _ensure_session()
+        return await _get_me(client)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -655,9 +637,9 @@ async def send_telegram_chat_action(
     if action not in ACTIONS_CHAT:
         return {"error": f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         response = await _send_chat_action(
-            session,
+            client,
             chat_id,
             message_thread_id,
             action=action,
@@ -731,9 +713,9 @@ async def send_telegram_photo(
     if parse_mode and parse_mode not in PARSE_MODES:
         return {"error": f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}"}
     try:
-        session = await _ensure_session()
+        client = await _ensure_session()
         response = await _send_photo(
-            session,
+            client,
             chat_id,
             file_path,
             caption=caption,
