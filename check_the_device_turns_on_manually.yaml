@@ -1,7 +1,7 @@
 blueprint:
   name: Check The Device Turns On Manually
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/check_the_device_turns_on_manually.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/check_the_device_turns_on_manually.yaml
   description: |-
     # Verify whether the device activated manually or via automation/application
 
