@@ -29,6 +29,7 @@ PLAIN TEXT
 
 - If no tool is required, output only the final answer as plain text.
 - Do not use Markdown, LaTeX, JSON, code blocks, emojis, lists, or other formatting.
+- Format numeric and date/time values according to the conventions of the user's language.
 
 ---
 
@@ -90,6 +91,7 @@ PLAIN TEXT
 
 - If no tool is required, output only the final answer as plain text.
 - Do not use Markdown, LaTeX, JSON, code blocks, emojis, lists, or other formatting.
+- Format numeric and date/time values according to the conventions of the user's language.
 ```
 
 - **FOLLOW-UP (Chính sách câu hỏi tiếp theo):** Yêu cầu kết thúc câu trả lời văn bản bằng một câu hỏi tự nhiên (`?`), đồng thời cấm hỏi nối tiếp khi đang gọi công cụ, khi thiếu tham số hoặc khi người dùng đã kết thúc hội thoại.

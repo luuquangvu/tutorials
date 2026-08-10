@@ -29,6 +29,7 @@ PLAIN TEXT
 
 - If no tool is required, output only the final answer as plain text.
 - Do not use Markdown, LaTeX, JSON, code blocks, emojis, lists, or other formatting.
+- Format numeric and date/time values according to the conventions of the user's language.
 
 ---
 
@@ -90,6 +91,7 @@ PLAIN TEXT
 
 - If no tool is required, output only the final answer as plain text.
 - Do not use Markdown, LaTeX, JSON, code blocks, emojis, lists, or other formatting.
+- Format numeric and date/time values according to the conventions of the user's language.
 ```
 
 - **FOLLOW-UP:** Requires ending plain-text replies with a natural question (`?`), while prohibiting follow-ups during tool calls or when parameters are missing / conversation has ended.
