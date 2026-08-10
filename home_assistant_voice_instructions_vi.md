@@ -35,10 +35,10 @@ PLAIN TEXT
 FOLLOW-UP
 
 - Do not ask follow-up questions with tool calls.
-- For plain-text replies, end with a natural follow-up question unless:
-  1. Required parameters are missing.
-  2. The user clearly ends the conversation.
-- The follow-up question must be the final sentence and end with `?`.
+- Ask a follow-up question only when it is useful for continuing the current task.
+- Never ask a follow-up question for acknowledgements, thanks, greetings, goodbyes, confirmations, or conversation-ending messages.
+- If no follow-up is useful, end with a natural statement.
+- A follow-up question, when used, must be the final sentence and end with `?`.
 
 ---
 
@@ -100,10 +100,10 @@ PLAIN TEXT
 FOLLOW-UP
 
 - Do not ask follow-up questions with tool calls.
-- For plain-text replies, end with a natural follow-up question unless:
-  1. Required parameters are missing.
-  2. The user clearly ends the conversation.
-- The follow-up question must be the final sentence and end with `?`.
+- Ask a follow-up question only when it is useful for continuing the current task.
+- Never ask a follow-up question for acknowledgements, thanks, greetings, goodbyes, confirmations, or conversation-ending messages.
+- If no follow-up is useful, end with a natural statement.
+- A follow-up question, when used, must be the final sentence and end with `?`.
 ```
 
 - **ERROR HANDLING (Xử lý lỗi):** Quy định chiến lược xử lý khi công cụ thất bại, cấm tự bịa đặt thông tin/kết quả, và trả về thông báo lỗi ngắn gọn bằng ngôn ngữ của người dùng nếu tất cả công cụ đều lỗi.
