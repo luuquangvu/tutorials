@@ -14,6 +14,13 @@ from homeassistant.helpers import network
 DIRECTORY = "/media/zalo"
 
 _session: httpx.AsyncClient | None = None
+_session_lock = asyncio.Lock()
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _create_session() -> httpx.AsyncClient:
+    """Create the HTTPX client in native Python for executor-safe SSL setup."""
+    return httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
 
 
 def _to_relative_path(path: str) -> str:
@@ -49,7 +56,9 @@ async def _ensure_session() -> httpx.AsyncClient:
     """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
     if _session is None or _session.is_closed:
-        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
+        async with _session_lock:
+            if _session is None or _session.is_closed:
+                _session = await asyncio.to_thread(_create_session)
     return _session
 
 
@@ -99,11 +108,9 @@ def _cleanup_disk_sync(directory: str, cutoff: float) -> None:
         return
 
     for entry in path.iterdir():
-        try:
+        with contextlib.suppress(OSError):
             if entry.is_file() and entry.stat().st_mtime < cutoff:
                 entry.unlink()
-        except OSError:
-            pass
 
 
 async def _cleanup_old_files(directory: str, days: int = 30) -> None:
@@ -174,7 +181,6 @@ async def get_zalo_file_custom_bot(url: str) -> dict[str, Any]:
         mimetypes.add_type("text/plain", ".yaml")
         mime_type, _ = mimetypes.guess_file_type(file_path)
         file_path = _to_relative_path(file_path)
-        response: dict[str, Any] = {"file_path": file_path, "mime_type": mime_type}
         support_file_types = (
             "image/",
             "video/",
@@ -182,10 +188,11 @@ async def get_zalo_file_custom_bot(url: str) -> dict[str, Any]:
             "text/",
             "application/pdf",
         )
-        if mime_type and mime_type.startswith(support_file_types):
-            response["supported"] = True
-        else:
-            response["supported"] = False
+        response: dict[str, Any] = {
+            "file_path": file_path,
+            "mime_type": mime_type,
+            "supported": bool(mime_type and mime_type.startswith(support_file_types)),
+        }
         return response
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -203,16 +210,19 @@ async def generate_webhook_id() -> dict[str, Any]:
         webhook_id = secrets.token_urlsafe()
         internal_url = _internal_url()
         external_url = _external_url()
-        response = {"webhook_id": webhook_id}
-        if internal_url:
-            response["sample_internal_url"] = f"{internal_url}/api/webhook/{webhook_id}"
-        else:
-            response["sample_internal_url"] = "The internal Home Assistant URL is not found."
-        if external_url:
-            response["sample_external_url"] = f"{external_url}/api/webhook/{webhook_id}"
-        else:
-            response["sample_external_url"] = "The external Home Assistant URL is not found or incorrect."
-        return response
+        return {
+            "webhook_id": webhook_id,
+            "sample_internal_url": (
+                f"{internal_url}/api/webhook/{webhook_id}"
+                if internal_url
+                else "The internal Home Assistant URL is not found."
+            ),
+            "sample_external_url": (
+                f"{external_url}/api/webhook/{webhook_id}"
+                if external_url
+                else "The external Home Assistant URL is not found or incorrect."
+            ),
+        }
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}

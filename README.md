@@ -30,7 +30,7 @@ Transform Home Assistant into a fully-fledged personal teammate with this curate
     - [Lunar Calendar Conversion & Lookup](#lunar-calendar-conversion--lookup)
     - [Create Lunar Calendar Events](#create-lunar-calendar-events)
   - [Interactive Smart Home Chatbot](#interactive-smart-home-chatbot)
-  - [Voice Assist - Send Messages & Images](#voice-assist---send-messages--images)
+  - [Voice Assist - Send Messages & Media](#voice-assist---send-messages--media)
   - [Voice Assist - Internet Knowledge Search](#voice-assist---internet-knowledge-search)
   - [Voice Assist - YouTube Search & Playback](#voice-assist---youtube-search--playback)
   - [Voice Assist - Favorite YouTube Channels](#voice-assist---favorite-youtube-channels)
@@ -286,20 +286,22 @@ _Install the webhook blueprint for your chosen platform. For image analysis, als
 
 ---
 
-## Voice Assist - Send Messages & Images
+## Voice Assist - Send Messages & Media
 
-Driving or hands messy? Use your voice to send messages, share your location, or send camera images to loved ones via Telegram/Zalo.
+Driving or hands messy? Use your voice to send messages and share content with loved ones via Telegram/Zalo. The Telegram blueprint supports text, map locations, images, audio, documents, videos, and voice messages.
 
 **Key Features:**
 
 - **Hands-Free Messaging:** Dictate your message, and Assistant will send it immediately.
-- **Smart Sharing:** Automatically attach Google Maps links when you mention a location.
+- **Telegram Map Pins:** Send a precise location using latitude/longitude or a Google Maps URL containing coordinates. The blueprint sends the summary first, followed by the map pin.
+- **Media Sharing:** Send local images, MP3/M4A audio, documents, MPEG-4 videos, and OGG/Opus, MP3, or M4A voice messages using paths under `local/` or `/media/`.
 - **Image Reporting:** Command to take a photo from a security camera and send it directly to a family chat group.
 
 **Example Voice Commands:**
 
 - "Send a list of good restaurants in Nha Trang to the Telegram family group."
-- "Send the Thang Long Citadel location via Zalo to my wife."
+- "Send the Thang Long Citadel map pin to the Telegram family group using this Google Maps link."
+- "Send the monthly report PDF and the meeting recording to the Telegram family group."
 - "Take a photo from the gate camera and send it to the chat group."
 
 **Use Cases:**
@@ -307,8 +309,11 @@ Driving or hands messy? Use your voice to send messages, share your location, or
 - **Driving Safety:** "Message my wife I'll be home in 30 minutes" - Send important updates without taking your hands off the wheel, focusing on driving.
 - **Urgent Notifications:** Running late? "Message mom I'm on my way home" - Quickly inform without typing.
 - **Capture Moments:** "Take a photo from the yard camera and send it to the family group" - Instantly share interesting images.
+- **Rich Updates:** Send reports, recordings, videos, or voice messages alongside a concise summary.
 
 _Install the blueprint for the platform you want to send messages to:_
+
+For Telegram map pins, use coordinates or a Google Maps URL that contains coordinates. A plain address or shortened Maps URL requires a separate geocoding step.
 
 **Send to Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_telegram_full_llm.yaml)

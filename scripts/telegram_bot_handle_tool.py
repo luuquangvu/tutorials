@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import mimetypes
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ if TOKEN:
     TOKEN = TOKEN.strip()
 
 _session: httpx.AsyncClient | None = None
+_session_lock = asyncio.Lock()
 
 
 if not TOKEN:
@@ -40,6 +42,20 @@ PARSE_MODES: tuple[str, ...] = (
     "HTML",
     "MarkdownV2",
     "Markdown",
+)
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _create_session() -> httpx.AsyncClient:
+    """Create the HTTPX client in native Python for executor-safe SSL setup."""
+    return httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
+
+
+_COORDINATE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"@\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))"),
+    re.compile(r"!3d\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+)).*?!4d\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))"),
+    re.compile(r"(?:[?&](?:q|query|ll)=)\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))"),
+    re.compile(r"(?<![\d.])([+-]?(?:\d+(?:\.\d+)?|\.\d+))\s*,\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))"),
 )
 
 
@@ -77,7 +93,9 @@ async def _ensure_session() -> httpx.AsyncClient:
     """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
     if _session is None or _session.is_closed:
-        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
+        async with _session_lock:
+            if _session is None or _session.is_closed:
+                _session = await asyncio.to_thread(_create_session)
     return _session
 
 
@@ -132,16 +150,68 @@ async def _send_message(
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     text = message
     if len(text) > 4096:
-        text = text[:4093] + "..."
+        text = f"{text[:4093]}..."
     payload = {"chat_id": chat_id, "text": text}
-    if reply_to_message_id:
-        payload["reply_to_message_id"] = reply_to_message_id
+    if reply_to_message_id is not None:
+        payload["reply_parameters"] = {"message_id": reply_to_message_id}
     if message_thread_id:
         payload["message_thread_id"] = message_thread_id
     if parse_mode:
         if parse_mode not in PARSE_MODES:
             raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
         payload["parse_mode"] = parse_mode
+    data = orjson.dumps(payload).decode("utf-8")
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
+
+
+async def _send_location(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    latitude: float,
+    longitude: float,
+    horizontal_accuracy: float | None = None,
+    live_period: int | None = None,
+    heading: int | None = None,
+    proximity_alert_radius: int | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """Send a map location via the Telegram API."""
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "latitude": latitude,
+        "longitude": longitude,
+    }
+    optional_fields = {
+        "horizontal_accuracy": horizontal_accuracy,
+        "live_period": live_period,
+        "heading": heading,
+        "proximity_alert_radius": proximity_alert_radius,
+        "message_thread_id": message_thread_id,
+        "business_connection_id": business_connection_id,
+        "direct_messages_topic_id": direct_messages_topic_id,
+        "receiver_user_id": receiver_user_id,
+        "callback_query_id": callback_query_id,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "allow_paid_broadcast": allow_paid_broadcast,
+        "message_effect_id": message_effect_id,
+    }
+    payload |= {name: value for name, value in optional_fields.items() if value is not None and value != ""}
+    if reply_to_message_id is not None:
+        payload["reply_parameters"] = {"message_id": reply_to_message_id}
+
+    url = f"https://api.telegram.org/bot{TOKEN}/sendLocation"
     data = orjson.dumps(payload).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
     resp.raise_for_status()
@@ -177,8 +247,8 @@ async def _send_photo(
         if parse_mode not in PARSE_MODES:
             raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
         form_data["parse_mode"] = parse_mode
-    if reply_to_message_id:
-        form_data["reply_to_message_id"] = str(reply_to_message_id)
+    if reply_to_message_id is not None:
+        form_data["reply_parameters"] = orjson.dumps({"message_id": reply_to_message_id}).decode("utf-8")
     if message_thread_id:
         form_data["message_thread_id"] = str(message_thread_id)
 
@@ -191,6 +261,315 @@ async def _send_photo(
         return orjson.loads(resp.content)
     finally:
         await asyncio.to_thread(f.close)
+
+
+async def _send_media_file(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    file_path: str,
+    endpoint: str,
+    field_name: str,
+    caption: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+    fields: dict[str, Any] | None = None,
+    attachments: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Upload and send a local media file through a Telegram multipart endpoint."""
+    file_path = _to_media_path(file_path)
+
+    file_exists = await asyncio.to_thread(os.path.isfile, file_path)
+    if not file_exists:
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    form_data: dict[str, Any] = {"chat_id": str(chat_id)}
+    if caption:
+        form_data["caption"] = caption[:1024]
+    if parse_mode:
+        if parse_mode not in PARSE_MODES:
+            raise ValueError(f"Unsupported parse_mode: {parse_mode}. Allowed: {', '.join(PARSE_MODES)}")
+        form_data["parse_mode"] = parse_mode
+    if reply_to_message_id is not None:
+        form_data["reply_parameters"] = orjson.dumps({"message_id": reply_to_message_id}).decode("utf-8")
+    if message_thread_id is not None:
+        form_data["message_thread_id"] = str(message_thread_id)
+    if fields:
+        for name, value in fields.items():
+            if value is not None:
+                form_data[name] = str(value).lower() if isinstance(value, bool) else str(value)
+
+    paths = {field_name: file_path, **(attachments or {})}
+    opened_files: dict[str, Any] = {}
+    try:
+        files: dict[str, tuple[str, Any, str]] = {}
+        for field, path in paths.items():
+            normalized_path = _to_media_path(path)
+            if not await asyncio.to_thread(os.path.isfile, normalized_path):
+                raise FileNotFoundError(f"File not found: {normalized_path}")
+            attachment_name = os.path.basename(normalized_path)
+            attachment_type, _ = mimetypes.guess_file_type(attachment_name)
+            attachment_file = await asyncio.to_thread(_open_file, normalized_path, "rb")
+            opened_files[field] = attachment_file
+            files[field] = (attachment_name, attachment_file, attachment_type or "application/octet-stream")
+
+        url = f"https://api.telegram.org/bot{TOKEN}/{endpoint}"
+        resp = await client.post(url, data=form_data, files=files)
+        resp.raise_for_status()
+        return orjson.loads(resp.content)
+    finally:
+        for attachment_file in opened_files.values():
+            await asyncio.to_thread(attachment_file.close)
+
+
+def _common_media_fields(
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """Return common optional fields supported by Telegram send-media methods."""
+    return {
+        "business_connection_id": business_connection_id,
+        "direct_messages_topic_id": direct_messages_topic_id,
+        "receiver_user_id": receiver_user_id,
+        "callback_query_id": callback_query_id,
+        "disable_notification": disable_notification,
+        "protect_content": protect_content,
+        "allow_paid_broadcast": allow_paid_broadcast,
+        "message_effect_id": message_effect_id,
+    }
+
+
+def _parse_coordinates(value: Any) -> tuple[float, float] | None:
+    """Extract latitude and longitude from text, a coordinate pair, or a Google Maps URL."""
+    if isinstance(value, str):
+        decoded = value.replace("%2C", ",").replace("%2c", ",")
+    else:
+        try:
+            values = tuple(value)
+        except TypeError:
+            decoded = str(value)
+        else:
+            if len(values) == 2:
+                with contextlib.suppress(TypeError, ValueError):
+                    return float(values[0]), float(values[1])
+            decoded = str(value)
+
+        decoded = decoded.replace("%2C", ",").replace("%2c", ",")
+    for pattern in _COORDINATE_PATTERNS:
+        if match := pattern.search(decoded):
+            return float(match.group(1)), float(match.group(2))
+    return None
+
+
+async def _send_audio(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    performer: str | None = None,
+    title: str | None = None,
+    thumbnail_path: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+) -> dict[str, Any]:
+    """Upload and send an audio file via the Telegram API."""
+    return await _send_media_file(
+        client,
+        chat_id,
+        file_path,
+        endpoint="sendAudio",
+        field_name="audio",
+        caption=caption,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        fields={
+            "duration": duration,
+            "performer": performer,
+            "title": title,
+            **_common_media_fields(
+                business_connection_id,
+                direct_messages_topic_id,
+                receiver_user_id,
+                callback_query_id,
+                disable_notification,
+                protect_content,
+                allow_paid_broadcast,
+                message_effect_id,
+            ),
+        },
+        attachments={"thumbnail": thumbnail_path} if thumbnail_path else None,
+    )
+
+
+async def _send_document(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    file_path: str,
+    caption: str | None = None,
+    disable_content_type_detection: bool | None = None,
+    thumbnail_path: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+) -> dict[str, Any]:
+    """Upload and send a document file via the Telegram API."""
+    return await _send_media_file(
+        client,
+        chat_id,
+        file_path,
+        endpoint="sendDocument",
+        field_name="document",
+        caption=caption,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        fields={
+            "disable_content_type_detection": disable_content_type_detection,
+            **_common_media_fields(
+                business_connection_id,
+                direct_messages_topic_id,
+                receiver_user_id,
+                callback_query_id,
+                disable_notification,
+                protect_content,
+                allow_paid_broadcast,
+                message_effect_id,
+            ),
+        },
+        attachments={"thumbnail": thumbnail_path} if thumbnail_path else None,
+    )
+
+
+async def _send_video(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    supports_streaming: bool | None = None,
+    has_spoiler: bool | None = None,
+    thumbnail_path: str | None = None,
+    cover_path: str | None = None,
+    start_timestamp: int | None = None,
+    show_caption_above_media: bool | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+) -> dict[str, Any]:
+    """Upload and send a video file via the Telegram API."""
+    return await _send_media_file(
+        client,
+        chat_id,
+        file_path,
+        endpoint="sendVideo",
+        field_name="video",
+        caption=caption,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        fields={
+            "duration": duration,
+            "width": width,
+            "height": height,
+            "supports_streaming": supports_streaming,
+            "has_spoiler": has_spoiler,
+            "start_timestamp": start_timestamp,
+            "show_caption_above_media": show_caption_above_media,
+            **_common_media_fields(
+                business_connection_id,
+                direct_messages_topic_id,
+                receiver_user_id,
+                callback_query_id,
+                disable_notification,
+                protect_content,
+                allow_paid_broadcast,
+                message_effect_id,
+            ),
+        },
+        attachments=({"thumbnail": thumbnail_path} if thumbnail_path else {})
+        | ({"cover": cover_path} if cover_path else {})
+        or None,
+    )
+
+
+async def _send_voice(
+    client: httpx.AsyncClient,
+    chat_id: int | str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+) -> dict[str, Any]:
+    """Upload and send a voice message via the Telegram API."""
+    return await _send_media_file(
+        client,
+        chat_id,
+        file_path,
+        endpoint="sendVoice",
+        field_name="voice",
+        caption=caption,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        fields={
+            "duration": duration,
+            **_common_media_fields(
+                business_connection_id,
+                direct_messages_topic_id,
+                receiver_user_id,
+                callback_query_id,
+                disable_notification,
+                protect_content,
+                allow_paid_broadcast,
+                message_effect_id,
+            ),
+        },
+    )
 
 
 async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
@@ -321,11 +700,9 @@ def _cleanup_disk_sync(directory: str, cutoff: float) -> None:
         return
 
     for entry in path.iterdir():
-        try:
+        with contextlib.suppress(OSError):
             if entry.is_file() and entry.stat().st_mtime < cutoff:
                 entry.unlink()
-        except OSError:
-            pass
 
 
 async def _cleanup_old_files(directory: str, days: int = 30) -> None:
@@ -415,9 +792,7 @@ async def send_telegram_message(
             message_thread_id=message_thread_id,
             parse_mode=parse_mode,
         )
-        if not response:
-            return {"error": "Failed to send message"}
-        return response
+        return response or {"error": "Failed to send message"}
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -450,18 +825,25 @@ async def get_telegram_file(file_id: str) -> dict[str, Any]:
         mimetypes.add_type("text/plain", ".yaml")
         mime_type, _ = mimetypes.guess_file_type(file_path)
         file_path = _to_relative_path(file_path)
-        response: dict[str, Any] = {"file_path": file_path, "mime_type": mime_type}
         support_file_types = (
             "image/",
             "video/",
             "audio/",
             "text/",
             "application/pdf",
+            "application/rtf",
+            "application/msword",
+            "application/vnd.ms-excel",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
-        if mime_type and mime_type.startswith(support_file_types):
-            response["supported"] = True
-        else:
-            response["supported"] = False
+        response: dict[str, Any] = {
+            "file_path": file_path,
+            "mime_type": mime_type,
+            "supported": bool(mime_type and mime_type.lower().startswith(support_file_types)),
+        }
         return response
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -648,9 +1030,194 @@ async def send_telegram_chat_action(
             message_thread_id,
             action=action,
         )
-        if not response:
-            return {"error": "Failed to send message"}
-        return response
+        return response or {"error": "Failed to send message"}
+    except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {error}"}
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_telegram_location(
+    chat_id: str,
+    location: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    horizontal_accuracy: float | None = None,
+    live_period: int | None = None,
+    heading: int | None = None,
+    proximity_alert_radius: int | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Telegram Location
+    description: Send a Telegram map pin from latitude/longitude or a Google Maps URL containing coordinates.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the conversation (user or group).
+        required: true
+        selector:
+          text:
+      location:
+        name: Location
+        description: Coordinates as latitude,longitude or a Google Maps URL containing coordinates.
+        selector:
+          text:
+      latitude:
+        name: Latitude
+        description: Latitude in degrees from -90 to 90. Overrides the value parsed from location.
+        selector:
+          number:
+            min: -90
+            max: 90
+            step: 0.000001
+      longitude:
+        name: Longitude
+        description: Longitude in degrees from -180 to 180. Overrides the value parsed from location.
+        selector:
+          number:
+            min: -180
+            max: 180
+            step: 0.000001
+      horizontal_accuracy:
+        name: Horizontal Accuracy
+        description: Optional radius of uncertainty in meters, from 0 to 1500.
+        selector:
+          number:
+            min: 0
+            max: 1500
+            step: 0.1
+      live_period:
+        name: Live Period
+        description: "Optional live-location period in seconds: 60-86400 or 2147483647."
+        selector:
+          number:
+            min: 60
+            max: 2147483647
+            step: 1
+      heading:
+        name: Heading
+        description: Optional direction of movement for a live location, from 1 to 360 degrees.
+        selector:
+          number:
+            min: 1
+            max: 360
+            step: 1
+      proximity_alert_radius:
+        name: Proximity Alert Radius
+        description: Optional proximity alert radius in meters for a live location.
+        selector:
+          number:
+            min: 1
+            step: 1
+      reply_to_message_id:
+        name: Reply To Message ID
+        description: Optional message ID to reply to.
+        selector:
+          number:
+            min: 1
+            step: 1
+      message_thread_id:
+        name: Message Thread ID
+        description: Optional forum topic/thread ID.
+        selector:
+          number:
+            min: 1
+            step: 1
+      disable_notification:
+        name: Disable Notification
+        description: Send the location silently.
+        selector:
+          boolean:
+      protect_content:
+        name: Protect Content
+        description: Prevent forwarding and saving.
+        selector:
+          boolean:
+      allow_paid_broadcast:
+        name: Allow Paid Broadcast
+        description: Allow paid high-rate broadcasting.
+        selector:
+          boolean:
+    """
+    if not chat_id:
+        return {"error": "Missing a required argument: chat_id"}
+
+    if latitude is None or longitude is None:
+        if not location:
+            return {"error": "Provide latitude and longitude, or a Google Maps URL containing coordinates"}
+        coordinates = _parse_coordinates(location)
+        if not coordinates:
+            return {"error": "Unable to find coordinates in location; provide latitude and longitude explicitly"}
+    if latitude is None:
+        latitude = coordinates[0]
+    if longitude is None:
+        longitude = coordinates[1]
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        return {"error": "Latitude and longitude must be valid numbers"}
+
+    if not -90 <= latitude <= 90:
+        return {"error": "Latitude must be between -90 and 90"}
+    if not -180 <= longitude <= 180:
+        return {"error": "Longitude must be between -180 and 180"}
+    try:
+        if horizontal_accuracy is not None:
+            horizontal_accuracy = float(horizontal_accuracy)
+        if live_period is not None:
+            live_period = int(live_period)
+        if heading is not None:
+            heading = int(heading)
+        if proximity_alert_radius is not None:
+            proximity_alert_radius = int(proximity_alert_radius)
+    except (TypeError, ValueError):
+        return {"error": "Location optional parameters must be valid numbers"}
+
+    if horizontal_accuracy is not None and not 0 <= horizontal_accuracy <= 1500:
+        return {"error": "Horizontal accuracy must be between 0 and 1500 meters"}
+    if live_period is not None and live_period not in range(60, 86401) and live_period != 2147483647:
+        return {"error": "Live period must be between 60 and 86400 seconds, or 2147483647"}
+    if heading is not None and not 1 <= heading <= 360:
+        return {"error": "Heading must be between 1 and 360 degrees"}
+    if proximity_alert_radius is not None and proximity_alert_radius < 1:
+        return {"error": "Proximity alert radius must be at least 1 meter"}
+
+    try:
+        client = await _ensure_session()
+        response = await _send_location(
+            client,
+            chat_id,
+            latitude,
+            longitude,
+            horizontal_accuracy=horizontal_accuracy,
+            live_period=live_period,
+            heading=heading,
+            proximity_alert_radius=proximity_alert_radius,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+            business_connection_id=business_connection_id,
+            direct_messages_topic_id=direct_messages_topic_id,
+            receiver_user_id=receiver_user_id,
+            callback_query_id=callback_query_id,
+            disable_notification=disable_notification,
+            protect_content=protect_content,
+            allow_paid_broadcast=allow_paid_broadcast,
+            message_effect_id=message_effect_id,
+        )
+        return response or {"error": "Failed to send location"}
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -727,9 +1294,548 @@ async def send_telegram_photo(
             message_thread_id=message_thread_id,
             parse_mode=parse_mode,
         )
-        if not response:
-            return {"error": "Failed to send photo"}
-        return response
+        return response or {"error": "Failed to send photo"}
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}
+
+
+async def _send_telegram_media_action(
+    sender: Any,
+    media_name: str,
+    chat_id: str,
+    file_path: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Validate and execute a media-send Home Assistant action."""
+    if not all([chat_id, file_path]):
+        return {"error": "Missing one or more required arguments: chat_id, file_path"}
+    if kwargs.get("parse_mode") and kwargs["parse_mode"] not in PARSE_MODES:
+        return {"error": f"Unsupported parse_mode: {kwargs['parse_mode']}. Allowed: {', '.join(PARSE_MODES)}"}
+    try:
+        client = await _ensure_session()
+        response = await sender(client, chat_id, file_path, **kwargs)
+        return response or {"error": f"Failed to send {media_name}"}
+    except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {error}"}
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_telegram_audio(
+    chat_id: str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    performer: str | None = None,
+    title: str | None = None,
+    thumbnail_path: str | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Telegram Audio
+    description: Send a local MP3 or M4A audio file via Telegram multipart/form-data.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the conversation (user or group).
+        required: true
+        selector:
+          text:
+      file_path:
+        name: File Path
+        description: Local audio path under /media or local/.
+        required: true
+        selector:
+          text:
+      caption:
+        name: Caption
+        description: Optional audio caption, up to 1024 characters.
+        selector:
+          text:
+      duration:
+        name: Duration
+        description: Optional duration of the audio in seconds.
+        selector:
+          number:
+            min: 0
+            step: 1
+      performer:
+        name: Performer
+        description: Optional performer name.
+        selector:
+          text:
+      title:
+        name: Title
+        description: Optional track title.
+        selector:
+          text:
+      thumbnail_path:
+        name: Thumbnail Path
+        description: Optional JPEG thumbnail under /media or local/ (max 200 kB and 320 px).
+        selector:
+          text:
+      reply_to_message_id:
+        name: Reply To Message ID
+        description: Optional message ID to reply to.
+        selector:
+          number:
+            min: 1
+            step: 1
+      message_thread_id:
+        name: Message Thread ID
+        description: Optional forum topic/thread ID.
+        selector:
+          number:
+            min: 1
+            step: 1
+      parse_mode:
+        name: Parse Mode
+        description: Format entities in the caption.
+        selector:
+          select:
+            mode: dropdown
+            options:
+              - HTML
+              - MarkdownV2
+              - Markdown
+      disable_notification:
+        name: Disable Notification
+        description: Send the audio silently.
+        selector:
+          boolean:
+      protect_content:
+        name: Protect Content
+        description: Prevent forwarding and saving.
+        selector:
+          boolean:
+      allow_paid_broadcast:
+        name: Allow Paid Broadcast
+        description: Allow paid high-rate broadcasting.
+        selector:
+          boolean:
+    """
+    return await _send_telegram_media_action(
+        _send_audio,
+        "audio",
+        chat_id,
+        file_path,
+        caption=caption,
+        duration=duration,
+        performer=performer,
+        title=title,
+        thumbnail_path=thumbnail_path,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        business_connection_id=business_connection_id,
+        direct_messages_topic_id=direct_messages_topic_id,
+        receiver_user_id=receiver_user_id,
+        callback_query_id=callback_query_id,
+        disable_notification=disable_notification,
+        protect_content=protect_content,
+        allow_paid_broadcast=allow_paid_broadcast,
+        message_effect_id=message_effect_id,
+    )
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_telegram_document(
+    chat_id: str,
+    file_path: str,
+    caption: str | None = None,
+    thumbnail_path: str | None = None,
+    disable_content_type_detection: bool | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Telegram Document
+    description: Send a local file as a Telegram document via multipart/form-data.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the conversation (user or group).
+        required: true
+        selector:
+          text:
+      file_path:
+        name: File Path
+        description: Local document path under /media or local/.
+        required: true
+        selector:
+          text:
+      caption:
+        name: Caption
+        description: Optional document caption, up to 1024 characters.
+        selector:
+          text:
+      thumbnail_path:
+        name: Thumbnail Path
+        description: Optional JPEG thumbnail under /media or local/ (max 200 kB and 320 px).
+        selector:
+          text:
+      disable_content_type_detection:
+        name: Disable Content Type Detection
+        description: Disable automatic content type detection for the uploaded file.
+        selector:
+          boolean:
+      reply_to_message_id:
+        name: Reply To Message ID
+        description: Optional message ID to reply to.
+        selector:
+          number:
+            min: 1
+            step: 1
+      message_thread_id:
+        name: Message Thread ID
+        description: Optional forum topic/thread ID.
+        selector:
+          number:
+            min: 1
+            step: 1
+      parse_mode:
+        name: Parse Mode
+        description: Format entities in the caption.
+        selector:
+          select:
+            mode: dropdown
+            options:
+              - HTML
+              - MarkdownV2
+              - Markdown
+      disable_notification:
+        name: Disable Notification
+        description: Send the document silently.
+        selector:
+          boolean:
+      protect_content:
+        name: Protect Content
+        description: Prevent forwarding and saving.
+        selector:
+          boolean:
+      allow_paid_broadcast:
+        name: Allow Paid Broadcast
+        description: Allow paid high-rate broadcasting.
+        selector:
+          boolean:
+    """
+    return await _send_telegram_media_action(
+        _send_document,
+        "document",
+        chat_id,
+        file_path,
+        caption=caption,
+        thumbnail_path=thumbnail_path,
+        disable_content_type_detection=disable_content_type_detection,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        business_connection_id=business_connection_id,
+        direct_messages_topic_id=direct_messages_topic_id,
+        receiver_user_id=receiver_user_id,
+        callback_query_id=callback_query_id,
+        disable_notification=disable_notification,
+        protect_content=protect_content,
+        allow_paid_broadcast=allow_paid_broadcast,
+        message_effect_id=message_effect_id,
+    )
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_telegram_video(
+    chat_id: str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    thumbnail_path: str | None = None,
+    cover_path: str | None = None,
+    start_timestamp: int | None = None,
+    show_caption_above_media: bool | None = None,
+    has_spoiler: bool | None = None,
+    supports_streaming: bool | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Telegram Video
+    description: Send a local MPEG-4 video via Telegram multipart/form-data.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the conversation (user or group).
+        required: true
+        selector:
+          text:
+      file_path:
+        name: File Path
+        description: Local video path under /media or local/.
+        required: true
+        selector:
+          text:
+      caption:
+        name: Caption
+        description: Optional video caption, up to 1024 characters.
+        selector:
+          text:
+      duration:
+        name: Duration
+        description: Optional duration in seconds.
+        selector:
+          number:
+            min: 0
+            step: 1
+      width:
+        name: Width
+        description: Optional video width in pixels.
+        selector:
+          number:
+            min: 0
+            step: 1
+      height:
+        name: Height
+        description: Optional video height in pixels.
+        selector:
+          number:
+            min: 0
+            step: 1
+      thumbnail_path:
+        name: Thumbnail Path
+        description: Optional JPEG thumbnail under /media or local/ (max 200 kB and 320 px).
+        selector:
+          text:
+      cover_path:
+        name: Cover Path
+        description: Optional video cover under /media or local/.
+        selector:
+          text:
+      start_timestamp:
+        name: Start Timestamp
+        description: Optional start timestamp in seconds.
+        selector:
+          number:
+            min: 0
+            step: 1
+      show_caption_above_media:
+        name: Show Caption Above Media
+        description: Show the caption above the video.
+        selector:
+          boolean:
+      has_spoiler:
+        name: Has Spoiler
+        description: Cover the video with a spoiler animation.
+        selector:
+          boolean:
+      supports_streaming:
+        name: Supports Streaming
+        description: Mark the uploaded video as suitable for streaming.
+        selector:
+          boolean:
+      reply_to_message_id:
+        name: Reply To Message ID
+        description: Optional message ID to reply to.
+        selector:
+          number:
+            min: 1
+            step: 1
+      message_thread_id:
+        name: Message Thread ID
+        description: Optional forum topic/thread ID.
+        selector:
+          number:
+            min: 1
+            step: 1
+      parse_mode:
+        name: Parse Mode
+        description: Format entities in the caption.
+        selector:
+          select:
+            mode: dropdown
+            options:
+              - HTML
+              - MarkdownV2
+              - Markdown
+      disable_notification:
+        name: Disable Notification
+        description: Send the video silently.
+        selector:
+          boolean:
+      protect_content:
+        name: Protect Content
+        description: Prevent forwarding and saving.
+        selector:
+          boolean:
+      allow_paid_broadcast:
+        name: Allow Paid Broadcast
+        description: Allow paid high-rate broadcasting.
+        selector:
+          boolean:
+    """
+    return await _send_telegram_media_action(
+        _send_video,
+        "video",
+        chat_id,
+        file_path,
+        caption=caption,
+        duration=duration,
+        width=width,
+        height=height,
+        thumbnail_path=thumbnail_path,
+        cover_path=cover_path,
+        start_timestamp=start_timestamp,
+        show_caption_above_media=show_caption_above_media,
+        has_spoiler=has_spoiler,
+        supports_streaming=supports_streaming,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        business_connection_id=business_connection_id,
+        direct_messages_topic_id=direct_messages_topic_id,
+        receiver_user_id=receiver_user_id,
+        callback_query_id=callback_query_id,
+        disable_notification=disable_notification,
+        protect_content=protect_content,
+        allow_paid_broadcast=allow_paid_broadcast,
+        message_effect_id=message_effect_id,
+    )
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_telegram_voice(
+    chat_id: str,
+    file_path: str,
+    caption: str | None = None,
+    duration: int | None = None,
+    reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
+    parse_mode: str | None = None,
+    business_connection_id: str | None = None,
+    direct_messages_topic_id: int | None = None,
+    receiver_user_id: int | None = None,
+    callback_query_id: str | None = None,
+    disable_notification: bool | None = None,
+    protect_content: bool | None = None,
+    allow_paid_broadcast: bool | None = None,
+    message_effect_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Telegram Voice
+    description: Send a local OGG/Opus, MP3, or M4A voice message via Telegram multipart/form-data.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the conversation (user or group).
+        required: true
+        selector:
+          text:
+      file_path:
+        name: File Path
+        description: Local voice path under /media or local/.
+        required: true
+        selector:
+          text:
+      caption:
+        name: Caption
+        description: Optional voice caption, up to 1024 characters.
+        selector:
+          text:
+      duration:
+        name: Duration
+        description: Optional duration in seconds.
+        selector:
+          number:
+            min: 0
+            step: 1
+      reply_to_message_id:
+        name: Reply To Message ID
+        description: Optional message ID to reply to.
+        selector:
+          number:
+            min: 1
+            step: 1
+      message_thread_id:
+        name: Message Thread ID
+        description: Optional forum topic/thread ID.
+        selector:
+          number:
+            min: 1
+            step: 1
+      parse_mode:
+        name: Parse Mode
+        description: Format entities in the caption.
+        selector:
+          select:
+            mode: dropdown
+            options:
+              - HTML
+              - MarkdownV2
+              - Markdown
+      disable_notification:
+        name: Disable Notification
+        description: Send the voice message silently.
+        selector:
+          boolean:
+      protect_content:
+        name: Protect Content
+        description: Prevent forwarding and saving.
+        selector:
+          boolean:
+      allow_paid_broadcast:
+        name: Allow Paid Broadcast
+        description: Allow paid high-rate broadcasting.
+        selector:
+          boolean:
+    """
+    return await _send_telegram_media_action(
+        _send_voice,
+        "voice message",
+        chat_id,
+        file_path,
+        caption=caption,
+        duration=duration,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        parse_mode=parse_mode,
+        business_connection_id=business_connection_id,
+        direct_messages_topic_id=direct_messages_topic_id,
+        receiver_user_id=receiver_user_id,
+        callback_query_id=callback_query_id,
+        disable_notification=disable_notification,
+        protect_content=protect_content,
+        allow_paid_broadcast=allow_paid_broadcast,
+        message_effect_id=message_effect_id,
+    )

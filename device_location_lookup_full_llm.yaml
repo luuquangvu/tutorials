@@ -87,7 +87,7 @@ mode: parallel
 max_exceeded: silent
 description: Locates devices (phones, tags, etc.) within the home
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   entities:
     name: Entities
@@ -107,7 +107,7 @@ sequence:
           {% for entity in entities.split(';') -%}
           {% if not ((integration_entities('bermuda') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', entity.strip()) | list) or
           (integration_entities('mobile_app') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', entity.strip()) | list) or
-          (state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'device_tracker\.') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
+          (state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^device_tracker\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
           {% set validation.not_exist = true -%}
           {% endif -%}
           {% endfor -%}
@@ -127,16 +127,19 @@ sequence:
           {% for entity in entities.split(';') -%}
           {% set device = namespace(friendly_name=none, entity_id=none, notify_id=none, is_mobile=false, at_home=false) -%}
           {% set device.friendly_name = entity.strip() -%}
-          {% if (integration_entities('bermuda') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | list) -%}
-          {% set device.entity_id = integration_entities('bermuda') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | first -%}
-          {% elif (integration_entities('mobile_app') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | list) -%}
-          {% set device.entity_id = integration_entities('mobile_app') | select('match','device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | first -%}
+          {% set bermuda_matches = integration_entities('bermuda') | select('match','^device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | list -%}
+          {% set mobile_matches = integration_entities('mobile_app') | select('match','^device_tracker\.') | select('is_state_attr', 'friendly_name', device.friendly_name) | list -%}
+          {% set alias_matches = state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^device_tracker\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', device.friendly_name) | map(attribute='entity_id') | list -%}
+          {% if bermuda_matches -%}
+          {% set device.entity_id = bermuda_matches[0] -%}
+          {% elif mobile_matches -%}
+          {% set device.entity_id = mobile_matches[0] -%}
           {% set device.is_mobile = true -%}
           {% set device.notify_id = device.entity_id.split('device_tracker.')[1] -%}
-          {% else -%}
-          {% set device.entity_id = state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'device_tracker\.') | selectattr('aliases', 'contains', device.friendly_name) | map(attribute='entity_id') | first -%}
+          {% elif alias_matches -%}
+          {% set device.entity_id = alias_matches[0] -%}
           {% endif -%}
-          {% if not device.is_mobile -%}
+          {% if device.entity_id and not device.is_mobile -%}
           {% set parts = device.entity_id.split('device_tracker.')[1].split('_') -%}
           {% for i in range(1, (parts | length) + 1) -%}
           {% if (parts[:i] | join('_')) in mobile_devices -%}
@@ -145,10 +148,12 @@ sequence:
           {% endif -%}
           {% endfor -%}
           {% endif -%}
+          {% if device.entity_id -%}
           {% set device.at_home = is_state(device.entity_id, 'home') -%}
+          {% endif -%}
           - friendly_name: {{ device.friendly_name }}
             at_home: {{ device.at_home }}
-            area: {{ state_attr(device.entity_id, 'area') }}
+            area: {{ state_attr(device.entity_id, 'area') if device.entity_id else none }}
             can_ring: {{ device.is_mobile and device.at_home }}
             ring_id: {{ ('notify.mobile_app_' ~ device.notify_id) if (device.is_mobile and device.at_home) else none }}
           {% endfor -%}

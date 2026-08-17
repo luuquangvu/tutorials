@@ -105,7 +105,7 @@ mode: parallel
 max_exceeded: silent
 description: Retrieves weather forecast for hourly or daily periods
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   time_period_type:
     name: Time Period Type
@@ -227,7 +227,9 @@ sequence:
 
               {% set weather_data = selected_data.forecast %}
 
-              {% set forecast_keys = (weather_data[0] | default({})).keys() | reject('eq', 'datetime') %}
+              {% set first_forecast = weather_data[0] if weather_data else {} %}
+
+              {% set forecast_keys = first_forecast.keys() | reject('eq', 'datetime') %}
 
               {% for item in forecast_keys %}
 

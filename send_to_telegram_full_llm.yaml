@@ -48,11 +48,11 @@ blueprint:
     telegram_settings:
       name: Settings for Telegram
       icon: mdi:send-circle
-      description: Use these settings to configure Telegram for sending the message or image.
+      description: Use these settings to configure Telegram for sending text or media files.
       input:
         chat_id:
           name: Chat ID
-          description: Target chat or user to receive the message or image.
+          description: Target chat or user to receive the message or media file.
           selector:
             text:
         thread_id:
@@ -66,12 +66,12 @@ blueprint:
     prompt_settings:
       name: Prompt settings for the LLM
       icon: mdi:robot
-      description: Use these options to fine-tune the prompts that guide your LLM when preparing summaries, details, locations, or image paths.
+      description: Use these options to fine-tune the prompts that guide your LLM when preparing summaries, details, or media paths.
       collapsed: true
       input:
         summary_prompt:
           name: Summary Prompt
-          description: A brief overview or caption for the Telegram message/image
+          description: A brief overview or caption for the Telegram content
           selector:
             text:
               multiline: true
@@ -79,7 +79,7 @@ blueprint:
             <=10 words overview/caption. Plain text. Multiple items = multiple calls
         detail_prompt:
           name: Detail Prompt
-          description: Additional supporting details for the Telegram message/image
+          description: Additional supporting details for the Telegram content
           selector:
             text:
               multiline: true
@@ -87,23 +87,15 @@ blueprint:
             Full details. No links/markdown/emojis/repeats. Plain text
         content_type_prompt:
           name: Content Type Prompt
-          description: The type of content to send (information, location, or image)
+          description: Instructions for choosing the most appropriate Telegram content type
           selector:
             text:
               multiline: true
           default: |-
-            information, location, or image. Multiple items = multiple calls
-        location_prompt:
-          name: Location Prompt
-          description: The location/address to be sent via Telegram
-          selector:
-            text:
-              multiline: true
-          default: |-
-            Address only. No commas/punctuation
-        image_path_prompt:
-          name: Image Path Prompt
-          description: The file path of the image to be sent via Telegram
+            Choose the most appropriate type: information for text, location for a map pin, image for an image, audio for music, document for a file, video for a video, or voice for a voice message. For location, provide latitude,longitude or a Google Maps URL containing coordinates. Multiple items = multiple calls
+        media_path_prompt:
+          name: Media Path Prompt
+          description: The local path of an image, audio, document, video, or voice file to be sent via Telegram
           selector:
             text:
               multiline: true
@@ -128,9 +120,9 @@ blueprint:
 mode: queued
 max: 30
 max_exceeded: silent
-description: Sends messages, locations, or images via Telegram
+description: Sends messages, map locations, images, audio, documents, videos, or voice messages via Telegram
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   summary:
     name: Summary
@@ -152,15 +144,19 @@ fields:
           - information
           - location
           - image
+          - audio
+          - document
+          - video
+          - voice
     required: true
   location:
     name: Location
-    description: !input location_prompt
+    description: Coordinates as latitude,longitude or a Google Maps URL containing coordinates when content_type is location
     selector:
       text:
-  image_path:
-    name: Image Path
-    description: !input image_path_prompt
+  media_path:
+    name: Media Path
+    description: !input media_path_prompt
     selector:
       text:
   target_chat_id:
@@ -180,8 +176,9 @@ sequence:
       summary: "{{ summary | default('') | trim }}"
       detail: "{{ detail | default('') | trim }}"
       content_type: "{{ content_type | default('') | trim }}"
-      location: "{{ location | default('') | trim }}"
-      image_path: "{{ image_path | default('') | trim }}"
+      location: "{{ location | default('', true) | trim }}"
+      media_path: "{{ media_path | default('', true) | trim }}"
+      media_path_value: "{{ media_path }}"
       override_chat_id: "{{ target_chat_id | default('') | trim }}"
       override_message_thread_id: "{{ target_message_thread_id | default('') | trim }}"
       chat_id_value: >-
@@ -201,10 +198,10 @@ sequence:
         value_template: >-
           {{
             (not summary)
-            or (content_type not in ['information', 'location', 'image'])
+            or (content_type not in ['information', 'location', 'image', 'audio', 'document', 'video', 'voice'])
             or (not chat_id_value)
             or (content_type == 'location' and not location)
-            or (content_type == 'image' and not image_path)
+            or (content_type in ['image', 'audio', 'document', 'video', 'voice'] and not media_path_value)
             or (
               override_message_thread_id
               and not override_message_thread_id | regex_match('^\d+$')
@@ -215,7 +212,7 @@ sequence:
         variables:
           response:
             error: >-
-              Unable to send the message to Telegram because one or more inputs are missing or invalid (summary, content_type, chat_id, location, image_path, or message_thread_id).
+              Unable to send the message to Telegram because one or more inputs are missing or invalid (summary, content_type, chat_id, location, media_path, or message_thread_id).
       - alias: Stop the script
         stop: Unable to send the message to Telegram due to invalid inputs.
         response_variable: response
@@ -233,10 +230,6 @@ sequence:
                 <b>{{ summary | e }}</b>{% if detail %}
 
                 {{ detail | e }}{% endif %}
-
-                {% set query = summary.split() | join('+') -%}
-                {% set url = 'https://www.google.com/search?q=' ~ query -%}
-                <a href="{{ url }}">Google Search</a>
             response_variable: telegram_response
       - conditions:
           - condition: template
@@ -251,10 +244,12 @@ sequence:
                 <b>{{ summary | e }}</b>{% if detail %}
 
                 {{ detail | e }}{% endif %}
-
-                {% set place = (summary ~ ' ' ~ location).split() | join('+') -%}
-                {% set url = 'https://www.google.com/maps/search/?api=1&query=' ~ place -%}
-                <a href="{{ url }}">Google Maps</a>
+            response_variable: location_message_response
+          - action: pyscript.send_telegram_location
+            data:
+              chat_id: "{{ chat_id_value }}"
+              message_thread_id: "{{ message_thread_id_value }}"
+              location: "{{ location }}"
             response_variable: telegram_response
       - conditions:
           - condition: template
@@ -265,7 +260,67 @@ sequence:
               chat_id: "{{ chat_id_value }}"
               message_thread_id: "{{ message_thread_id_value }}"
               parse_mode: HTML
-              file_path: "{{ image_path }}"
+              file_path: "{{ media_path_value }}"
+              caption: |-
+                <b>{{ summary | e }}</b>{% if detail %}
+
+                {{ detail | e }}{% endif %}
+            response_variable: telegram_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'audio' }}"
+        sequence:
+          - action: pyscript.send_telegram_audio
+            data:
+              chat_id: "{{ chat_id_value }}"
+              message_thread_id: "{{ message_thread_id_value }}"
+              parse_mode: HTML
+              file_path: "{{ media_path_value }}"
+              caption: |-
+                <b>{{ summary | e }}</b>{% if detail %}
+
+                {{ detail | e }}{% endif %}
+            response_variable: telegram_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'document' }}"
+        sequence:
+          - action: pyscript.send_telegram_document
+            data:
+              chat_id: "{{ chat_id_value }}"
+              message_thread_id: "{{ message_thread_id_value }}"
+              parse_mode: HTML
+              file_path: "{{ media_path_value }}"
+              caption: |-
+                <b>{{ summary | e }}</b>{% if detail %}
+
+                {{ detail | e }}{% endif %}
+            response_variable: telegram_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'video' }}"
+        sequence:
+          - action: pyscript.send_telegram_video
+            data:
+              chat_id: "{{ chat_id_value }}"
+              message_thread_id: "{{ message_thread_id_value }}"
+              parse_mode: HTML
+              file_path: "{{ media_path_value }}"
+              caption: |-
+                <b>{{ summary | e }}</b>{% if detail %}
+
+                {{ detail | e }}{% endif %}
+            response_variable: telegram_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'voice' }}"
+        sequence:
+          - action: pyscript.send_telegram_voice
+            data:
+              chat_id: "{{ chat_id_value }}"
+              message_thread_id: "{{ message_thread_id_value }}"
+              parse_mode: HTML
+              file_path: "{{ media_path_value }}"
               caption: |-
                 <b>{{ summary | e }}</b>{% if detail %}
 

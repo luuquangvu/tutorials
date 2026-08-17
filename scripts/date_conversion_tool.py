@@ -66,8 +66,7 @@ def new_moon(k: int) -> float:
         deltat = 0.001 + 0.000839 * t + 0.0002261 * t2 - 0.00000845 * t3 - 0.000000081 * t * t3
     else:
         deltat = -0.000278 + 0.000265 * t + 0.000262 * t2
-    jd_new = jd1 + c1 - deltat
-    return jd_new
+    return jd1 + c1 - deltat
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -120,7 +119,7 @@ def get_leap_month_offset(a11: int, time_zone: int) -> int:
         last = arc
         i += 1
         arc = get_sun_longitude(get_new_moon_day(k + i, time_zone), time_zone)
-        if not (arc != last and i < 14):
+        if arc == last or i >= 14:
             break
     return i - 1
 
@@ -945,7 +944,6 @@ def get_auspicious_day(lunar_month: int, jd: int) -> dict[str, Any]:
         if lunar_month in months:
             start_chi_index = start_index
             break
-
     if start_chi_index == -1:
         return {"day_type": "unknown", "name": "Không xác định"}
 
@@ -1043,21 +1041,22 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
         day, month, year = split_date(date)
     if conversion_type == "s2l":
         try:
-            response = {}
             lunar_date = solar_to_lunar(day, month, year)
             days = get_number_of_days(date)
             lunar_month = MONTHS[lunar_date[1] - 1] + (" nhuận" if lunar_date[3] == 1 else "")
-            can_chi_day = CAN[(lunar_date[4] + 9) % 10] + " " + CHI[(lunar_date[4] + 1) % 12]
-            can_chi_month = CAN[(lunar_date[2] * 12 + lunar_date[1] + 3) % 10] + " " + CHI[(lunar_date[1] + 1) % 12]
-            can_chi_year = CAN[(lunar_date[2] + 6) % 10] + " " + CHI[(lunar_date[2] + 8) % 12]
+            can_chi_day = f"{CAN[(lunar_date[4] + 9) % 10]} {CHI[(lunar_date[4] + 1) % 12]}"
+            can_chi_month = f"{CAN[(lunar_date[2] * 12 + lunar_date[1] + 3) % 10]} {CHI[(lunar_date[1] + 1) % 12]}"
+            can_chi_year = f"{CAN[(lunar_date[2] + 6) % 10]} {CHI[(lunar_date[2] + 8) % 12]}"
             auspicious_hours = get_auspicious_hours(lunar_date[4])
             auspicious_day = get_auspicious_day(lunar_date[1], lunar_date[4])
             twelve_day_officers = get_twelve_day_officers(lunar_date[4])
             twenty_eight_mansions = get_twenty_eight_mansions(lunar_date[4])
-            response["mode"] = "s2l"
-            response["solar_date"] = date
-            response["lunar_date"] = f"{lunar_date[2]:04d}-{lunar_date[1]:02d}-{lunar_date[0]:02d}"
-            response["weekday_vi"] = f"{DAYS[get_day_of_week(day, month, year)]}"
+            response = {
+                "mode": "s2l",
+                "solar_date": date,
+                "lunar_date": f"{lunar_date[2]:04d}-{lunar_date[1]:02d}-{lunar_date[0]:02d}",
+                "weekday_vi": f"{DAYS[get_day_of_week(day, month, year)]}",
+            }
             response["difference_days"] = abs(days)
             response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
             response["relative_to"] = datetime.date.today().isoformat()
@@ -1091,7 +1090,6 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
         if day > 30:
             return {"error": "Invalid date: Lunar day must be less than or equal to 30"}
         try:
-            response = {}
             leap_month = bool(kwargs.get("leap_month", False))
             is_leap = 1 if leap_month else 0
             solar_date = lunar_to_solar(day, month, year, is_leap)
@@ -1102,16 +1100,18 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
                 }
             days = get_number_of_days(join_date(solar_date[0], solar_date[1], solar_date[2]))
             day_number = jd_from_date(solar_date[0], solar_date[1], solar_date[2])
-            can_chi_day = CAN[(day_number + 9) % 10] + " " + CHI[(day_number + 1) % 12]
-            can_chi_month = CAN[(year * 12 + month + 3) % 10] + " " + CHI[(month + 1) % 12]
-            can_chi_year = CAN[(year + 6) % 10] + " " + CHI[(year + 8) % 12]
+            can_chi_day = f"{CAN[(day_number + 9) % 10]} {CHI[(day_number + 1) % 12]}"
+            can_chi_month = f"{CAN[(year * 12 + month + 3) % 10]} {CHI[(month + 1) % 12]}"
+            can_chi_year = f"{CAN[(year + 6) % 10]} {CHI[(year + 8) % 12]}"
             auspicious_hours = get_auspicious_hours(day_number)
             auspicious_day = get_auspicious_day(month, day_number)
             twelve_day_officers = get_twelve_day_officers(day_number)
             twenty_eight_mansions = get_twenty_eight_mansions(day_number)
-            response["mode"] = "l2s"
-            response["solar_date"] = join_date(solar_date[0], solar_date[1], solar_date[2])
-            response["lunar_date"] = date
+            response = {
+                "mode": "l2s",
+                "solar_date": join_date(solar_date[0], solar_date[1], solar_date[2]),
+                "lunar_date": date,
+            }
             response["weekday_vi"] = f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]}"
             response["difference_days"] = abs(days)
             response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"

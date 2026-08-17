@@ -20,10 +20,11 @@ _INDEX_LOCKS_GUARD = threading.Lock()
 
 
 class _IndexLockContext:
-    def __init__(self, key: str):
-        self.key = key
-        self.lock = None
+    key: str
+    lock: asyncio.Lock | None
 
+    # Pyscript handles __init__ specially; initialize these attributes in the factory below.
+    @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
     async def __aenter__(self):
         key = self.key
         with _INDEX_LOCKS_GUARD:
@@ -36,6 +37,7 @@ class _IndexLockContext:
         await self.lock.acquire()
         return self
 
+    @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self.lock:
             self.lock.release()
@@ -50,7 +52,10 @@ class _IndexLockContext:
 
 
 def _acquire_index_lock(key: str):
-    return _IndexLockContext(key)
+    context = _IndexLockContext()
+    context.key = key
+    context.lock = None
+    return context
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -330,6 +335,7 @@ async def memory_cache_forget(key: str) -> dict[str, Any]:
             "error": "Missing a required argument: key",
         }
     try:
+        deleted = 0
         async with _acquire_index_lock(key):
             deleted = await _cache_delete(key)
         return {
@@ -386,6 +392,7 @@ async def memory_cache_set(
         ttl = TTL
     try:
         stored_value = orjson.dumps(value).decode("utf-8")
+        success = False
         async with _acquire_index_lock(key):
             success = await _cache_set(key, stored_value, ttl)
         if not success:
@@ -499,8 +506,8 @@ async def memory_cache_index_update(
     except (ValueError, TypeError):
         ttl = INDEX_TTL
 
-    async with _acquire_index_lock(cleaned_key):
-        try:
+    try:
+        async with _acquire_index_lock(cleaned_key):
             entries: list[str] = []
             seen: set[str] = set()
             changed = False
@@ -557,11 +564,11 @@ async def memory_cache_index_update(
                 "ttl": ttl,
                 "changed": changed,
             }
-        except Exception as error:
-            log.error(f"{__name__}: index_update failed for '{cleaned_key}': {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-            return {
-                "status": "error",
-                "op": "index_update",
-                "key": cleaned_key,
-                "error": f"An unexpected error occurred during processing: {error}",
-            }
+    except Exception as error:
+        log.error(f"{__name__}: index_update failed for '{cleaned_key}': {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {
+            "status": "error",
+            "op": "index_update",
+            "key": cleaned_key,
+            "error": f"An unexpected error occurred during processing: {error}",
+        }

@@ -44,7 +44,12 @@ blueprint:
     - Use the `pyscript.get_telegram_webhook` action to check the current Telegram Webhook ID.
     - Use the `pyscript.delete_telegram_webhook` action to delete the Telegram Webhook ID when you are no longer using it.
     - Use the `pyscript.send_telegram_message` action to easily send a message directly to Telegram in your automation without any dependencies.
+    - Use the `pyscript.send_telegram_location` action to send a Telegram map pin from coordinates or a Google Maps URL containing coordinates.
     - Use the `pyscript.send_telegram_photo` action to easily send a photo directly to Telegram in your automation without any dependencies.
+    - Use the `pyscript.send_telegram_audio` action to send MP3 or M4A audio files directly to Telegram.
+    - Use the `pyscript.send_telegram_document` action to send local files directly to Telegram as documents.
+    - Use the `pyscript.send_telegram_video` action to send MPEG-4 videos directly to Telegram.
+    - Use the `pyscript.send_telegram_voice` action to send OGG/Opus, MP3, or M4A voice messages directly to Telegram.
   domain: automation
   homeassistant:
     min_version: 2025.8.0
@@ -99,7 +104,7 @@ mode: queued
 max: 30
 max_exceeded: silent
 variables:
-  version: 20260409
+  version: 20260818
   chat_ids: !input chat_ids
   user_ids: !input user_ids
   language: !input language

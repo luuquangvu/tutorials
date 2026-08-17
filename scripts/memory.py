@@ -197,9 +197,7 @@ def _ensure_db_once(force: bool = False) -> None:
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def _normalize_value(s: str) -> str:
     """Normalize text value to Unicode NFC form."""
-    if s is None:
-        return ""
-    return unicodedata.normalize("NFC", str(s))
+    return "" if s is None else unicodedata.normalize("NFC", s)
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -244,7 +242,7 @@ def _normalize_key(s: str) -> str:
     """Normalize a memory key to a standard alphanumeric format."""
     if s is None:
         return ""
-    s = str(s).strip().lower()
+    s = s.strip().lower()
     s = _strip_diacritics(s)
     s = re.sub(r"[^a-z0-9_]", "_", s)
     s = re.sub(r"_+", "_", s).strip("_")
@@ -255,7 +253,7 @@ def _condense_candidate_for_selection(entry: dict[str, Any], *, score: float | N
     """Condense a database entry for inclusion in result lists."""
     value = entry.get("value")
     if isinstance(value, str) and len(value) > VALUE_PREVIEW_CHARS:
-        value = value[: VALUE_PREVIEW_CHARS - 3] + "..."
+        value = f"{value[: VALUE_PREVIEW_CHARS - 3]}..."
     data = {
         "key": entry.get("key"),
         "value": value,
@@ -360,9 +358,7 @@ async def _find_tag_matches_for_query(
 def _tokenize_query(q: str) -> list[str]:
     """Tokenize query string into normalized word tokens."""
     normalized = _normalize_search_text(q)
-    if not normalized:
-        return []
-    return normalized.split()
+    return normalized.split() if normalized else []
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -371,11 +367,8 @@ def _near_distance_for_tokens(n: int) -> int:
     if n <= 1:
         return 0
     val = 2 * n - 1
-    if val < 3:
-        val = 3
-    if val > NEAR_DISTANCE:
-        val = NEAR_DISTANCE
-    return val
+    val = max(val, 3)
+    return min(val, NEAR_DISTANCE)
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -390,7 +383,6 @@ def _build_fts_queries(raw_query: str) -> list[str]:
             phrase = " ".join(tokens)
             variants.append(f'"{phrase}"')
 
-        if len(tokens) >= 2:
             near_inner = " ".join(tokens)
             near_dist = _near_distance_for_tokens(len(tokens))
             variants.append(f"NEAR({near_inner}, {near_dist})")
@@ -405,8 +397,7 @@ def _build_fts_queries(raw_query: str) -> list[str]:
 
     if normalized_query:
         variants.append(normalized_query)
-    rq = (raw_query or "").strip()
-    if rq:
+    if rq := (raw_query or "").strip():
         variants.append(rq)
 
     seen = set()
@@ -437,8 +428,7 @@ def _fetch_with_expiry(cur: sqlite3.Cursor, key: str) -> tuple[bool, sqlite3.Row
     ).fetchone()
     if not row:
         return False, None
-    expires_at = row["expires_at"]
-    if expires_at:
+    if expires_at := row["expires_at"]:
         dt = _dt_from_iso(expires_at)
         if dt and datetime.now(UTC) > dt:
             return True, row
@@ -448,7 +438,7 @@ def _fetch_with_expiry(cur: sqlite3.Cursor, key: str) -> tuple[bool, sqlite3.Row
 def _set_result(state_value: str = "ok", **attrs: Any) -> None:
     """Update the memory result sensor state and attributes."""
     _ensure_result_entity_name()
-    attrs.update(result_entity_name)
+    attrs |= result_entity_name
     state.set(RESULT_ENTITY, value=state_value, new_attributes=attrs)  # noqa: F821  # ty:ignore[unresolved-reference]
 
 
@@ -693,7 +683,7 @@ def _memory_forget_db_sync(key_norm: str) -> int:
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def _memory_purge_expired_db_sync(grace_days: int = 0) -> int:
     """Synchronously remove expired memory records."""
-    grace = max(int(grace_days), 0)
+    grace = max(grace_days, 0)
     cutoff_dt = datetime.now(UTC) - timedelta(days=grace)
     cutoff_iso = cutoff_dt.isoformat()
     for attempt in range(2):
@@ -965,22 +955,19 @@ async def memory_set(
         }
 
     try:
-        expiration_days_i = int(expiration_days)
+        expiration_days_i = expiration_days
     except (TypeError, ValueError):
         expiration_days_i = 0
-    if expiration_days_i < 0:
-        expiration_days_i = 0
-    if expiration_days_i > EXPIRATION_MAX_DAYS:
-        expiration_days_i = EXPIRATION_MAX_DAYS
-
+    expiration_days_i = max(expiration_days_i, 0)
+    expiration_days_i = min(expiration_days_i, EXPIRATION_MAX_DAYS)
     if isinstance(force_new, str):
         force_new_bool = force_new.strip().lower() in {"1", "true", "yes", "y", "on"}
     else:
-        force_new_bool = bool(force_new)
+        force_new_bool = force_new
     forced_duplicate_override = False
 
     try:
-        scope_norm = ("" if scope is None else str(scope).strip()).lower() or "user"
+        scope_norm = ("" if scope is None else scope.strip()).lower() or "user"
         value_norm = _normalize_value(value)
         tags_raw = _normalize_value(tags) if tags else _normalize_value(key)
         tags_search = _normalize_tags(tags_raw)
@@ -1179,14 +1166,11 @@ async def memory_search(query: str, limit: int = 5):
         }
 
     try:
-        lim = int(limit)
+        lim = limit
     except (TypeError, ValueError):
         lim = 5
-    if lim < 1:
-        lim = 1
-    if lim > SEARCH_LIMIT_MAX:
-        lim = SEARCH_LIMIT_MAX
-
+    lim = max(lim, 1)
+    lim = min(lim, SEARCH_LIMIT_MAX)
     try:
         results = await _memory_search_db(query, lim)
     except Exception as e:
@@ -1291,11 +1275,8 @@ async def memory_purge_expired(grace_days: int | None = None):
             grace = int(grace_days)
         except (TypeError, ValueError):
             grace = 0
-    if grace < 0:
-        grace = 0
-    if grace > HOUSEKEEPING_GRACE_MAX_DAYS:
-        grace = HOUSEKEEPING_GRACE_MAX_DAYS
-
+    grace = max(grace, 0)
+    grace = min(grace, HOUSEKEEPING_GRACE_MAX_DAYS)
     try:
         removed = await _memory_purge_expired_db(grace)
     except Exception as e:

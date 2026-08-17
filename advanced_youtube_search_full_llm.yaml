@@ -71,7 +71,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Search query. Silence-correct misspellings. Use ordinals for results, omit Media IDs. Confirm if ambiguous
+            Search query. Silence-correct misspellings. Use ordinals for results, omit Media IDs and URLs. Confirm if ambiguous
         page_token_prompt:
           name: Page Token Prompt
           description: The token used by the AI to fetch the next page of YouTube results
@@ -84,7 +84,7 @@ mode: parallel
 max_exceeded: silent
 description: Searches YouTube for videos and returns matching results
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   query_string:
     name: Query String
@@ -137,6 +137,7 @@ sequence:
                 title: {{ entry.snippet.title | lower }}
                 published: {{ strptime(entry.snippet.publishedAt, '%Y-%m-%dT%H:%M:%S%z') | relative_time }} ago
                 media_id: {{ entry.id.videoId }}
+                media_url: {{ 'https://www.youtube.com/watch?v=' ~ entry.id.videoId }}
               {% endfor -%}
             next_page_token: "{{ response.get('nextPageToken') }}"
   - stop: ""

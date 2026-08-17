@@ -39,7 +39,7 @@ def youtube_search(
     page_token: str = "",
 ) -> dict[str, Any]:
     """Execute a search query against the YouTube API."""
-    search_response = (
+    return (
         client.search()
         .list(
             q=query,
@@ -50,8 +50,6 @@ def youtube_search(
         )
         .execute()
     )
-
-    return search_response
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]

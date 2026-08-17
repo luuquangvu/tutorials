@@ -90,7 +90,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Channel names (semicolon-separated). Silence-correct. After results, ask to play using ordinals, omit Media IDs
+            Channel names (semicolon-separated). Silence-correct. After results, ask to play using ordinals, omit Media IDs and URLs
         period_length_prompt:
           name: Period Length Prompt
           description: The prompt used by the AI to identify the lookback period in days
@@ -103,7 +103,7 @@ mode: parallel
 max_exceeded: silent
 description: Fetches recent video uploads from specified YouTube channels
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   entities:
     name: Entities
@@ -132,7 +132,7 @@ sequence:
           {% set validation = namespace(not_exist=false) -%}
           {% for entity in entities.split(';') -%}
           {% if not ((integration_entities('feedparser') | select('is_state_attr', 'friendly_name', entity.strip()) | list) or
-          (state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'sensor\.') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
+          (state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^sensor\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
           {% set validation.not_exist = true -%}
           {% endif -%}
           {% endfor -%}
@@ -148,21 +148,20 @@ sequence:
   - variables:
       response:
         entries: |-
+          {% set seen_video_ids = namespace(values=[]) -%}
           {% for entity in entities.split(';') -%}
-          {% set entity_id = (integration_entities('feedparser') | select('is_state_attr', 'friendly_name', entity.strip()) | first)
-          if (integration_entities('feedparser') | select('is_state_attr', 'friendly_name', entity.strip()) | list)
-          else (state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'sensor\.') | selectattr('aliases', 'contains', entity.strip()) | map(attribute='entity_id') | first) -%}
-          {% for entry in state_attr(entity_id, 'entries') if (strptime(entry.published, '%Y-%m-%dT%H:%M:%S%z') > (now() - timedelta(days=period_length))) -%}
-          {% if entry.link is not search('\/shorts\/') -%}
+          {% set feed_matches = integration_entities('feedparser') | select('is_state_attr', 'friendly_name', entity.strip()) | list -%}
+          {% set alias_matches = state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^sensor\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', entity.strip()) | map(attribute='entity_id') | list -%}
+          {% set entity_id = feed_matches[0] if feed_matches else (alias_matches[0] if alias_matches else none) -%}
+          {% set entries = state_attr(entity_id, 'entries') | default([], true) if entity_id else [] -%}
+          {% for entry in entries if (strptime(entry.published, '%Y-%m-%dT%H:%M:%S%z') > (now() - timedelta(days=period_length))) -%}
+          {% if (short_videos or entry.link is not search('\/shorts\/')) and entry.yt_videoid not in seen_video_ids.values -%}
+          {% set seen_video_ids.values = seen_video_ids.values + [entry.yt_videoid] -%}
           - channel: {{ entry.author | lower }}
             title: {{ entry.title | lower }}
             published: {{ strptime(entry.published, '%Y-%m-%dT%H:%M:%S%z') | relative_time }} ago
             media_id: {{ entry.yt_videoid }}
-          {% elif short_videos -%}
-          - channel: {{ entry.author | lower }}
-            title: {{ entry.title | lower }}
-            published: {{ strptime(entry.published, '%Y-%m-%dT%H:%M:%S%z') | relative_time }} ago
-            media_id: {{ entry.yt_videoid }}
+            media_url: {{ 'https://www.youtube.com/watch?v=' ~ entry.yt_videoid }}
           {% endif -%}
           {% endfor -%}
           {% endfor -%}
