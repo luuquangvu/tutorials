@@ -20,10 +20,17 @@ if TOKEN:
     TOKEN = TOKEN.strip()
 
 _session: httpx.AsyncClient | None = None
+_session_lock = asyncio.Lock()
 
 
 if not TOKEN:
     raise ValueError("Zalo bot token is missing")
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _create_session() -> httpx.AsyncClient:
+    """Create the HTTPX client in native Python for executor-safe SSL setup."""
+    return httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
 
 
 def _to_media_path(path: str) -> str:
@@ -60,7 +67,9 @@ async def _ensure_session() -> httpx.AsyncClient:
     """Create or return a shared httpx AsyncClient with HTTP/2."""
     global _session
     if _session is None or _session.is_closed:
-        _session = httpx.AsyncClient(http2=True, timeout=httpx.Timeout(300))
+        async with _session_lock:
+            if _session is None or _session.is_closed:
+                _session = await asyncio.to_thread(_create_session)
     return _session
 
 
@@ -110,11 +119,9 @@ def _cleanup_disk_sync(directory: str, cutoff: float) -> None:
         return
 
     for entry in path.iterdir():
-        try:
+        with contextlib.suppress(OSError):
             if entry.is_file() and entry.stat().st_mtime < cutoff:
                 entry.unlink()
-        except OSError:
-            pass
 
 
 async def _cleanup_old_files(directory: str, days: int = 30) -> None:
@@ -147,7 +154,7 @@ async def _send_message(client: httpx.AsyncClient, chat_id: str, message: str) -
     url = f"https://bot-api.zapps.me/bot{TOKEN}/sendMessage"
     text = message
     if len(text) > 2000:
-        text = text[:1997] + "..."
+        text = f"{text[:1997]}..."
     payload = {"chat_id": chat_id, "text": text}
     data = orjson.dumps(payload).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -325,9 +332,7 @@ async def send_zalo_message(chat_id: str, message: str) -> dict[str, Any]:
     try:
         client = await _ensure_session()
         response = await _send_message(client, chat_id, message)
-        if not response:
-            return {"error": "Failed to send message"}
-        return response
+        return response or {"error": "Failed to send message"}
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -361,7 +366,6 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
         mimetypes.add_type("text/plain", ".yaml")
         mime_type, _ = mimetypes.guess_file_type(file_path)
         file_path = _to_relative_path(file_path)
-        response: dict[str, Any] = {"file_path": file_path, "mime_type": mime_type}
         support_file_types = (
             "image/",
             "video/",
@@ -369,10 +373,11 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
             "text/",
             "application/pdf",
         )
-        if mime_type and mime_type.startswith(support_file_types):
-            response["supported"] = True
-        else:
-            response["supported"] = False
+        response: dict[str, Any] = {
+            "file_path": file_path,
+            "mime_type": mime_type,
+            "supported": bool(mime_type and mime_type.startswith(support_file_types)),
+        }
         return response
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -505,9 +510,7 @@ async def send_zalo_chat_action(chat_id: str) -> dict[str, Any]:
     try:
         client = await _ensure_session()
         response = await _send_chat_action(client, chat_id)
-        if not response:
-            return {"error": "Failed to send message"}
-        return response
+        return response or {"error": "Failed to send message"}
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}
@@ -550,8 +553,7 @@ async def send_zalo_photo(
     try:
         client = await _ensure_session()
         public_url, published_path = await _copy_to_www(file_path)
-        response = await _send_photo(client, chat_id, public_url, caption=caption)
-        return response
+        return await _send_photo(client, chat_id, public_url, caption=caption)
     except Exception as error:
         log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
         return {"error": f"An unexpected error occurred during processing: {error}"}

@@ -105,7 +105,7 @@ mode: parallel
 max_exceeded: silent
 description: Controls AC mode, temperature, and fan speed
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   ac_entities:
     name: AC Entities
@@ -168,7 +168,7 @@ sequence:
             {% if exact_match %}
               {% set res.entities = res.entities + exact_match %}
             {% else %}
-              {% set alias_match = state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'climate\.') | selectattr('aliases', 'contains', name) | map(attribute='entity_id') | list %}
+              {% set alias_match = state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^climate\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', name) | map(attribute='entity_id') | list %}
               {% if alias_match %}
                 {% set res.entities = res.entities + alias_match %}
               {% else %}
@@ -195,7 +195,7 @@ sequence:
         {% for entity_id in resolution.entities %}
           {% set device_name = state_attr(entity_id, 'friendly_name') %}
           {% if hvac_mode %}
-            {% set supported_hvac = state_attr(entity_id, 'hvac_modes') | default([]) %}
+            {% set supported_hvac = state_attr(entity_id, 'hvac_modes') | default([], true) %}
             {% set hvac_support = namespace(modes=[]) %}
             {% for m in supported_hvac %}
               {% set val = m %}
@@ -246,7 +246,7 @@ sequence:
              {% set result.resolved_temps = result.resolved_temps + [''] %}
           {% endif %}
           {% if fan_mode %}
-            {% set supported_fan = state_attr(entity_id, 'fan_modes') | default([]) %}
+            {% set supported_fan = state_attr(entity_id, 'fan_modes') | default([], true) %}
             {% set fan_check = namespace(matched=false, resolved_mode='') %}
             {% set fan_support = namespace(aliases=[]) %}
             {% for mode in supported_fan %}

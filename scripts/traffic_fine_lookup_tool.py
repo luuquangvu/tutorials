@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import time
 import urllib.parse
-from contextlib import closing
+from contextlib import closing, suppress
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,18 @@ CACHE_REFRESH_PERIOD = 4 * 60 * 60
 CACHE_REFRESH_THRESHOLD = CACHE_MAX_AGE - CACHE_REFRESH_PERIOD
 
 BROWSERS: list[BrowserTypeLiteral] = ["chrome", "safari", "safari_ios"]
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _create_http_session(loop: asyncio.AbstractEventLoop, browser: BrowserTypeLiteral) -> AsyncSession:
+    """Create the curl session off the event loop while preserving its loop binding."""
+    return AsyncSession(
+        loop=loop,
+        impersonate=browser,
+        timeout=60,
+        allow_redirects=CurlFollow.SAFE,
+        http_version=CurlHttpVersion.NONE,
+    )
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -239,11 +251,11 @@ async def _get_recaptcha_version(ss: AsyncSession) -> str | None:
     """Fetch the current reCAPTCHA JS version from Google's API."""
     try:
         url = f"https://www.google.com/recaptcha/api.js?render={RECAPTCHA_SITEKEY}"
-        headers = {"Referer": BASE_URL + "/"}
+        headers = {"Referer": f"{BASE_URL}/"}
         resp = await ss.get(url, headers=headers)
         resp.raise_for_status()
         match = re.search(r"/recaptcha/releases/([^/]+)/", resp.text)
-        return match.group(1) if match else None
+        return match[1] if match else None
     except RequestsError:
         return None
 
@@ -265,14 +277,14 @@ async def _get_recaptcha_anchor(ss: AsyncSession, version: str) -> str | None:
         anchor_url = f"https://www.google.com/recaptcha/api2/anchor?{anchor_params_str}"
 
         anchor_headers = {
-            "Referer": BASE_URL + "/",
+            "Referer": f"{BASE_URL}/",
             "Accept-Language": "en-US,en;q=0.9,vi;q=0.8",
         }
         resp = await ss.get(anchor_url, headers=anchor_headers)
         resp.raise_for_status()
 
         match = re.search(r'id="recaptcha-token"\s+value="([^"]+)"', resp.text)
-        return match.group(1) if match else None
+        return match[1] if match else None
     except RequestsError:
         return None
 
@@ -303,33 +315,27 @@ async def _get_recaptcha_reload(
         resp.raise_for_status()
 
         response_text = resp.text.lstrip(")]}'")
-        try:
+        with suppress(orjson.JSONDecodeError):
             rresp_data = orjson.loads(response_text)
             if isinstance(rresp_data, list) and len(rresp_data) > 1 and rresp_data[0] == "rresp":
-                token = rresp_data[1]
-                if token:
+                if token := rresp_data[1]:
                     return token, None
                 return None, "Google returned a null token (Bot detected)"
-        except orjson.JSONDecodeError:
-            pass
-
-        rresp_match = re.search(r'"rresp","([^"]+)"', resp.text)
-        if not rresp_match:
+        if rresp_match := re.search(r'"rresp","([^"]+)"', resp.text):
+            return rresp_match[1], None
+        else:
             return None, "Failed to extract response token"
 
-        return rresp_match.group(1), None
     except RequestsError as error:
         return None, f"reCAPTCHA reload failed: {error}"
 
 
 async def _get_recaptcha_clr(ss: AsyncSession) -> None:
     """Send reCAPTCHA clr request to clean up the session."""
-    try:
+    with suppress(RequestsError):
         url = f"https://www.google.com/recaptcha/api2/clr?k={RECAPTCHA_SITEKEY}"
-        headers = {"Origin": BASE_URL, "Referer": BASE_URL + "/"}
+        headers = {"Origin": BASE_URL, "Referer": f"{BASE_URL}/"}
         await ss.post(url, headers=headers)
-    except RequestsError:
-        pass
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -362,8 +368,7 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
         if title_div:
             violation["Biển kiểm soát"] = title_div.get_text(strip=True)
 
-        status_span = card.find("span", class_="status-badge")
-        if status_span:
+        if status_span := card.find("span", class_="status-badge"):
             violation["Trạng thái"] = status_span.get_text(strip=True)
 
         info_groups = card.find_all("div", class_="info-group")
@@ -386,14 +391,17 @@ def _extract_violations_from_html(result_html: str) -> dict[str, Any]:
                         resolution_items.append(col_data)
 
                 for col_data in resolution_items:
-                    unit_key = next((k for k in col_data if k.startswith("Đơn vị")), None)
+                    for key in col_data:
+                        if (unit_key := key).startswith("Đơn vị"):
+                            break
+                    else:
+                        unit_key = None
                     if unit_key:
                         violation[unit_key] = col_data[unit_key]
-                        addr = col_data.get("Địa chỉ")
-                        if addr:
+                        if addr := col_data.get("Địa chỉ"):
                             violation[f"Địa chỉ ({unit_key})"] = addr
                     else:
-                        violation.update(col_data)
+                        violation |= col_data
             else:
                 for item in group.find_all("div", class_="info-item"):
                     label_span = item.find("span", class_="label")
@@ -429,9 +437,8 @@ async def _check_license_plate(
 
     if browser is None:
         browser = random.choice(BROWSERS)
-    async with AsyncSession(
-        impersonate=browser, timeout=60, allow_redirects=CurlFollow.SAFE, http_version=CurlHttpVersion.V3
-    ) as ss:
+    session = await asyncio.to_thread(_create_http_session, asyncio.get_running_loop(), browser)
+    async with session as ss:
         try:
             homepage = await ss.get(BASE_URL)
             homepage.raise_for_status()
@@ -446,7 +453,7 @@ async def _check_license_plate(
                 log.error(f"CSRF token extraction failed for {license_plate}")  # noqa: F821  # ty:ignore[unresolved-reference]
                 return {"error": "Failed to extract CSRF token"}
 
-            csrf_token = token_match.group(1)
+            csrf_token = token_match[1]
 
             version = await _get_recaptcha_version(ss)
             if not version:
@@ -592,9 +599,9 @@ async def traffic_fine_lookup_tool(
           boolean:
     """
     try:
-        license_plate = str(license_plate).upper()
+        license_plate = license_plate.upper()
         license_plate = re.sub(r"[^A-Z0-9]", "", license_plate)
-        vehicle_type = str(vehicle_type).lower()
+        vehicle_type = vehicle_type.lower()
 
         if vehicle_type not in VEHICLE_TYPES:
             return {"error": "The type of vehicle is invalid"}
@@ -604,7 +611,7 @@ async def traffic_fine_lookup_tool(
             return {"error": "The license plate number is invalid"}
 
         cache_key = f"{license_plate}-{vehicle_type}"
-        if bool(bypass_caching):
+        if bypass_caching:
             await _cache_delete(cache_key)
             response = await _check_license_plate(license_plate, vehicle_type)
             if response and response.get("status") == "success":

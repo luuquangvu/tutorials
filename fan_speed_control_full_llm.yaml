@@ -111,7 +111,7 @@ mode: parallel
 max_exceeded: silent
 description: Controls fan speed
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   fan_entities:
     name: Fan Entities
@@ -146,7 +146,7 @@ sequence:
           {% set validation = namespace(invalid=false) -%}
           {% for entity in fan_entities.split(';') -%}
           {% if not ((states.fan | selectattr('attributes.friendly_name', 'eq', entity.strip()) | list) or
-          (state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'fan\.') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
+          (state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^fan\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', entity.strip()) | list)) -%}
           {% set validation.invalid = true -%}
           {% endif -%}
           {% endfor -%}
@@ -180,7 +180,7 @@ sequence:
         {% if (states.fan | selectattr('attributes.friendly_name', 'eq', entity.strip()) | list) -%}
         {% set device.entities = device.entities + (states.fan | selectattr('attributes.friendly_name', 'eq', entity.strip()) | map(attribute='entity_id') | list) -%}
         {% else -%}
-        {% set device.entities = device.entities + (state_attr(entity_aliases, 'entities') | default([]) | selectattr('entity_id', 'match', 'fan\.') | selectattr('aliases', 'contains', entity.strip()) | map(attribute='entity_id') | list) -%}
+        {% set device.entities = device.entities + (state_attr(entity_aliases, 'entities') | default([], true) | selectattr('entity_id', 'defined') | selectattr('entity_id', 'match', '^fan\.') | selectattr('aliases', 'defined') | selectattr('aliases', 'contains', entity.strip()) | map(attribute='entity_id') | list) -%}
         {% endif -%}
         {% endfor -%}
         {{ device.entities }}

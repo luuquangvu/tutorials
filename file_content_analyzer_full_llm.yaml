@@ -73,7 +73,7 @@ mode: parallel
 max_exceeded: silent
 description: Analyzes file content (images, video, audio, text) to extract information or provide summaries
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   instructions:
     name: Instructions
@@ -99,7 +99,7 @@ sequence:
       ai_task_entity: !input ai_task_entity
       instructions: "{{ instructions | default('') | trim }}"
       file_path: "{{ file_path | default('') | trim }}"
-      mime_type: "{{ mime_type | default('') | trim }}"
+      mime_type: "{{ mime_type | default('') | trim | lower }}"
   - if:
       - alias: Check if variables were set correctly
         condition: template
@@ -131,7 +131,20 @@ sequence:
   - if:
       - alias: Check if variables were set correctly
         condition: template
-        value_template: "{{ not mime_type.startswith(('image/', 'video/', 'audio/', 'text/', 'application/')) }}"
+        value_template: >-
+          {{ not (
+            mime_type.startswith(('image/', 'video/', 'audio/', 'text/')) or
+            mime_type in (
+              'application/pdf',
+              'application/rtf',
+              'application/msword',
+              'application/vnd.ms-excel',
+              'application/vnd.ms-powerpoint',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+            )
+          ) }}
     then:
       - alias: Set variable for error message
         variables:

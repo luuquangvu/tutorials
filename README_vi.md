@@ -30,7 +30,7 @@ Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ s
     - [Tra cứu & chuyển đổi Lịch Âm](#tra-cứu--chuyển-đổi-lịch-âm)
     - [Tạo Sự kiện theo Lịch Âm](#tạo-sự-kiện-theo-lịch-âm)
   - [Chatbot Tương tác & Điều khiển Nhà thông minh](#chatbot-tương-tác--điều-khiển-nhà-thông-minh)
-  - [Voice Assist - Gửi Tin nhắn & Hình ảnh](#voice-assist---gửi-tin-nhắn--hình-ảnh)
+  - [Voice Assist - Gửi Tin nhắn & Nội dung](#voice-assist---gửi-tin-nhắn--nội-dung)
   - [Voice Assist - Tra cứu Thông tin Internet](#voice-assist---tra-cứu-thông-tin-internet)
   - [Voice Assist - Tìm kiếm & Phát Video YouTube](#voice-assist---tìm-kiếm--phát-video-youtube)
   - [Voice Assist - Theo dõi Kênh YouTube Yêu thích](#voice-assist---theo-dõi-kênh-youtube-yêu-thích)
@@ -286,20 +286,22 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 
 ---
 
-## Voice Assist - Gửi Tin nhắn & Hình ảnh
+## Voice Assist - Gửi Tin nhắn & Nội dung
 
-Đang lái xe hoặc tay dính dầu mỡ? Hãy dùng giọng nói để gửi tin nhắn, chia sẻ vị trí hoặc hình ảnh camera tới người thân qua Telegram/Zalo.
+Đang lái xe hoặc tay dính dầu mỡ? Hãy dùng giọng nói để gửi tin nhắn và chia sẻ nội dung tới người thân qua Telegram/Zalo. Blueprint Telegram hỗ trợ tin nhắn văn bản, ghim vị trí, hình ảnh, âm thanh, tài liệu, video và tin nhắn thoại.
 
 **Tính năng nổi bật:**
 
 - **Nhắn tin rảnh tay:** Đọc nội dung tin nhắn và Assistant sẽ gửi đi ngay lập tức.
-- **Chia sẻ thông minh:** Tự động đính kèm link Google Maps khi bạn nhắc đến một địa điểm.
+- **Ghim vị trí Telegram:** Gửi vị trí chính xác bằng vĩ độ/kinh độ hoặc liên kết Google Maps có chứa tọa độ. Blueprint sẽ gửi phần tóm tắt trước, sau đó gửi ghim vị trí.
+- **Chia sẻ nội dung đa phương tiện:** Gửi hình ảnh, âm thanh MP3/M4A, tài liệu, video MPEG-4 và tin nhắn thoại OGG/Opus, MP3 hoặc M4A từ đường dẫn `local/` hoặc `/media/`.
 - **Báo cáo hình ảnh:** Ra lệnh chụp ảnh từ camera an ninh và gửi ngay vào nhóm chat gia đình.
 
 **Ví dụ lệnh thoại:**
 
 - "Gửi danh sách quán ăn ngon ở Nha Trang lên nhóm Telegram gia đình."
-- "Gửi vị trí Hoàng Thành Thăng Long qua Zalo cho vợ."
+- "Gửi ghim vị trí Hoàng Thành Thăng Long lên nhóm Telegram bằng liên kết Google Maps này."
+- "Gửi báo cáo PDF tháng này và bản ghi âm cuộc họp lên nhóm Telegram gia đình."
 - "Chụp ảnh camera cổng gửi vào nhóm chat."
 
 **Ứng dụng thực tế:**
@@ -307,8 +309,11 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 - **An toàn khi lái xe:** "Nhắn cho vợ là anh về muộn khoảng 30 phút" - Gửi thông báo quan trọng mà không cần rời tay khỏi vô lăng, tập trung lái xe.
 - **Thông báo khẩn:** Về nhà muộn? "Gửi tin nhắn cho mẹ là con đang trên đường về" - Nhanh chóng thông báo mà không cần gõ phím.
 - **Chia sẻ khoảnh khắc:** "Chụp ảnh camera sân gửi vào nhóm gia đình" - Chia sẻ ngay lập tức những hình ảnh thú vị.
+- **Cập nhật đầy đủ:** Gửi báo cáo, bản ghi âm, video hoặc tin nhắn thoại kèm phần tóm tắt ngắn gọn.
 
 _Cài đặt blueprint cho nền tảng bạn muốn gửi tin đến:_
+
+Để gửi ghim vị trí Telegram, hãy dùng tọa độ hoặc liên kết Google Maps có chứa tọa độ. Địa chỉ thuần văn bản hoặc liên kết Maps rút gọn cần có bước mã hóa địa chỉ riêng.
 
 **Gửi đến Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_telegram_full_llm.yaml)
