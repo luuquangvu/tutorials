@@ -10,6 +10,8 @@ import datetime
 import math
 from typing import Any
 
+VIETNAM_TIME_ZONE = 7
+
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def jd_from_date(dd: int, mm: int, yy: int) -> int:
@@ -125,7 +127,7 @@ def get_leap_month_offset(a11: int, time_zone: int) -> int:
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
-def solar_to_lunar(dd: int, mm: int, yy: int, time_zone: int = 7) -> list[int]:
+def solar_to_lunar(dd: int, mm: int, yy: int, time_zone: int = VIETNAM_TIME_ZONE) -> list[int]:
     """Convert a Gregorian (Solar) date to its corresponding Lunar date."""
     day_number = jd_from_date(dd, mm, yy)
     k = int((day_number - 2415021.076998695) / 29.530588853)
@@ -163,7 +165,7 @@ def lunar_to_solar(
     lunar_month: int,
     lunar_year: int,
     lunar_leap: int,
-    time_zone: int = 7,
+    time_zone: int = VIETNAM_TIME_ZONE,
 ) -> list[int]:
     """Convert a Lunar date to its corresponding Gregorian (Solar) date."""
     if lunar_month < 11:
@@ -849,10 +851,12 @@ FIELD_MAPPING = {
 
 def validate_date(date: str) -> bool:
     """Validate if a string is in YYYY-MM-DD format."""
+    if not isinstance(date, str) or len(date) != 10 or date[4] != "-" or date[7] != "-":
+        return False
     try:
         datetime.date.fromisoformat(date)
         return True
-    except ValueError:
+    except (TypeError, ValueError):
         return False
 
 
@@ -868,15 +872,25 @@ def join_date(day: int, month: int, year: int) -> str:
 
 
 def validate_lunar_date(date: str) -> bool:
-    """Validate if a string is in YYYY-MM-DD format with lunar-valid ranges."""
+    """Validate the YYYY-MM-DD format and basic lunar date ranges."""
     try:
         parts = date.split("-")
-        if len(parts) != 3:
+        if len(parts) != 3 or len(parts[0]) != 4 or len(parts[1]) != 2 or len(parts[2]) != 2:
             return False
         year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
         return 1 <= month <= 12 and 1 <= day <= 30 and year > 0
-    except (ValueError, IndexError):
+    except (AttributeError, TypeError, ValueError, IndexError):
         return False
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _is_valid_lunar_date(day: int, month: int, year: int, lunar_leap: bool) -> bool:
+    """Validate that a lunar date maps back to the same lunar month and day."""
+    solar_date = lunar_to_solar(day, month, year, 1 if lunar_leap else 0)
+    if solar_date == [0, 0, 0]:
+        return False
+    lunar_date = solar_to_lunar(*solar_date, time_zone=VIETNAM_TIME_ZONE)
+    return lunar_date[:4] == [day, month, year, 1 if lunar_leap else 0]
 
 
 def split_lunar_date(date: str) -> tuple[int, int, int]:
@@ -892,7 +906,7 @@ def get_day_of_week(day: int, month: int, year: int) -> int:
 
 def get_twelve_day_officers(jd: int) -> dict[str, Any]:
     """Calculate the Twelve Day Officer (Trực) for a Julian day."""
-    st_index = get_solar_term(jd, 7)
+    st_index = get_solar_term(jd, VIETNAM_TIME_ZONE)
     month_chi_list = [
         3,
         4,
@@ -987,9 +1001,22 @@ def get_auspicious_hours(jd: int) -> list:
 
 def get_number_of_days(date: str) -> int:
     """Calculate the day difference between today and a given date string."""
-    start_date = datetime.datetime.combine(datetime.date.today(), datetime.time.min)
+    vietnam_now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=VIETNAM_TIME_ZONE)))
+    start_date = datetime.datetime.combine(vietnam_now.date(), datetime.time.min)
     end_date = datetime.datetime.strptime(date, "%Y-%m-%d")
     return (end_date - start_date).days
+
+
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    """Convert common service-call boolean representations safely."""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        return False if normalized in {"0", "false", "no", "n", "off", ""} else default
+    return bool(value)
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -1059,7 +1086,9 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             }
             response["difference_days"] = abs(days)
             response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
-            response["relative_to"] = datetime.date.today().isoformat()
+            response["relative_to"] = (
+                datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=VIETNAM_TIME_ZONE))).date().isoformat()
+            )
             response["lunar_date_meta"] = {"leap_month": lunar_date[3] == 1}
             response["full_lunar_date_vi"] = (
                 f"{DAYS[get_day_of_week(day, month, year)]} ngày {lunar_date[0]} tháng {lunar_month} năm {can_chi_year}"
@@ -1069,7 +1098,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
                 "full_can_chi_date_vi": f"{DAYS[get_day_of_week(day, month, year)]} "
                 f"ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
             }
-            response["solar_term"] = SOLAR_TERM[get_solar_term(lunar_date[4] + 1, 7)]
+            response["solar_term"] = SOLAR_TERM[get_solar_term(lunar_date[4] + 1, VIETNAM_TIME_ZONE)]
             response["extras"] = {
                 "auspicious_hours": auspicious_hours,
                 "auspicious_day": auspicious_day,
@@ -1087,17 +1116,15 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             )
             return {"error": f"Error converting Solar date {date} to Lunar date: {error}"}
     elif conversion_type == "l2s":
-        if day > 30:
-            return {"error": "Invalid date: Lunar day must be less than or equal to 30"}
         try:
-            leap_month = bool(kwargs.get("leap_month", False))
+            leap_month = _coerce_bool(kwargs.get("leap_month", False))
             is_leap = 1 if leap_month else 0
-            solar_date = lunar_to_solar(day, month, year, is_leap)
-            if solar_date == [0, 0, 0]:
+            if not _is_valid_lunar_date(day, month, year, leap_month):
                 return {
                     "error": f"Invalid lunar date: Day {day} Month {month} "
                     f"(Leap: {leap_month}) Year {year} does not exist."
                 }
+            solar_date = lunar_to_solar(day, month, year, is_leap)
             days = get_number_of_days(join_date(solar_date[0], solar_date[1], solar_date[2]))
             day_number = jd_from_date(solar_date[0], solar_date[1], solar_date[2])
             can_chi_day = f"{CAN[(day_number + 9) % 10]} {CHI[(day_number + 1) % 12]}"
@@ -1115,7 +1142,9 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
             response["weekday_vi"] = f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]}"
             response["difference_days"] = abs(days)
             response["difference_direction"] = "days_remaining" if days >= 0 else "days_elapsed"
-            response["relative_to"] = datetime.date.today().isoformat()
+            response["relative_to"] = (
+                datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=VIETNAM_TIME_ZONE))).date().isoformat()
+            )
             response["lunar_date_meta"] = {"leap_month": leap_month}
             response["full_solar_date_vi"] = (
                 f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} "
@@ -1126,7 +1155,7 @@ def date_conversion_tool(conversion_type: str, date: str, **kwargs) -> dict[str,
                 "full_can_chi_date_vi": f"{DAYS[get_day_of_week(solar_date[0], solar_date[1], solar_date[2])]} "
                 f"ngày {can_chi_day} tháng {can_chi_month} năm {can_chi_year}",
             }
-            response["solar_term"] = SOLAR_TERM[get_solar_term(day_number + 1, 7)]
+            response["solar_term"] = SOLAR_TERM[get_solar_term(day_number + 1, VIETNAM_TIME_ZONE)]
             response["extras"] = {
                 "auspicious_hours": auspicious_hours,
                 "auspicious_day": auspicious_day,

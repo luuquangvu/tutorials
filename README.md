@@ -278,9 +278,6 @@ _Install the webhook blueprint for your chosen platform. For image analysis, als
 **Webhook for Zalo (Official Account):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_bot_webhook.yaml)
 
-**Webhook for Zalo (Custom Bot):**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_custom_bot_webhook.yaml)
-
 **(Optional) Image Analyzer Blueprint:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffile_content_analyzer_full_llm.yaml)
 
@@ -288,13 +285,14 @@ _Install the webhook blueprint for your chosen platform. For image analysis, als
 
 ## Voice Assist - Send Messages & Media
 
-Driving or hands messy? Use your voice to send messages and share content with loved ones via Telegram/Zalo. The Telegram blueprint supports text, map locations, images, audio, documents, videos, and voice messages.
+Driving or hands messy? Use your voice to send messages and share content with loved ones via Telegram/Zalo. The Telegram blueprint supports text, map locations, images, audio, documents, videos, and voice messages. The Zalo blueprint supports text, map locations, images, stickers, and AAC voice messages.
 
 **Key Features:**
 
 - **Hands-Free Messaging:** Dictate your message, and Assistant will send it immediately.
 - **Telegram Map Pins:** Send a precise location using latitude/longitude or a Google Maps URL containing coordinates. The blueprint sends the summary first, followed by the map pin.
 - **Media Sharing:** Send local images, MP3/M4A audio, documents, MPEG-4 videos, and OGG/Opus, MP3, or M4A voice messages using paths under `local/` or `/media/`.
+- **Zalo Media:** Send local images, stickers by Zalo sticker ID, or voice messages from a public HTTPS URL ending in `.aac`. Zalo voice messages support one-to-one chats only and have no caption.
 - **Image Reporting:** Command to take a photo from a security camera and send it directly to a family chat group.
 
 **Example Voice Commands:**
@@ -303,6 +301,8 @@ Driving or hands messy? Use your voice to send messages and share content with l
 - "Send the Thang Long Citadel map pin to the Telegram family group using this Google Maps link."
 - "Send the monthly report PDF and the meeting recording to the Telegram family group."
 - "Take a photo from the gate camera and send it to the chat group."
+- "Send a Zalo sticker with ID `your-sticker-id` to my Zalo chat."
+- "Send this AAC voice message to Zalo: `https://your-public-host.example/audio.aac`"
 
 **Use Cases:**
 
@@ -315,14 +315,13 @@ _Install the blueprint for the platform you want to send messages to:_
 
 For Telegram map pins, use coordinates or a Google Maps URL that contains coordinates. A plain address or shortened Maps URL requires a separate geocoding step.
 
+For Zalo, provide a sticker ID from `stickers.zaloapp.com` or a public HTTPS `.aac` URL for a voice message. Zalo voice messages are limited to one-to-one chats and do not support captions.
+
 **Send to Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_telegram_full_llm.yaml)
 
 **Send to Zalo (Official Bot):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_bot_full_llm.yaml)
-
-**Send to Zalo (Custom Bot):**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_custom_bot_full_llm.yaml)
 
 ---
 

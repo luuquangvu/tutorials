@@ -1,7 +1,7 @@
 blueprint:
   name: Perform YouTube Search
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/advanced_youtube_search_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/advanced_youtube_search_full_llm.yaml
   description: |-
     # Tool for searching YouTube videos used for Voice Assistant
 
@@ -54,7 +54,7 @@ blueprint:
           name: Number Of Results
           selector:
             number:
-              min: 0
+              min: 1
               max: 50
               step: 1
           default: 5

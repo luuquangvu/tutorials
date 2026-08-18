@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import ipaddress
 import mimetypes
 import os
 import secrets
@@ -25,6 +26,8 @@ _session_lock = asyncio.Lock()
 
 if not TOKEN:
     raise ValueError("Zalo bot token is missing")
+
+ZALO_API_BASE_URL = f"https://bot-api.zaloplatforms.com/bot{TOKEN}"
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -76,6 +79,35 @@ async def _ensure_session() -> httpx.AsyncClient:
 async def _ensure_dir(path: str) -> None:
     """Ensure a directory exists, creating it if necessary."""
     await asyncio.to_thread(os.makedirs, path, exist_ok=True)
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _validate_download_url(url: str) -> str:
+    """Allow HTTPS downloads while rejecting obvious local/private targets."""
+    parsed_url = urlparse(url.strip())
+    hostname = parsed_url.hostname
+    if parsed_url.scheme.lower() != "https" or not hostname:
+        raise ValueError("Only HTTPS URLs with a hostname are allowed")
+    if parsed_url.username or parsed_url.password:
+        raise ValueError("URLs containing credentials are not allowed")
+    normalized_hostname = hostname.lower().rstrip(".")
+    if normalized_hostname in {"localhost", "localhost.localdomain"} or normalized_hostname.endswith(
+        (".local", ".localhost", ".internal")
+    ):
+        raise ValueError("Local and internal hostnames are not allowed")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None and not address.is_global:
+        raise ValueError("Private and reserved IP addresses are not allowed")
+    try:
+        parsed_port = parsed_url.port
+    except ValueError as error:
+        raise ValueError("Invalid URL port") from error
+    if parsed_port == 0:
+        raise ValueError("Port 0 is not allowed")
+    return url.strip()
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -134,12 +166,13 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
 async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, None] | tuple[None, str]:
     """Download a file from a URL and save it locally."""
     try:
-        parsed_url = urlparse(url)
-        original_name = Path(parsed_url.path).name
+        safe_url = _validate_download_url(url)
+        parsed_url = urlparse(safe_url)
+        original_name = Path(parsed_url.path).name or "zalo_file"
 
         file_path = await asyncio.to_thread(
             _download_file_chunks_with_headers,
-            url,
+            safe_url,
             original_name,
             DIRECTORY,
         )
@@ -151,7 +184,7 @@ async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, None
 
 async def _send_message(client: httpx.AsyncClient, chat_id: str, message: str) -> dict[str, Any]:
     """Send a text message via the Zalo Bot API."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/sendMessage"
+    url = f"{ZALO_API_BASE_URL}/sendMessage"
     text = message
     if len(text) > 2000:
         text = f"{text[:1997]}..."
@@ -169,7 +202,7 @@ async def _send_photo(
     caption: str | None = None,
 ) -> dict[str, Any]:
     """Send a photo to a Zalo chat using a public URL."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/sendPhoto"
+    url = f"{ZALO_API_BASE_URL}/sendPhoto"
     payload: dict[str, Any] = {"chat_id": chat_id, "photo": photo_url}
     if caption:
         payload["caption"] = caption
@@ -179,20 +212,61 @@ async def _send_photo(
     return orjson.loads(resp.content)
 
 
-async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
-    """Retrieve current Zalo webhook status."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/getWebhookInfo"
-    resp = await client.get(url)
+async def _send_sticker(
+    client: httpx.AsyncClient,
+    chat_id: str,
+    sticker: str,
+) -> dict[str, Any]:
+    """Send a sticker to a Zalo chat using its sticker ID."""
+    url = f"{ZALO_API_BASE_URL}/sendSticker"
+    payload = {"chat_id": chat_id, "sticker": sticker}
+    data = orjson.dumps(payload).decode("utf-8")
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
     resp.raise_for_status()
     return orjson.loads(resp.content)
 
 
-async def _set_webhook(client: httpx.AsyncClient, base_url: str, webhook_id: str) -> dict[str, Any]:
+def _validate_voice_url(url: str) -> str:
+    """Validate a public AAC voice URL accepted by the Zalo Bot API."""
+    safe_url = _validate_download_url(url)
+    if Path(urlparse(safe_url).path).suffix.lower() != ".aac":
+        raise ValueError("voice_url must reference a file with the .aac extension")
+    return safe_url
+
+
+async def _send_voice(
+    client: httpx.AsyncClient,
+    chat_id: str,
+    voice_url: str,
+) -> dict[str, Any]:
+    """Send an AAC voice message to a one-to-one Zalo chat."""
+    url = f"{ZALO_API_BASE_URL}/sendVoice"
+    payload = {"chat_id": chat_id, "voice_url": voice_url}
+    data = orjson.dumps(payload).decode("utf-8")
+    resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
+
+
+async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
+    """Retrieve current Zalo webhook status."""
+    url = f"{ZALO_API_BASE_URL}/getWebhookInfo"
+    resp = await client.post(url, json={})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
+
+
+async def _set_webhook(
+    client: httpx.AsyncClient,
+    base_url: str,
+    webhook_id: str,
+    secret_token: str,
+) -> dict[str, Any]:
     """Configure the Zalo bot webhook URL."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/setWebhook"
+    url = f"{ZALO_API_BASE_URL}/setWebhook"
     params = {
         "url": f"{base_url}/api/webhook/{webhook_id}",
-        "secret_token": secrets.token_urlsafe(),
+        "secret_token": secret_token,
     }
     data = orjson.dumps(params).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -200,17 +274,25 @@ async def _set_webhook(client: httpx.AsyncClient, base_url: str, webhook_id: str
     return orjson.loads(resp.content)
 
 
+async def _test_webhook(client: httpx.AsyncClient) -> dict[str, Any]:
+    """Test whether the configured Zalo webhook can receive a request."""
+    url = f"{ZALO_API_BASE_URL}/testWebhook"
+    resp = await client.post(url, json={})
+    resp.raise_for_status()
+    return orjson.loads(resp.content)
+
+
 async def _delete_webhook(client: httpx.AsyncClient) -> dict[str, Any]:
     """Remove the Zalo bot webhook configuration."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/deleteWebhook"
-    resp = await client.get(url)
+    url = f"{ZALO_API_BASE_URL}/deleteWebhook"
+    resp = await client.post(url, json={})
     resp.raise_for_status()
     return orjson.loads(resp.content)
 
 
 async def _get_updates(client: httpx.AsyncClient, timeout: int = 30) -> dict[str, Any]:
     """Fetch updates from Zalo using long polling."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/getUpdates"
+    url = f"{ZALO_API_BASE_URL}/getUpdates"
     payload = {"timeout": timeout}
     data = orjson.dumps(payload).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -220,15 +302,15 @@ async def _get_updates(client: httpx.AsyncClient, timeout: int = 30) -> dict[str
 
 async def _get_me(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve basic Zalo bot account information."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/getMe"
-    resp = await client.get(url)
+    url = f"{ZALO_API_BASE_URL}/getMe"
+    resp = await client.post(url, json={})
     resp.raise_for_status()
     return orjson.loads(resp.content)
 
 
 async def _send_chat_action(client: httpx.AsyncClient, chat_id: str, action: str = "typing") -> dict[str, Any]:
     """Broadcast a chat action status to a Zalo conversation."""
-    url = f"https://bot-api.zapps.me/bot{TOKEN}/sendChatAction"
+    url = f"{ZALO_API_BASE_URL}/sendChatAction"
     params = {"chat_id": chat_id, "action": action}
     data = orjson.dumps(params).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -400,6 +482,23 @@ async def get_zalo_webhook() -> dict[str, Any]:
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def test_zalo_webhook() -> dict[str, Any]:
+    """
+    yaml
+    name: Test Zalo Bot Webhook
+    description: >-
+      Immediately test whether the configured Zalo webhook responds successfully.
+      Check result.ok in the response; the outer ok only indicates that the API call succeeded.
+    """
+    try:
+        client = await _ensure_session()
+        return await _test_webhook(client)
+    except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {error}"}
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
 async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
     """
     yaml
@@ -414,12 +513,13 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
     """
     try:
         if not webhook_id:
-            webhook_id: str = secrets.token_urlsafe()
+            webhook_id: str = secrets.token_urlsafe(32)
         external_url = _external_url()
         if not external_url:
             return {"error": "The external Home Assistant URL is not found or incorrect."}
+        selected_secret = secrets.token_urlsafe(32)
         client = await _ensure_session()
-        response = await _set_webhook(client, external_url, webhook_id)
+        response = await _set_webhook(client, external_url, webhook_id, selected_secret)
         if isinstance(response, dict) and response.get("ok"):
             response["webhook_id"] = webhook_id
         return response
@@ -560,3 +660,71 @@ async def send_zalo_photo(
     finally:
         if published_path:
             task.create(_delayed_remove, published_path, 30)  # noqa: F821  # ty:ignore[unresolved-reference]
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_zalo_sticker(chat_id: str, sticker: str) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Zalo Sticker
+    description: Send a sticker to a Zalo user or conversation by sticker ID.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: ID of the recipient or conversation.
+        required: true
+        selector:
+          text:
+      sticker:
+        name: Sticker ID
+        description: Sticker ID obtained from stickers.zaloapp.com.
+        required: true
+        selector:
+          text:
+    """
+    if not all([chat_id, sticker]):
+        return {"error": "Missing one or more required arguments: chat_id, sticker"}
+    try:
+        client = await _ensure_session()
+        response = await _send_sticker(client, chat_id, sticker)
+        return response or {"error": "Failed to send sticker"}
+    except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {error}"}
+
+
+@service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def send_zalo_voice(chat_id: str, voice_url: str) -> dict[str, Any]:
+    """
+    yaml
+    name: Send Zalo Voice
+    description: >-
+      Send an AAC voice message from a public HTTPS URL to a one-to-one Zalo chat.
+      Group chats are not supported by the Zalo API.
+    fields:
+      chat_id:
+        name: Chat ID
+        description: One-to-one recipient ID; group chats are not supported.
+        required: true
+        selector:
+          text:
+      voice_url:
+        name: Voice URL
+        description: Public HTTPS URL for an AAC audio file with a .aac extension.
+        required: true
+        selector:
+          text:
+    """
+    if not all([chat_id, voice_url]):
+        return {"error": "Missing one or more required arguments: chat_id, voice_url"}
+    try:
+        safe_voice_url = _validate_voice_url(voice_url)
+    except ValueError as error:
+        return {"error": f"Invalid voice_url: {error}"}
+    try:
+        client = await _ensure_session()
+        response = await _send_voice(client, chat_id, safe_voice_url)
+        return response or {"error": "Failed to send voice message"}
+    except Exception as error:
+        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {error}"}

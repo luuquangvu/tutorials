@@ -1,7 +1,7 @@
 blueprint:
   name: File Content Analyzer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/file_content_analyzer_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/file_content_analyzer_full_llm.yaml
   description: |-
     # Tool designed to analyze and extract all types of information from media and document files
 
@@ -157,8 +157,8 @@ sequence:
         response_variable: response
   - variables:
       attachments:
-        media_content_id: media-source://media_source/{{ file_path }}
-        media_content_type: "{{ mime_type }}"
+        - media_content_id: media-source://media_source/{{ file_path }}
+          media_content_type: "{{ mime_type }}"
   - if:
       - condition: template
         value_template: "{{ not ai_task_entity }}"

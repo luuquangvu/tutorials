@@ -1,7 +1,7 @@
 blueprint:
   name: Send to Zalo
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/send_to_zalo_bot_full_llm.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/send_to_zalo_bot_full_llm.yaml
   description: |-
     # Tool for sending content to Zalo used for Voice Assistant
 
@@ -48,7 +48,7 @@ blueprint:
     zalo_settings:
       name: Settings for Zalo
       icon: mdi:alpha-z-circle-outline
-      description: You can use these settings to configure Zalo for sending the message.
+      description: Use these settings to configure Zalo for sending text or supported media.
       input:
         chat_id:
           name: Chat ID
@@ -63,7 +63,7 @@ blueprint:
       input:
         summary_prompt:
           name: Summary Prompt
-          description: A brief overview or caption for the Zalo message/image
+          description: A brief overview or caption for Zalo text or images; not used for stickers or voice messages
           selector:
             text:
               multiline: true
@@ -79,20 +79,12 @@ blueprint:
             Full details. No links/markdown/emojis. Multiple items = multiple calls
         content_type_prompt:
           name: Content Type Prompt
-          description: The type of content to send (information, location, or image)
+          description: Instructions for choosing the Zalo content type
           selector:
             text:
               multiline: true
           default: |-
-            information, location, or image. Multiple items = multiple calls
-        location_prompt:
-          name: Location Prompt
-          description: The location/address to be sent via Zalo
-          selector:
-            text:
-              multiline: true
-          default: |-
-            Address only. No commas/punctuation
+            Choose the most appropriate type: information for text, image for an image, sticker for a Zalo sticker ID, or voice for a public HTTPS AAC voice URL. Voice messages support one-to-one chats only and have no caption. Multiple items = multiple calls
         image_path_prompt:
           name: Image Path Prompt
           description: Prompt shown to the LLM to request the media path when sending an image.
@@ -101,6 +93,22 @@ blueprint:
               multiline: true
           default: |-
             Existing path (local/, /media/). No guessing
+        sticker_prompt:
+          name: Sticker ID Prompt
+          description: Prompt shown to the LLM to request the Zalo sticker ID when sending a sticker.
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Existing Zalo sticker ID from stickers.zaloapp.com. No guessing
+        voice_url_prompt:
+          name: Voice URL Prompt
+          description: Prompt shown to the LLM to request the public AAC URL when sending a voice message.
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Public HTTPS URL ending in .aac. One-to-one Zalo chats only. No guessing
         chat_id_override_prompt:
           name: Chat ID Override Prompt
           description: An alternate Zalo Chat ID specified by the user
@@ -112,16 +120,15 @@ blueprint:
 mode: queued
 max: 30
 max_exceeded: silent
-description: Sends messages, locations, or images via Zalo
+description: Sends messages, images, stickers, or AAC voice messages via Zalo
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   summary:
     name: Summary
     description: !input summary_prompt
     selector:
       text:
-    required: true
   detail:
     name: Detail
     description: !input detail_prompt
@@ -134,17 +141,23 @@ fields:
       select:
         options:
           - information
-          - location
           - image
+          - sticker
+          - voice
     required: true
-  location:
-    name: Location
-    description: !input location_prompt
-    selector:
-      text:
   image_path:
     name: Image Path
     description: !input image_path_prompt
+    selector:
+      text:
+  sticker:
+    name: Sticker ID
+    description: !input sticker_prompt
+    selector:
+      text:
+  voice_url:
+    name: Voice URL
+    description: !input voice_url_prompt
     selector:
       text:
   target_chat_id:
@@ -158,8 +171,9 @@ sequence:
       summary: "{{ summary | default('') | trim }}"
       detail: "{{ detail | default('') | trim }}"
       content_type: "{{ content_type | default('') | trim }}"
-      location: "{{ location | default('') | trim }}"
-      image_path: "{{ image_path | default('') | trim }}"
+      image_path: "{{ image_path | default('', true) | trim }}"
+      sticker: "{{ sticker | default('', true) | trim }}"
+      voice_url: "{{ voice_url | default('', true) | trim }}"
       override_chat_id: "{{ target_chat_id | default('') | trim }}"
       chat_id_value: >-
         {% set candidate = override_chat_id if override_chat_id else default_chat_id %}
@@ -169,18 +183,19 @@ sequence:
       - condition: template
         value_template: >-
           {{
-            (not summary)
-            or (content_type not in ['information', 'location', 'image'])
+            (content_type not in ['information', 'image', 'sticker', 'voice'])
             or (not chat_id_value)
-            or (content_type == 'location' and not location)
+            or (content_type in ['information', 'image'] and not summary)
             or (content_type == 'image' and not image_path)
+            or (content_type == 'sticker' and not sticker)
+            or (content_type == 'voice' and not voice_url)
           }}
     then:
       - alias: Set variable for error message
         variables:
           response:
             error: >-
-              Unable to send the message to Zalo because one or more inputs are missing or invalid (summary, content_type, chat_id, location, or image_path).
+              Unable to send the message to Zalo because one or more inputs are missing or invalid (summary, content_type, chat_id, image_path, sticker, or voice_url).
       - alias: Stop the script
         stop: Unable to send the message to Zalo due to invalid inputs.
         response_variable: response
@@ -196,26 +211,6 @@ sequence:
                 {{ summary }}{% if detail %}
 
                 {{ detail }}{% endif %}
-
-                {% set query = summary.split() | join('+') -%}
-                {% set url = 'https://www.google.com/search?q=' ~ query -%}
-                Google Search ({{ url }})
-            response_variable: zalo_response
-      - conditions:
-          - condition: template
-            value_template: "{{ content_type == 'location' }}"
-        sequence:
-          - action: pyscript.send_zalo_message
-            data:
-              chat_id: "{{ chat_id_value }}"
-              message: |-
-                {{ summary }}{% if detail %}
-
-                {{ detail }}{% endif %}
-
-                {% set place = (summary ~ ' ' ~ location).split() | join('+') -%}
-                {% set url = 'https://www.google.com/maps/search/?api=1&query=' ~ place -%}
-                Google Maps ({{ url }})
             response_variable: zalo_response
       - conditions:
           - condition: template
@@ -229,6 +224,24 @@ sequence:
                 {{ summary }}{% if detail %}
 
                 {{ detail }}{% endif %}
+            response_variable: zalo_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'sticker' }}"
+        sequence:
+          - action: pyscript.send_zalo_sticker
+            data:
+              chat_id: "{{ chat_id_value }}"
+              sticker: "{{ sticker }}"
+            response_variable: zalo_response
+      - conditions:
+          - condition: template
+            value_template: "{{ content_type == 'voice' }}"
+        sequence:
+          - action: pyscript.send_zalo_voice
+            data:
+              chat_id: "{{ chat_id_value }}"
+              voice_url: "{{ voice_url }}"
             response_variable: zalo_response
   - stop: ""
     response_variable: zalo_response

@@ -1,7 +1,7 @@
 blueprint:
   name: Zalo Bot Webhook
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/main/zalo_bot_webhook.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/zalo_bot_webhook.yaml
   description: |-
     # A Zalo bot enabling seamless two-way communication with Home Assistant.
 
@@ -31,6 +31,7 @@ blueprint:
     ```
 
     - Use the `pyscript.get_zalo_updates` action to retrieve chat IDs then use the `pyscript.set_zalo_webhook` action to generate a Webhook ID.
+    - The Zalo API requires `secret_token`; `pyscript.set_zalo_webhook` generates a random token internally for each call.
 
     ### Note
 
@@ -40,11 +41,14 @@ blueprint:
 
     - Use the `pyscript.get_zalo_bot_info` action to retrieve Zalo bot basic information.
     - Use the `pyscript.get_zalo_updates` action to retrieve chat IDs and user IDs.
-    - Use the `pyscript.set_zalo_webhook` action to easily configure a Zalo Webhook ID automatically.
+    - Use the `pyscript.set_zalo_webhook` action to configure a Zalo Webhook ID.
+    - Use the `pyscript.test_zalo_webhook` action to test whether the configured Zalo Webhook responds successfully.
     - Use the `pyscript.get_zalo_webhook` action to check the current Zalo Webhook ID.
     - Use the `pyscript.delete_zalo_webhook` action to delete the Zalo Webhook ID when you are no longer using it.
-    - Use the `pyscript.send_zalo_message` action to easily send a message directly to Zalo in your automation without any dependencies.
-    - Use the `pyscript.send_zalo_photo` action to easily send a photo directly to Zalo in your automation without any dependencies.
+    - Use the `pyscript.send_zalo_message` action to send a message directly to Zalo in your automation without any dependencies.
+    - Use the `pyscript.send_zalo_photo` action to send a photo directly to Zalo in your automation without any dependencies.
+    - Use the `pyscript.send_zalo_sticker` action to send a sticker directly to Zalo in your automation without any dependencies.
+    - Use the `pyscript.send_zalo_voice` action to send an AAC voice message directly to a Zalo user without any dependencies.
   domain: automation
   homeassistant:
     min_version: 2025.8.0
@@ -99,7 +103,7 @@ mode: queued
 max: 30
 max_exceeded: silent
 variables:
-  version: 20260409
+  version: 20260818
   chat_ids: !input chat_ids
   user_ids: !input user_ids
   language: !input language
@@ -196,7 +200,7 @@ actions:
               - action: conversation.process
                 data:
                   agent_id: !input agent_id
-                  text: "{{ agent_input }}"
+                  text: "{{ agent_input | to_json }}"
                   language: "{{ language | trim }}"
                 response_variable: result
                 continue_on_error: true
@@ -204,7 +208,7 @@ actions:
               - action: conversation.process
                 data:
                   agent_id: !input agent_id
-                  text: "{{ agent_input }}"
+                  text: "{{ agent_input | to_json }}"
                   conversation_id: "{{ conversation_id }}"
                   language: "{{ language | trim }}"
                 response_variable: result
