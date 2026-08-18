@@ -11,6 +11,8 @@ import orjson
 TTL = 300  # Retention period in Home Assistant is set to a fixed 5 minutes of idle time.
 INDEX_TTL = 2592000  # 30 days
 DB_PATH = Path("/config/cache.db")
+READY_ENTITY = "binary_sensor.pyscript_common_utilities"
+READY_ENTITY_FRIENDLY_NAME = "Pyscript Common Utilities"
 
 _CACHE_READY = False
 _CACHE_READY_LOCK = threading.Lock()
@@ -111,6 +113,7 @@ def _reset_cache_ready() -> None:
         _CACHE_READY = False
 
 
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def _cache_prepare_db_sync(force: bool = False) -> bool:
     """Synchronously ensure the cache database is ready."""
     _ensure_cache_db_once(force=force)
@@ -252,10 +255,10 @@ async def initialize_cache_db() -> None:
     await _cache_prepare_db(force=True)
     await _prune_expired()
     state.set(  # noqa: F821  # ty:ignore[unresolved-reference]
-        f"binary_sensor.pyscript_{__name__}",
+        READY_ENTITY,
         "on",
         {
-            "friendly_name": f"Pyscript {__name__.replace('_', ' ').title()}",
+            "friendly_name": READY_ENTITY_FRIENDLY_NAME,
             "device_class": "connectivity",
         },
     )

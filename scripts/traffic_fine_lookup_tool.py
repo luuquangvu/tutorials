@@ -101,6 +101,7 @@ def _ensure_cache_db_once(force: bool = False) -> None:
             _CACHE_READY = True
 
 
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def _reset_cache_ready() -> None:
     """Mark the cache database schema as stale."""
     global _CACHE_READY
@@ -553,6 +554,24 @@ async def _check_license_plate(
             return {"error": f"Failed after {RETRY_LIMIT} retries: {error}"}
 
 
+async def _refresh_license_plate_cache(license_plate: str, vehicle_type: str) -> None:
+    """Refresh a near-expiry cache entry without blocking the caller."""
+    cache_key = f"traffic:{license_plate}-{vehicle_type}"
+    task.unique(f"traffic_fine_refresh:{cache_key}")  # noqa: F821  # ty:ignore[unresolved-reference]
+    try:
+        response = await _check_license_plate(license_plate, vehicle_type)
+        if response and response.get("status") == "success":
+            await _cache_set(
+                cache_key,
+                orjson.dumps(response).decode("utf-8"),
+                CACHE_MAX_AGE,
+            )
+    except Exception as error:
+        log.warning(  # noqa: F821  # ty:ignore[unresolved-reference]
+            f"Background traffic-fine cache refresh failed for {license_plate}: {error}"
+        )
+
+
 @time_trigger("startup")  # noqa: F821  # ty:ignore[unresolved-reference]
 async def build_cached_ctx() -> None:
     """Initialize cache and prune expired entries on startup."""
@@ -610,7 +629,7 @@ async def traffic_fine_lookup_tool(
         if not (license_plate and re.match(pattern, license_plate)):
             return {"error": "The license plate number is invalid"}
 
-        cache_key = f"{license_plate}-{vehicle_type}"
+        cache_key = f"traffic:{license_plate}-{vehicle_type}"
         if bypass_caching:
             await _cache_delete(cache_key)
             response = await _check_license_plate(license_plate, vehicle_type)
@@ -625,7 +644,11 @@ async def traffic_fine_lookup_tool(
         cached_value, ttl = await _cache_get(cache_key)
         if cached_value is not None:
             if ttl is not None and ttl < CACHE_REFRESH_THRESHOLD:
-                task.create(_check_license_plate, license_plate, vehicle_type)  # noqa: F821  # ty:ignore[unresolved-reference]
+                task.create(  # noqa: F821  # ty:ignore[unresolved-reference]
+                    _refresh_license_plate_cache,
+                    license_plate,
+                    vehicle_type,
+                )
             return orjson.loads(cached_value)
 
         response = await _check_license_plate(license_plate, vehicle_type)

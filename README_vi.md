@@ -278,9 +278,6 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 **Webhook cho Zalo (Official Account):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_bot_webhook.yaml)
 
-**Webhook cho Zalo (Custom Bot):**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fzalo_custom_bot_webhook.yaml)
-
 **(Tùy chọn) Blueprint Phân tích Hình ảnh:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffile_content_analyzer_full_llm.yaml)
 
@@ -288,13 +285,14 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 
 ## Voice Assist - Gửi Tin nhắn & Nội dung
 
-Đang lái xe hoặc tay dính dầu mỡ? Hãy dùng giọng nói để gửi tin nhắn và chia sẻ nội dung tới người thân qua Telegram/Zalo. Blueprint Telegram hỗ trợ tin nhắn văn bản, ghim vị trí, hình ảnh, âm thanh, tài liệu, video và tin nhắn thoại.
+Đang lái xe hoặc tay dính dầu mỡ? Hãy dùng giọng nói để gửi tin nhắn và chia sẻ nội dung tới người thân qua Telegram/Zalo. Blueprint Telegram hỗ trợ tin nhắn văn bản, ghim vị trí, hình ảnh, âm thanh, tài liệu, video và tin nhắn thoại. Blueprint Zalo hỗ trợ văn bản, ghim vị trí, hình ảnh, sticker và tin nhắn thoại AAC.
 
 **Tính năng nổi bật:**
 
 - **Nhắn tin rảnh tay:** Đọc nội dung tin nhắn và Assistant sẽ gửi đi ngay lập tức.
 - **Ghim vị trí Telegram:** Gửi vị trí chính xác bằng vĩ độ/kinh độ hoặc liên kết Google Maps có chứa tọa độ. Blueprint sẽ gửi phần tóm tắt trước, sau đó gửi ghim vị trí.
 - **Chia sẻ nội dung đa phương tiện:** Gửi hình ảnh, âm thanh MP3/M4A, tài liệu, video MPEG-4 và tin nhắn thoại OGG/Opus, MP3 hoặc M4A từ đường dẫn `local/` hoặc `/media/`.
+- **Nội dung Zalo:** Gửi hình ảnh từ `local/` hoặc `/media/`, sticker bằng ID Zalo, hoặc tin nhắn thoại từ URL HTTPS công khai kết thúc bằng `.aac`. Tin nhắn thoại Zalo chỉ hỗ trợ cuộc trò chuyện 1-1 và không có chú thích.
 - **Báo cáo hình ảnh:** Ra lệnh chụp ảnh từ camera an ninh và gửi ngay vào nhóm chat gia đình.
 
 **Ví dụ lệnh thoại:**
@@ -303,6 +301,8 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 - "Gửi ghim vị trí Hoàng Thành Thăng Long lên nhóm Telegram bằng liên kết Google Maps này."
 - "Gửi báo cáo PDF tháng này và bản ghi âm cuộc họp lên nhóm Telegram gia đình."
 - "Chụp ảnh camera cổng gửi vào nhóm chat."
+- "Gửi sticker Zalo có ID `your-sticker-id` vào cuộc trò chuyện Zalo của tôi."
+- "Gửi tin nhắn thoại AAC này qua Zalo: `https://your-public-host.example/audio.aac`"
 
 **Ứng dụng thực tế:**
 
@@ -315,14 +315,13 @@ _Cài đặt blueprint cho nền tảng bạn muốn gửi tin đến:_
 
 Để gửi ghim vị trí Telegram, hãy dùng tọa độ hoặc liên kết Google Maps có chứa tọa độ. Địa chỉ thuần văn bản hoặc liên kết Maps rút gọn cần có bước mã hóa địa chỉ riêng.
 
+Để gửi nội dung qua Zalo, hãy cung cấp ID sticker từ `stickers.zaloapp.com` hoặc URL HTTPS công khai của tệp `.aac`. Tin nhắn thoại Zalo chỉ gửi được trong cuộc trò chuyện 1-1 và không hỗ trợ chú thích.
+
 **Gửi đến Telegram:**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_telegram_full_llm.yaml)
 
 **Gửi đến Zalo (Official Bot):**
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_bot_full_llm.yaml)
-
-**Gửi đến Zalo (Custom Bot):**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fsend_to_zalo_custom_bot_full_llm.yaml)
 
 ---
 

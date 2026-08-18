@@ -580,12 +580,18 @@ async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
     return orjson.loads(resp.content)
 
 
-async def _set_webhook(client: httpx.AsyncClient, base_url: str, webhook_id: str) -> dict[str, Any]:
+async def _set_webhook(
+    client: httpx.AsyncClient,
+    base_url: str,
+    webhook_id: str,
+    secret_token: str,
+) -> dict[str, Any]:
     """Configure the Telegram webhook URL."""
     url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
     params = {
         "url": f"{base_url}/api/webhook/{webhook_id}",
         "drop_pending_updates": True,
+        "secret_token": secret_token,
     }
     data = orjson.dumps(params).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -880,12 +886,13 @@ async def set_telegram_webhook(webhook_id: str | None = None) -> dict[str, Any]:
     """
     try:
         if not webhook_id:
-            webhook_id: str = secrets.token_urlsafe()
+            webhook_id: str = secrets.token_urlsafe(32)
         external_url = _external_url()
         if not external_url:
             return {"error": "The external Home Assistant URL is not found or incorrect."}
+        secret_token = secrets.token_urlsafe(32)
         client = await _ensure_session()
-        response = await _set_webhook(client, external_url, webhook_id)
+        response = await _set_webhook(client, external_url, webhook_id, secret_token)
         if isinstance(response, dict) and response.get("ok"):
             response["webhook_id"] = webhook_id
         return response

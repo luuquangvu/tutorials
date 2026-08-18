@@ -281,7 +281,12 @@ def _calculate_match_score(source_tokens: set[str], candidate_tokens: set[str], 
         union_size = len(union) or 1
         jaccard_score = len(intersection) / union_size
     if isinstance(bm25_raw, (int, float)):
-        bm25_score = 1 / (1 + max(bm25_raw, 0))
+        if bm25_raw < 0:
+            # SQLite FTS5 exposes rank as a negative BM25 score; more negative is better.
+            bm25_magnitude = -bm25_raw
+            bm25_score = bm25_magnitude / (1 + bm25_magnitude)
+        else:
+            bm25_score = 1 / (1 + bm25_raw)
         jaccard_weight = 1 - BM25_WEIGHT
         return BM25_WEIGHT * bm25_score + jaccard_weight * jaccard_score
     return jaccard_score
@@ -564,6 +569,8 @@ def _memory_get_db_sync(key_norm: str) -> tuple[str, dict[str, Any] | None]:
 def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
     """Synchronously search for memory records matching the provided query."""
     normalized_query = _normalize_search_text(query)
+    if not normalized_query:
+        return []
     query_tokens = set(normalized_query.split()) if normalized_query else set()
     for attempt in range(2):
         try:
@@ -878,7 +885,7 @@ async def memory_set(
     key: str,
     value: str,
     scope: str = "user",
-    expiration_days: int = 180,
+    expiration_days: int | str = 180,
     tags: str = "",
     force_new: bool = False,
 ):
@@ -955,7 +962,7 @@ async def memory_set(
         }
 
     try:
-        expiration_days_i = expiration_days
+        expiration_days_i = int(expiration_days)
     except (TypeError, ValueError):
         expiration_days_i = 0
     expiration_days_i = max(expiration_days_i, 0)
@@ -1133,7 +1140,7 @@ async def memory_get(key: str):
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
-async def memory_search(query: str, limit: int = 5):
+async def memory_search(query: str, limit: int | str = 5):
     """
     yaml
     name: Memory Search
@@ -1165,8 +1172,18 @@ async def memory_search(query: str, limit: int = 5):
             "error": "query_missing",
         }
 
+    normalized_query = _normalize_search_text(query)
+    if not normalized_query:
+        _set_result("error", op="search", query=query, error="query_empty")
+        return {
+            "status": "error",
+            "op": "search",
+            "query": query,
+            "error": "query_empty",
+        }
+
     try:
-        lim = limit
+        lim = int(limit)
     except (TypeError, ValueError):
         lim = 5
     lim = max(lim, 1)
@@ -1336,7 +1353,7 @@ async def memory_health_check():
         _set_result(
             "idle",
             op="health",
-            db_path=DB_PATH,
+            db_path=str(DB_PATH),
             rows=rows,
             expired=expired,
             fts_rows=fts_rows,
@@ -1348,7 +1365,7 @@ async def memory_health_check():
         return {
             "status": "ok",
             "op": "health",
-            "db_path": DB_PATH,
+            "db_path": str(DB_PATH),
             "rows": rows,
             "expired": expired,
             "fts_rows": fts_rows,

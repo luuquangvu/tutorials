@@ -80,7 +80,7 @@ mode: parallel
 max_exceeded: silent
 description: Retrieves upcoming or past calendar events for a specific period
 variables:
-  version: 20260409
+  version: 20260818
 fields:
   time_period_type:
     name: Time Period Type
@@ -127,14 +127,17 @@ sequence:
   - alias: Check if variables were set correctly
     if:
       - condition: template
-        value_template: "{{ start == 'n/a' or end | as_datetime < now() }}"
+        value_template: >-
+          {{ start == 'n/a'
+             or end == 'n/a'
+             or (end | as_datetime <= start | as_datetime) }}
     then:
       - alias: Set variable for eror message
         variables:
           response:
-            error: Unable to provide calendar events as the start date is either empty or in the past.
+            error: Unable to provide calendar events because the dates are invalid or the time period is empty.
       - alias: Stop the script
-        stop: Unable to provide calendar events as the start date is either empty or in the past.
+        stop: Unable to provide calendar events because the dates are invalid or the time period is empty.
         response_variable: response
   - action: calendar.get_events
     target:
