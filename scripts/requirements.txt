@@ -1,9 +1,12 @@
-# common
+# Requires for telegram_bot_handle_tool.py and zalo_bot_handle_tool.py
 h2
 
-# youtube_data_tool
+# Requires for youtube_data_tool.py
 google-api-python-client
 
-# traffic_fine_lookup_tool
+# Requires for traffic_fine_lookup_tool.py
 beautifulsoup4
 curl-cffi
+
+# Requires for play_youtube_video_full_llm.yaml blueprint (media_extractor)
+deno

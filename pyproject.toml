@@ -1,8 +1,9 @@
 [project]
 name = "tutorials"
 version = "1.0.0"
-description = "Home Assistant Blueprints & Tutorials"
+description = "Exclusive Home Assistant Blueprints: Voice & Smart Automations"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.14.2"
 dependencies = []
 
@@ -10,6 +11,7 @@ dependencies = []
 dev = [
   "beautifulsoup4",
   "curl-cffi",
+  "deno",
   "google-api-python-client",
   "homeassistant>=2026.6.0",
   "httpx[http2]",
