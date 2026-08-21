@@ -73,7 +73,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            daily or hourly
+            daily or hourly. Default daily
         time_period_length_prompt:
           name: Time period length prompt
           description: The prompt used by the AI to identify the period length
@@ -82,7 +82,7 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Length in days (daily) or hours (hourly)
+            Length in days (daily) or hours (hourly). Default 1
         date_prompt:
           name: Date prompt
           description: The prompt used by the AI to identify the starting date
@@ -100,12 +100,12 @@ blueprint:
               multiline: true
               multiple: false
           default: |-
-            Start time (HH:MM:SS)
+            Start time (HH:MM:SS). Default 00:00:00 for daily, current time for hourly
 mode: parallel
 max_exceeded: silent
 description: Retrieves weather forecast for hourly or daily periods
 variables:
-  version: 20260818
+  version: 20260821
 fields:
   time_period_type:
     name: Time Period Type
@@ -115,7 +115,7 @@ fields:
         options:
           - daily
           - hourly
-    required: true
+    default: daily
   time_period_length:
     name: Time Period Length
     description: !input time_period_length_prompt
@@ -123,19 +123,17 @@ fields:
       number:
         min: 1
         max: 48
-    required: true
+    default: 1
   start_date:
     name: Start Date
     description: !input date_prompt
     selector:
       date:
-    required: true
   start_time:
     name: Start Time
     description: !input time_prompt
     selector:
       time:
-    required: true
 sequence:
   - variables:
       weather_entity: !input weather_entity
@@ -145,34 +143,44 @@ sequence:
         {% set h = ['hourly'] if sf | bitwise_and(2) else [] %}
         {% set td = ['twice_daily'] if sf | bitwise_and(4) else [] %}
         {{ d + h + td }}
+      _period_type: "{{ time_period_type if (time_period_type | default) in ['daily', 'hourly', 'twice_daily'] else 'daily' }}"
       time_period_type: >
         {{
           'twice_daily'
-            if time_period_type not in supported
-            and time_period_type == 'daily'
-            and  'twice_daily' in supported
-          else time_period_type
+            if _period_type not in supported
+            and _period_type == 'daily'
+            and 'twice_daily' in supported
+          else _period_type
         }}
-      start_date: "{{ start_date | as_datetime(default='') }}"
-      start_time:
-        "{{ start_time | default('00:00:00') | as_timedelta | default('00:00:00',
-        true) }}"
-      start:
-        "{{ (start_date | as_datetime + as_timedelta(start_time)) | as_local if
-        start_date else 'NA' }}"
-      end: "{% if start != 'NA' %}
-
-        {% set start = as_datetime(start) %}
-
-        {% set add = time_period_length | default(1) | int(1) %}
-
-        {% set type = time_period_type | default if time_period_type | default in ['daily', 'hourly']
-        else 'daily' %}
-
-        {{ (start + timedelta(days = add if type == 'daily' else 0, hours = add if type == 'hourly'
-        else 0)).isoformat() }}
-
-        {% endif %}"
+      _add_length: "{{ (time_period_length | default(1) | int(1)) | abs }}"
+      _start_date_raw: "{{ start_date | default('', true) | trim }}"
+      _start_time_raw: "{{ start_time | default('', true) | trim }}"
+      _start_date_val: >-
+        {% if _start_date_raw != '' %}
+          {% set parsed = _start_date_raw | as_datetime(default=none) %}
+          {{ (parsed.date() | string) if parsed is not none else _start_date_raw }}
+        {% else %}
+          {{ now().strftime('%Y-%m-%d') }}
+        {% endif %}
+      _start_time_val: >-
+        {% if _start_time_raw != '' %}
+          {{ _start_time_raw }}
+        {% elif time_period_type == 'hourly' and (_start_date_val == now().strftime('%Y-%m-%d')) %}
+          {{ now().strftime('%H:%M:%S') }}
+        {% else %}
+          00:00:00
+        {% endif %}
+      start: >-
+        {% set dt_str = _start_date_val ~ ' ' ~ _start_time_val %}
+        {% set dt = dt_str | as_datetime(default=none) %}
+        {{ (dt | as_local).isoformat() if dt is not none else 'NA' }}
+      end: >-
+        {% if start != 'NA' %}
+          {% set start_dt = as_datetime(start) %}
+          {{ (start_dt + timedelta(days = _add_length if time_period_type in ['daily', 'twice_daily'] else 0, hours = _add_length if time_period_type == 'hourly' else 0)) | as_local | string }}
+        {% else %}
+          NA
+        {% endif %}
   - alias: Check if variables were set correctly
     if:
       - condition: template
@@ -209,23 +217,29 @@ sequence:
         response_variable: weather_response
       - variables:
           calc_average: !input calc_average
-          selected_data:
-            forecast: "{% set ns = namespace(forecast=[]) %}
-
-              {% for item in weather_response[weather_entity].forecast %}
-
+          selected_data: >-
+            {% set ns = namespace(forecast=[]) %}
+            {% for item in weather_response[weather_entity].forecast %}
               {% if start | as_datetime <= item.datetime | as_datetime | as_local < end | as_datetime %}
-
-              {% set ns.forecast = ns.forecast + [item] %}
-
+                {% set ns.forecast = ns.forecast + [item] %}
               {% endif %}
-
-              {% endfor %} {{ ns.forecast }}"
+            {% endfor %}
+            {{
+              dict(
+                current_context=dict(
+                  current_time=now().strftime('%A, %Y-%m-%d %H:%M:%S %z'),
+                  timezone=now().tzinfo | string
+                ),
+                start_of_period=start,
+                end_of_period=end,
+                forecast=ns.forecast
+              )
+            }}
           averaged:
             averaged_weather_data_for_period:
               "{% set ns = namespace(combined={}) %}
 
-              {% set weather_data = selected_data.forecast %}
+              {% set weather_data = selected_data.forecast if selected_data is mapping and selected_data.forecast is defined else [] %}
 
               {% set first_forecast = weather_data[0] if weather_data else {} %}
 
@@ -243,7 +257,15 @@ sequence:
 
               {% endfor %}
 
-              {{ dict(start_of_period=start, end_of_period=end, **ns.combined) }}"
+              {{ dict(
+              current_context=dict(
+              current_time=now().strftime('%A, %Y-%m-%d %H:%M:%S %z'),
+              timezone=now().tzinfo | string
+              ),
+              start_of_period=start,
+              end_of_period=end,
+              **ns.combined
+              ) }}"
           response: "{{ averaged if calc_average else selected_data }}"
       - stop: ""
         response_variable: response

@@ -56,7 +56,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Date (YYYY-MM-DD). If no year, use current
+            Date (YYYY-MM-DD). Optional, defaults to today if omitted.
         leap_month_prompt:
           name: Leap Month Prompt
           description: Indicates whether the Lunar date is in a leap month, determined by the AI
@@ -69,7 +69,7 @@ mode: parallel
 max_exceeded: silent
 description: Converts dates between Solar and Lunar calendars
 variables:
-  version: 20260409
+  version: 20260821
 fields:
   conversion_type:
     name: Conversion Type
@@ -85,7 +85,6 @@ fields:
     description: !input date_prompt
     selector:
       date:
-    required: true
   leap_month:
     name: Leap Month
     description: !input leap_month_prompt

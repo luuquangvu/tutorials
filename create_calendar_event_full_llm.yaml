@@ -87,7 +87,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            End date/time (YYYY-MM-DD HH:MM:SS)
+            End date/time (YYYY-MM-DD HH:MM:SS). Optional, default start + 1h
         start_date_prompt:
           name: Start Date Prompt
           description: The starting date for all-day events (YYYY-MM-DD), provided by the AI
@@ -103,13 +103,13 @@ blueprint:
             text:
               multiline: true
           default: |-
-            End date (YYYY-MM-DD)
+            End date (YYYY-MM-DD). Optional, default start date
 mode: queued
 max: !input simultaneous
 max_exceeded: silent
 description: Adds a new event to a specified calendar
 variables:
-  version: 20260409
+  version: 20260821
 fields:
   summary:
     selector:
@@ -148,9 +148,31 @@ sequence:
       summary: "{{ summary | default('') | trim }}"
       description: "{{ description | default('') | trim }}"
       start_date_time: "{{ start_date_time | default('') | trim }}"
-      end_date_time: "{{ end_date_time | default('') | trim }}"
       start_date: "{{ start_date | default('') | trim }}"
-      end_date: "{{ end_date | default('') | trim }}"
+      end_date_time: >-
+        {% if end_date_time | default('') | trim != '' %}
+          {{ end_date_time | trim }}
+        {% elif start_date_time | default('') | trim != '' %}
+          {% set sdt = start_date_time | as_datetime(default=none) %}
+          {{ ((sdt + timedelta(hours=1)) | as_local).isoformat() if sdt is not none else '' }}
+        {% else %}
+          ''
+        {% endif %}
+      end_date: >-
+        {% set sd = start_date | as_datetime(default=none) %}
+        {% set ed_raw = end_date | default('', true) | trim %}
+        {% if ed_raw != '' %}
+          {% set ed = ed_raw | as_datetime(default=none) %}
+          {% if sd is not none and ed is not none and sd.date() == ed.date() %}
+            {{ ((ed + timedelta(days=1)) | as_local).date() | string }}
+          {% else %}
+            {{ ed_raw }}
+          {% endif %}
+        {% elif sd is not none %}
+          {{ ((sd + timedelta(days=1)) | as_local).date() | string }}
+        {% else %}
+          ''
+        {% endif %}
       calendar: !input calendar
   - alias: Check if variables were set correctly
     if:
@@ -304,7 +326,14 @@ sequence:
             variables:
               response:
                 message: >-
-                  Event created: {{ summary }} ({{ (start_date | as_datetime).date() }} to {{ (end_date | as_datetime).date() }}) in {{ state_attr(calendar, 'friendly_name') or calendar }}.
+                  {% set s_date = (start_date | as_datetime).date() %}
+                  {% set e_date = (end_date | as_datetime).date() %}
+                  {% set diff_days = (e_date - s_date).days %}
+                  {% if diff_days <= 1 %}
+                    Event created: {{ summary }} (all day on {{ s_date }}) in {{ state_attr(calendar, 'friendly_name') or calendar }}.
+                  {% else %}
+                    Event created: {{ summary }} ({{ s_date }} to {{ (e_date - timedelta(days=1)) }}) in {{ state_attr(calendar, 'friendly_name') or calendar }}.
+                  {% endif %}
           - stop: ""
             response_variable: response
     default:

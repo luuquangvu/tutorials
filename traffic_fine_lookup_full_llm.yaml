@@ -62,7 +62,7 @@ mode: parallel
 max_exceeded: silent
 description: Queries traffic violation databases using a license plate and vehicle type
 variables:
-  version: 20260409
+  version: 20260821
 fields:
   license_plate:
     name: License Plate
@@ -105,5 +105,8 @@ sequence:
     data:
       license_plate: "{{ license_plate }}"
       vehicle_type: "{{ vehicle_type }}"
+  - variables:
+      response: >-
+        {{ dict(response, checked_at=now().strftime('%Y-%m-%d %H:%M:%S %z')) if response is mapping else response }}
   - stop: ""
     response_variable: response
