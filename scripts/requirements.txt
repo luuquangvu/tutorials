@@ -7,6 +7,3 @@ google-api-python-client
 # Requires for traffic_fine_lookup_tool.py
 beautifulsoup4
 curl-cffi
-
-# Requires for play_youtube_video_full_llm.yaml blueprint (media_extractor)
-deno

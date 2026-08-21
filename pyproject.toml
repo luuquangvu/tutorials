@@ -11,7 +11,6 @@ dependencies = []
 dev = [
   "beautifulsoup4",
   "curl-cffi",
-  "deno",
   "google-api-python-client",
   "homeassistant>=2026.6.0",
   "httpx[http2]",
