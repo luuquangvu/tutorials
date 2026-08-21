@@ -189,7 +189,7 @@ mode: parallel
 max_exceeded: silent
 description: Saves, retrieves, searches, or deletes persistent notes and facts reliably
 variables:
-  version: 20260414
+  version: 20260821
 sequence:
   - variables:
       op: "{{ operation | default('set') }}"
@@ -300,5 +300,8 @@ sequence:
             status: "error"
             error: "invalid_operation"
             message: "Invalid operation. Use one of: set, get, search, forget."
+  - variables:
+      response: >-
+        {{ dict(response, current_time=now().strftime('%Y-%m-%d %H:%M:%S %z')) if response is mapping else response }}
   - stop: ""
     response_variable: response

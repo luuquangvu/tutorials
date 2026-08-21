@@ -1,11 +1,14 @@
 # Unique Home Assistant Blueprints & Tutorials
 
-**[ 🇺🇸 English | [🇻🇳 Tiếng Việt](README_vi.md) ]**
+**🇺🇸 English | [🇻🇳 Tiếng Việt](README_vi.md)**
 
 > [!TIP]
 > **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: A highly useful integration that automatically updates blueprints in this collection. When you have many blueprints from different sources, keeping track of updates can be challenging - this integration handles it for you automatically.
 
-**Google has recently significantly cut back on the free Gemini API, making it almost impossible to meet the usage needs of Home Assistant. You can find [a completely free alternative solution here](https://github.com/luuquangvu/ha-addons).**
+<!-- MD028/no-blanks-blockquote: Blank line inside blockquote -->
+
+> [!NOTE]
+> **Google has recently significantly cut back on the free Gemini API, making it almost impossible to meet the usage needs of Home Assistant. You can find [a completely free alternative solution here](https://github.com/luuquangvu/ha-addons).**
 
 _All blueprints in this collection are fine-tuned to work best with **Gemini Flash** models. Other models may require minor adjustments to behave as expected._
 

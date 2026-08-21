@@ -114,7 +114,7 @@ mode: parallel
 max_exceeded: silent
 description: Captures a camera snapshot or records a video and returns the local file path
 variables:
-  version: 20260818
+  version: 20260821
 fields:
   camera_name:
     name: Camera Name
@@ -278,5 +278,8 @@ sequence:
       - variables:
           response:
             error: "Unsupported capture type: {{ capture_type }}"
+  - variables:
+      response: >-
+        {{ dict(response, captured_at=now().strftime('%Y-%m-%d %H:%M:%S %z')) if response is mapping else response }}
   - stop: ""
     response_variable: response

@@ -51,7 +51,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            daily or hourly
+            daily or hourly. Default daily
         time_period_length_prompt:
           name: Time Period Length Prompt
           description: The prompt used by the AI to identify the period length [Human-only]
@@ -59,7 +59,7 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Length in days (daily) or hours (hourly)
+            Length in days (daily) or hours (hourly). Default 1
         date_prompt:
           name: Date Prompt
           description: The prompt used by the AI to identify the starting date [Human-only]
@@ -75,12 +75,12 @@ blueprint:
             text:
               multiline: true
           default: |-
-            Start time (HH:MM:SS)
+            Start time (HH:MM:SS). Default 00:00:00 for daily, current time for hourly
 mode: parallel
 max_exceeded: silent
 description: Retrieves upcoming or past calendar events for a specific period
 variables:
-  version: 20260818
+  version: 20260821
 fields:
   time_period_type:
     name: Time Period Type
@@ -90,7 +90,7 @@ fields:
         options:
           - daily
           - hourly
-    required: true
+    default: daily
   time_period_length:
     name: Time Period Length
     description: !input time_period_length_prompt
@@ -98,31 +98,48 @@ fields:
       number:
         min: 1
         max: 120
-    required: true
+    default: 1
   start_date:
     name: Start Date
     description: !input date_prompt
     selector:
       date:
-    required: true
   start_time:
     name: Start Time
     description: !input time_prompt
     selector:
       time:
-    required: true
 sequence:
   - variables:
-      start_date: "{{ start_date | as_datetime(default='') }}"
-      start_time: "{{ start_time | default('00:00:00') | as_timedelta | default('00:00:00', true) }}"
+      _period_type: "{{ time_period_type if (time_period_type | default) in ['daily', 'hourly'] else 'daily' }}"
+      _add_length: "{{ (time_period_length | default(1) | float(1)) | abs }}"
+      _start_date_raw: "{{ start_date | default('', true) | trim }}"
+      _start_time_raw: "{{ start_time | default('', true) | trim }}"
+      _start_date_val: >-
+        {% if _start_date_raw != '' %}
+          {% set parsed = _start_date_raw | as_datetime(default=none) %}
+          {{ (parsed.date() | string) if parsed is not none else _start_date_raw }}
+        {% else %}
+          {{ now().strftime('%Y-%m-%d') }}
+        {% endif %}
+      _start_time_val: >-
+        {% if _start_time_raw != '' %}
+          {{ _start_time_raw }}
+        {% elif _period_type == 'hourly' and (_start_date_val == now().strftime('%Y-%m-%d')) %}
+          {{ now().strftime('%H:%M:%S') }}
+        {% else %}
+          00:00:00
+        {% endif %}
       start: >-
-        {{ ((start_date | as_datetime + as_timedelta(start_time)) | as_local) if start_date else 'n/a' }}
+        {% set dt_str = _start_date_val ~ ' ' ~ _start_time_val %}
+        {% set dt = dt_str | as_datetime(default=none) %}
+        {{ (dt | as_local).isoformat() if dt is not none else 'n/a' }}
       end: >-
         {% if start != 'n/a' %}
-        {% set start = as_datetime(start) %}
-        {% set add = (time_period_length | default(1) | float(1)) | abs %}
-        {% set type = time_period_type if (time_period_type | default) in ['daily', 'hourly'] else 'daily' %}
-        {{ (start + timedelta(days = add if type == 'daily' else 0, hours = add if type == 'hourly' else 0)) | as_local }}
+          {% set start_dt = as_datetime(start) %}
+          {{ (start_dt + timedelta(days = _add_length if _period_type == 'daily' else 0, hours = _add_length if _period_type == 'hourly' else 0)) | as_local | string }}
+        {% else %}
+          n/a
         {% endif %}
   - alias: Check if variables were set correctly
     if:
@@ -147,13 +164,67 @@ sequence:
       start_date_time: "{{ start }}"
       end_date_time: "{{ end }}"
   - variables:
-      response:
-        events: >-
-          {{
-            response.values()
-              | map(attribute='events')
-              | sum(start=[])
-              | sort(attribute='start')
-          }}
+      response: >-
+        {% set raw_events = response.values() | map(attribute='events') | sum(start=[]) | sort(attribute='start') %}
+        {% set enriched = namespace(events=[]) %}
+        {% for ev in raw_events %}
+          {% set s_str = ev.start | string %}
+          {% set is_all_day = ('T' not in s_str) and (' ' not in s_str) %}
+          {% set s_dt = (ev.start | as_datetime | as_local) if (ev.start | as_datetime(default=none)) is not none else none %}
+          {% set e_dt = (ev.end | as_datetime | as_local) if (ev.end | as_datetime(default=none)) is not none else none %}
+          {% if s_dt is not none %}
+            {% set rel = ('in ' ~ time_until(s_dt)) if s_dt >= now() else (time_since(s_dt) ~ ' ago') %}
+          {% else %}
+            {% set rel = '' %}
+          {% endif %}
+          {% if is_all_day %}
+            {% if s_dt is not none and e_dt is not none %}
+              {% set d_days = (e_dt.date() - s_dt.date()).days %}
+              {% set dur = 'all day' if d_days <= 1 else (d_days ~ ' days') %}
+            {% else %}
+              {% set dur = 'all day' %}
+            {% endif %}
+          {% else %}
+            {% if s_dt is not none and e_dt is not none %}
+              {% set dur_sec = (e_dt - s_dt).total_seconds() | int(0) %}
+              {% set dur_h = dur_sec // 3600 %}
+              {% set dur_m = (dur_sec % 3600) // 60 %}
+              {% if dur_h > 0 and dur_m > 0 %}
+                {% set dur = dur_h ~ ' hr ' ~ dur_m ~ ' min' %}
+              {% elif dur_h > 0 %}
+                {% set dur = dur_h ~ (' hr' if dur_h == 1 else ' hrs') %}
+              {% elif dur_m > 0 %}
+                {% set dur = dur_m ~ ' min' %}
+              {% else %}
+                {% set dur = dur_sec ~ ' sec' %}
+              {% endif %}
+            {% else %}
+              {% set dur = '' %}
+            {% endif %}
+          {% endif %}
+          {% set item = dict(ev,
+              weekday=(s_dt.strftime('%A') if s_dt is not none else ''),
+              is_all_day=is_all_day,
+              relative_time=rel,
+              duration=dur
+          ) %}
+          {% set enriched.events = enriched.events + [item] %}
+        {% endfor %}
+        {{
+          dict(
+            current_context=dict(
+              current_time=now().strftime('%A, %Y-%m-%d %H:%M:%S %z'),
+              timezone=now().tzinfo | string
+            ),
+            queried_period=dict(
+              start=start,
+              end=end,
+              type=_period_type,
+              length=_add_length
+            ),
+            events_count=enriched.events | length,
+            events=enriched.events
+          )
+        }}
   - stop: ""
     response_variable: response

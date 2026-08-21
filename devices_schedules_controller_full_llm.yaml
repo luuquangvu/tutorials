@@ -149,7 +149,7 @@ mode: parallel
 max_exceeded: silent
 description: Manages device timers (start, cancel, pause, resume, list)
 variables:
-  version: 20260409
+  version: 20260821
 fields:
   mode:
     name: Mode
@@ -757,5 +757,8 @@ sequence:
       - stop: "Unsupported mode requested: {{ _mode }}"
         response_variable: response
 
+  - variables:
+      response: >-
+        {{ dict(response, current_time=now().strftime('%Y-%m-%d %H:%M:%S %z')) if response is mapping else response }}
   - stop: ""
     response_variable: response
