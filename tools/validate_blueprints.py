@@ -22,15 +22,11 @@ from homeassistant.components.automation.config import AUTOMATION_BLUEPRINT_SCHE
 from homeassistant.components.blueprint.errors import InvalidBlueprint
 from homeassistant.components.blueprint.models import Blueprint
 from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
+from homeassistant.components.template.config import TEMPLATE_BLUEPRINT_SCHEMA
 from homeassistant.helpers.selector import validate_selector
 from homeassistant.helpers.template import TemplateEnvironment
 from homeassistant.util.yaml.loader import load_yaml
 from homeassistant.util.yaml.objects import Input
-
-try:
-    from homeassistant.components.template.config import TEMPLATE_BLUEPRINT_SCHEMA
-except ImportError:
-    TEMPLATE_BLUEPRINT_SCHEMA = None
 
 
 def get_blueprint_schema(domain: str) -> vol.Schema | vol.All:
@@ -99,6 +95,32 @@ def extract_used_inputs(obj: Any) -> list[str]:
     return used
 
 
+def _is_jinja_template(text: str) -> bool:
+    """Check if a string contains Jinja2 template markers."""
+    return "{{" in text or "{%" in text or "{#" in text
+
+
+def _validate_jinja_string(
+    text: str,
+    env: TemplateEnvironment,
+    path: str,
+    *,
+    is_key: bool = False,
+) -> list[str]:
+    """Validate a single Jinja2 template string."""
+    if not _is_jinja_template(text):
+        return []
+
+    target = f"key '{path}'" if is_key else f"'{path}'"
+    try:
+        env.parse(text)
+    except jinja2.TemplateSyntaxError as e:
+        return [f"Jinja2 syntax error in {target} at line {e.lineno}: {e.message}"]
+    except Exception as e:
+        return [f"Jinja2 parse error in {target}: {e}"]
+    return []
+
+
 def validate_jinja_in_obj(
     obj: Any,
     env: TemplateEnvironment,
@@ -110,25 +132,14 @@ def validate_jinja_in_obj(
     errors: list[str] = []
 
     if isinstance(obj, str):
-        if "{{" in obj or "{%" in obj or "{#" in obj:
-            try:
-                env.parse(obj)
-            except jinja2.TemplateSyntaxError as e:
-                errors.append(f"Jinja2 syntax error in '{path}' at line {e.lineno}: {e.message}")
-            except Exception as e:
-                errors.append(f"Jinja2 parse error in '{path}': {e}")
+        errors.extend(_validate_jinja_string(obj, env, path))
     elif isinstance(obj, Mapping):
         for k, v in obj.items():
             if skip_blueprint_metadata and k == "blueprint":
                 continue
             child_path = f"{path}.{k}" if path != "root" else str(k)
-            if isinstance(k, str) and ("{{" in k or "{%" in k or "{#" in k):
-                try:
-                    env.parse(k)
-                except jinja2.TemplateSyntaxError as e:
-                    errors.append(f"Jinja2 syntax error in key '{child_path}' at line {e.lineno}: {e.message}")
-                except Exception as e:
-                    errors.append(f"Jinja2 parse error in key '{child_path}': {e}")
+            if isinstance(k, str):
+                errors.extend(_validate_jinja_string(k, env, child_path, is_key=True))
             errors.extend(validate_jinja_in_obj(v, env, child_path))
     elif isinstance(obj, Sequence) and not isinstance(obj, (str, bytes, bytearray)):
         for idx, item in enumerate(obj):
@@ -202,8 +213,8 @@ def validate_blueprint_file(
     return is_valid, errors, warnings
 
 
-def main() -> int:
-    """CLI entrypoint for blueprint validator."""
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Verify Home Assistant Blueprint and Jinja2 syntax across YAML files.")
     parser.add_argument(
         "paths",
@@ -218,75 +229,129 @@ def main() -> int:
         action="store_true",
         help="Enable verbose output",
     )
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
-    jinja_env = TemplateEnvironment(None)
 
-    root_dir = Path(__file__).resolve().parent.parent
+_BLUEPRINT_EXTENSIONS = ("*.yaml", "*.yml")
+
+
+def _find_yaml_files(directory: Path) -> list[Path]:
+    """Find YAML files in a directory, ignoring hidden directories."""
+    files: list[Path] = []
+    for ext in _BLUEPRINT_EXTENSIONS:
+        files.extend(
+            candidate
+            for candidate in directory.rglob(ext)
+            if not any(part.startswith(".") for part in candidate.relative_to(directory).parts[:-1])
+        )
+    return files
+
+
+def _collect_target_files(paths: Sequence[Path], root_dir: Path) -> list[Path] | None:
+    """Resolve target YAML files from provided paths or default root directory."""
+    if not paths:
+        return sorted(set(_find_yaml_files(root_dir)))
+
     target_files: list[Path] = []
-    if args.paths:
-        for p in args.paths:
-            if p.is_dir():
-                for ext in ("*.yaml", "*.yml"):
-                    target_files.extend(
-                        candidate
-                        for candidate in p.rglob(ext)
-                        if not any(part.startswith(".") for part in candidate.relative_to(p).parts[:-1])
-                    )
-            elif p.is_file():
-                target_files.append(p)
-            else:
-                print(f"Error: Path '{p}' not found.")
-                return 1
+    for path in paths:
+        if path.is_dir():
+            target_files.extend(_find_yaml_files(path))
+        elif path.is_file():
+            target_files.append(path)
+        else:
+            print(f"Error: Path '{path}' not found.")
+            return None
+    return sorted(set(target_files))
+
+
+_HEADER_WIDTH = 55
+_BANNER_TITLE = "Home Assistant Blueprint & Jinja2 Syntax Validator"
+
+
+def _report_file_result(
+    rel_path: Path,
+    is_valid: bool,
+    errors: list[str],
+    warnings: list[str],
+    *,
+    verbose: bool,
+) -> None:
+    """Print the validation outcome for a single blueprint file."""
+    if is_valid:
+        print(f"[PASS] {rel_path}")
+        if warnings and verbose:
+            for w in warnings:
+                print(f"  Warning: {w}")
     else:
-        for ext in ("*.yaml", "*.yml"):
-            target_files.extend(
-                candidate
-                for candidate in root_dir.rglob(ext)
-                if not any(part.startswith(".") for part in candidate.relative_to(root_dir).parts[:-1])
-            )
-    target_files = sorted(set(target_files))
+        print(f"[FAIL] {rel_path}")
+        for err in errors:
+            print(f"  [ERROR] {err}")
+        for w in warnings:
+            print(f"  [WARN]  {w}")
 
-    if not target_files:
-        print("No YAML files found to validate.")
-        return 0
 
-    print("=======================================================")
-    print("   Home Assistant Blueprint & Jinja2 Syntax Validator   ")
-    print("=======================================================")
-    print(f"Scanning {len(target_files)} YAML files...\n")
-
+def _validate_all_files(
+    target_files: Sequence[Path],
+    root_dir: Path,
+    jinja_env: TemplateEnvironment,
+    *,
+    verbose: bool,
+) -> tuple[int, int, int]:
+    """Validate all target files and print their progress, returning (valid, invalid, skipped) counts."""
     total_valid = 0
     total_invalid = 0
     total_skipped = 0
 
     for file_path in target_files:
         rel_path = file_path.relative_to(root_dir) if file_path.is_relative_to(root_dir) else file_path
-        is_valid, errors, warnings = validate_blueprint_file(file_path, jinja_env, args.verbose)
+        is_valid, errors, warnings = validate_blueprint_file(file_path, jinja_env, verbose)
 
         if "Not a blueprint (missing 'blueprint:' key)" in warnings:
-            if args.verbose:
-                print(f"  [SKIP] {rel_path} (not a blueprint)")
+            if verbose:
+                print(f"[SKIP] {rel_path} (not a blueprint)")
             total_skipped += 1
             continue
 
         if is_valid:
             total_valid += 1
-            print(f"  [PASS] {rel_path}")
-            if warnings and args.verbose:
-                for w in warnings:
-                    print(f"         Warning: {w}")
         else:
             total_invalid += 1
-            print(f"  [FAIL] {rel_path}")
-            for err in errors:
-                print(f"         [ERROR] {err}")
-            for w in warnings:
-                print(f"         [WARN]  {w}")
 
-    print("\n-------------------------------------------------------")
+        _report_file_result(rel_path, is_valid, errors, warnings, verbose=verbose)
+
+    return total_valid, total_invalid, total_skipped
+
+
+def _print_summary(total_valid: int, total_invalid: int, total_skipped: int) -> None:
+    """Print the overall validation summary."""
+    print(f"\n{'-' * _HEADER_WIDTH}")
     print(f"Results: {total_valid} passed, {total_invalid} failed, {total_skipped} skipped")
-    print("-------------------------------------------------------\n")
+    print(f"{'-' * _HEADER_WIDTH}\n")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entrypoint for blueprint validator."""
+    args = _parse_args(argv)
+    root_dir = Path(__file__).resolve().parent.parent
+
+    target_files = _collect_target_files(args.paths, root_dir)
+    if target_files is None:
+        return 1
+
+    if not target_files:
+        print("No YAML files found to validate.")
+        return 0
+
+    print("=" * _HEADER_WIDTH)
+    print(_BANNER_TITLE.center(_HEADER_WIDTH))
+    print("=" * _HEADER_WIDTH)
+    print(f"Scanning {len(target_files)} YAML files...\n")
+
+    jinja_env = TemplateEnvironment(None)
+    total_valid, total_invalid, total_skipped = _validate_all_files(
+        target_files, root_dir, jinja_env, verbose=args.verbose
+    )
+    _print_summary(total_valid, total_invalid, total_skipped)
 
     return 0 if total_invalid == 0 else 1
 
