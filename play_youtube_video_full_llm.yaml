@@ -3,21 +3,18 @@ blueprint:
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/play_youtube_video_full_llm.yaml
   description: |-
-    # Tool plays YouTube videos on a supported TV or speakers used for Voice Assistant
+    # Tool plays YouTube videos on a supported TV used for Voice Assistant
 
     ## Blueprint Setup
 
     ### Required
 
-    - A Chromecast/Google Cast device, Android TV/Google TV device, Apple TV, or smart speaker (Google Home Mini, Nest Audio, Sonos) integrated into Home Assistant.
-    - For TV devices (Chromecast, Android TV, Apple TV): The official YouTube app must be installed on the target device.
-    - For speakers (Google Home Mini, Nest Audio, Sonos, etc.): The **Media Extractor** integration is required (built-in integration: Settings > Devices & Services > Add Integration > Media Extractor).
+    - A Chromecast/Google Cast device (with display), Android TV/Google TV device, Apple TV, or Roku device integrated into Home Assistant.
+    - The official YouTube app must be installed on the target device.
     - A template sensor stores all information about entity aliases needs to be configured in `config/configuration.yaml`; The sensor is required for friendly-name lookup.
 
     ```
     # File configuration.yaml
-    media_extractor:
-
     shell_command:
       get_entity_alias: >-
         jq '[.data.entities[] | select(.options.conversation.should_expose == true) | {entity_id, aliases: (if has("aliases_v2") then ((if (.aliases_v2 | type) == "array" then .aliases_v2 else [] end) | map(select(. != null and . != ""))) else (if (.aliases | type) == "array" then .aliases else [] end) end)} | select(.aliases | length > 0)]' ./.storage/core.entity_registry
@@ -46,7 +43,7 @@ blueprint:
 
     ### Note
 
-    - Provide a concise and precise description for the script. This will be utilized by the LLM to understand it should use this script for playing YouTube videos on a supported TV or speakers.
+    - Provide a concise and precise description for the script. This will be utilized by the LLM to understand it should use this script for playing YouTube videos on a supported TV.
     - Make sure to expose the script to Assist after the script has been saved.
     - Do not alter the default script name.
     - Once the script is created, click the three dots in the top right corner, choose "Edit in YAML," and remove the `description: ...` line to restore the default. This step is important because it helps the LLM better understand the script's purpose.
@@ -69,29 +66,23 @@ blueprint:
     media_player_settings:
       name: Settings for Media Player
       icon: mdi:television
-      description: Configure a default supported TV or speaker and its YouTube playback method
+      description: Configure a default supported TV for YouTube playback
       input:
         media_player:
-          name: Default Media Player
+          name: Supported TV
           selector:
             entity:
               filter:
                 - domain: media_player
-        playback_method:
-          name: YouTube Playback Method
-          description: Select the default playback method matching the selected device.
-          selector:
-            select:
-              options:
-                - label: Chromecast / Google Cast (TV or Display)
-                  value: cast
-                - label: Android TV / Google TV
-                  value: android_tv
-                - label: Apple TV
-                  value: apple_tv
-                - label: Media Extractor (Google Home Mini, Speakers, other TVs)
-                  value: media_extractor
-          default: cast
+                  integration: cast
+                - domain: media_player
+                  integration: androidtv_remote
+                - domain: media_player
+                  integration: androidtv
+                - domain: media_player
+                  integration: apple_tv
+                - domain: media_player
+                  integration: roku
     prompt_settings:
       name: Prompt settings for the LLM
       icon: mdi:robot
@@ -100,12 +91,12 @@ blueprint:
       input:
         media_player_name_prompt:
           name: Media Player Name Prompt
-          description: The prompt used by the AI to identify the target supported TV or speaker name
+          description: The prompt used by the AI to identify the target supported TV name
           selector:
             text:
               multiline: true
           default: |-
-            Device name (Chromecast, Android TV, Apple TV, Google Home Mini, or speakers). Omit if unclear
+            Device name (Chromecast, Android TV, Google TV, Apple TV, or Roku). Omit if unclear
         media_id_prompt:
           name: Media ID Prompt
           description: The prompt used by the AI to identify the YouTube video ID
@@ -116,9 +107,9 @@ blueprint:
             YouTube video ID
 mode: parallel
 max_exceeded: silent
-description: Plays a specific YouTube video by ID using the target TV's native YouTube app or speakers via Media Extractor
+description: Plays a specific YouTube video by ID on a supported TV using the native YouTube app
 variables:
-  version: 20260821
+  version: 20260828
 fields:
   media_player:
     name: Media Player
@@ -134,8 +125,17 @@ fields:
 sequence:
   - variables:
       entity_aliases: !input entity_aliases
-      configured_playback_method: !input playback_method
-      media_id: "{{ media_id | default('') | trim }}"
+      media_id: >-
+        {% set raw_id = media_id | default('') | trim %}
+        {% if 'watch?v=' in raw_id %}
+          {{ (raw_id.split('watch?v=')[1].split('&')[0]) | trim }}
+        {% elif 'youtu.be/' in raw_id %}
+          {{ (raw_id.split('youtu.be/')[1].split('?')[0]) | trim }}
+        {% elif 'shorts/' in raw_id %}
+          {{ (raw_id.split('shorts/')[1].split('?')[0]) | trim }}
+        {% else %}
+          {{ raw_id }}
+        {% endif %}
       media_player_query: "{{ media_player | default('') | trim }}"
       default_media_player: !input media_player
   - alias: Resolve Target Media Player
@@ -152,18 +152,18 @@ sequence:
         {% else %}
           {{ default_media_player }}
         {% endif %}
-      media_player_name: "{{ state_attr(media_player_entity, 'friendly_name') | default('the selected device') }}"
+      media_player_name: "{{ state_attr(media_player_entity, 'friendly_name') | default('the selected TV') }}"
       resolved_playback_method: >-
-        {% if is_state_attr(media_player_entity, 'device_class', 'speaker') %}
-          media_extractor
-        {% elif media_player_entity in integration_entities('cast') %}
+        {% if media_player_entity in integration_entities('cast') %}
           cast
         {% elif (media_player_entity in integration_entities('androidtv_remote')) or (media_player_entity in integration_entities('androidtv')) %}
           android_tv
         {% elif media_player_entity in integration_entities('apple_tv') %}
           apple_tv
+        {% elif media_player_entity in integration_entities('roku') %}
+          roku
         {% else %}
-          {{ configured_playback_method }}
+          unsupported
         {% endif %}
   - alias: Check if variables were set correctly
     if:
@@ -177,10 +177,10 @@ sequence:
       - alias: Stop the script
         stop: Unable to play the video because inputs are invalid.
         response_variable: response
-  - alias: Turn on device if supported and needed
+  - alias: Turn on target TV if supported and needed
     if:
       - condition: template
-        value_template: "{{ resolved_playback_method in ['android_tv', 'apple_tv'] and is_state(media_player_entity, ['off', 'standby']) }}"
+        value_template: "{{ is_state(media_player_entity, ['off', 'standby']) }}"
     then:
       - action: media_player.turn_on
         continue_on_error: true
@@ -195,16 +195,6 @@ sequence:
             data:
               media_content_type: cast
               media_content_id: "{{ {'app_name': 'youtube', 'media_id': media_id} | to_json }}"
-            target:
-              entity_id: "{{ media_player_entity }}"
-      - conditions:
-          - condition: template
-            value_template: "{{ resolved_playback_method == 'media_extractor' }}"
-        sequence:
-          - action: media_extractor.play_media
-            data:
-              media_content_type: music
-              media_content_id: "{{ 'https://www.youtube.com/watch?v=' ~ media_id }}"
             target:
               entity_id: "{{ media_player_entity }}"
       - conditions:
@@ -225,6 +215,18 @@ sequence:
             data:
               media_content_type: url
               media_content_id: "{{ 'youtube://www.youtube.com/watch?v=' ~ media_id }}"
+            target:
+              entity_id: "{{ media_player_entity }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ resolved_playback_method == 'roku' }}"
+        sequence:
+          - action: media_player.play_media
+            data:
+              media_content_type: app
+              media_content_id: "837"
+              extra:
+                content_id: "{{ media_id }}"
             target:
               entity_id: "{{ media_player_entity }}"
     default:

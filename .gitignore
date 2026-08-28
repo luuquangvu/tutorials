@@ -1,6 +1,6 @@
 .env
 .venv/
-.idea/
 .vscode/
 __pycache__/
 .ruff_cache/
+uv.lock

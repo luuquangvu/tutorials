@@ -1,31 +1,28 @@
-# Hướng dẫn chi tiết cài đặt Voice Assist phát video Youtube lên Smart TV hoặc loa
+# Hướng dẫn chi tiết cài đặt Voice Assist phát video Youtube lên Smart TV
 
-Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát các video mới nhất từ các kênh YouTube yêu thích lên Smart TV hoặc loa của mình.
+Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát các video mới nhất từ các kênh YouTube yêu thích lên Smart TV của mình.
 
 ## Giới thiệu & Tính năng chính
 
 - **Mục đích:** Tự động phát video mới ra mắt gần đây từ một kênh YouTube bất kỳ mà bạn yêu thích.
-- **Hỗ trợ thiết bị:** Hoạt động tốt với Smart TV (Android, Samsung, Apple), Chromecast và các dòng loa Sonos.
+- **Hỗ trợ thiết bị:** Hoạt động tốt với Chromecast, Android TV, Google TV, Apple TV và Roku TV.
 - **Hỗ trợ LLM:** Chỉ hoạt động với các LLM như Google hoặc OpenAI.
-- **Hỗ trợ Alias:** Bạn có thể tạo biệt danh (alias) cho cả kênh YouTube và thiết bị phát (TV/loa) để dễ gọi tên hơn.
+- **Hỗ trợ Alias:** Bạn có thể tạo biệt danh (alias) cho cả kênh YouTube và thiết bị phát (TV) để dễ gọi tên hơn.
 
 ### Hạn chế
 
 - Không hỗ trợ tìm kiếm các video cũ từ một kênh.
 - Không hỗ trợ tìm kiếm một video bất kỳ trong toàn bộ YouTube (chỉ tìm video mới nhất của kênh đã theo dõi).
-- Yêu cầu cần có một Smart TV hoặc thiết bị media player đã tích hợp vào Home Assistant.
+- Yêu cầu cần có một Smart TV hoặc thiết bị phát hỗ trợ tích hợp vào Home Assistant và đã cài đặt ứng dụng YouTube chính thức.
 
 ![image](images/20250528_210348.jpg)
 
 ## Bước 1: Lấy thông tin video từ các kênh YouTube yêu thích
 
-### 1.1. Cài đặt các tích hợp cần thiết
+### 1.1. Cài đặt tích hợp cần thiết
 
-Để tính năng này hoạt động, bạn cần cài đặt hai tích hợp (một từ HACS và một có sẵn):
-
-1. **Feedparser:** Dùng để đọc dữ liệu RSS từ YouTube.
-   [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
-2. **Media Extractor:** Dùng để trích xuất link video/audio trực tiếp từ YouTube. Đây là một tích hợp **có sẵn (Built-in)** của Home Assistant. Vào **Settings** > **Devices & Services** > **Add Integration** và tìm từ khóa `Media extractor`.
+Để tính năng này hoạt động, bạn cần cài đặt tích hợp **Feedparser** từ HACS để đọc dữ liệu RSS từ YouTube:
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=custom-components&repository=feedparser&category=Integration)
 
 - Sau khi cài đặt xong, hãy **khởi động lại** Home Assistant.
 
@@ -159,7 +156,7 @@ Blueprint này có nhiệm vụ phát video đã tìm được lên thiết bị
   1. Import blueprint.
   2. Tạo một **Script** mới từ blueprint này.
   3. Chỉ định Template Sensor (`sensor.assist_entity_ids_and_aliases`) đã tạo ở bước 1.5.
-  4. Chỉ định một Smart TV hoặc loa **mặc định** sẽ phát video lên (Assist sẽ dùng thiết bị này nếu bạn không chỉ định tên thiết bị cụ thể khi ra lệnh).
+  4. Chọn một Smart TV **Mặc định** để phát video (Assist sẽ dùng thiết bị này nếu bạn không chỉ định thiết bị trong câu lệnh).
   5. **Quan trọng:** Giữ nguyên tên Script mặc định.
   6. Sau khi tạo xong, **Expose** script đó cho Voice Assist.
 
