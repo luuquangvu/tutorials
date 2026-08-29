@@ -14,10 +14,18 @@ import argparse
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jinja2
-import voluptuous as vol
+
+if TYPE_CHECKING:
+    import voluptuous as vol
+else:
+    try:
+        import probatio as vol
+    except ImportError:
+        import voluptuous as vol
+
 from homeassistant.components.automation.config import AUTOMATION_BLUEPRINT_SCHEMA
 from homeassistant.components.blueprint.errors import InvalidBlueprint
 from homeassistant.components.blueprint.models import Blueprint

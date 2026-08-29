@@ -1,0 +1,150 @@
+blueprint:
+  name: Turn On Device with Motion and Timer
+  author: luuquangvu
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/motion_activated_device_with_timer.yaml
+  description: |-
+    # Turn On Device with Motion and Timer
+
+    Automatically turn on a switch, light, or device when motion is detected, and start a timer helper when motion clears to turn it off when the timer finishes.
+
+    ### Key Features:
+    - **Motion Triggered:** Turns on target devices immediately upon motion detection.
+    - **Timer Reset:** Automatically cancels active timer if motion is re-detected while the device is on.
+    - **Graceful Turn Off:** Starts the timer when motion clears and turns off devices only after the timer finishes.
+    - **Global Conditions:** Gate the entire automation from triggering (e.g. alarm system status).
+    - **Extensible Action Sequences with Conditions:**
+      - *Additional Actions on Motion:* Optional custom actions that run when motion is detected, optionally gated by *Additional Turn On Conditions*.
+      - *Additional Actions on Timer Finished:* Optional custom actions that run when the timer finishes, optionally gated by *Additional Turn Off Conditions*.
+
+    ### Requirements:
+    - A binary sensor (e.g., motion, occupancy, or presence sensor group).
+    - A configured `timer` helper entity.
+    - Requires Home Assistant 2024.12.0 or newer.
+  domain: automation
+  homeassistant:
+    min_version: 2024.12.0
+  input:
+    motion_sensor:
+      name: Motion Sensor
+      description: Binary sensor (e.g. motion, occupancy or presence sensor) that triggers the automation.
+      selector:
+        entity:
+          filter:
+            domain: binary_sensor
+            device_class:
+              - motion
+              - occupancy
+              - presence
+    target_device:
+      name: Target Device(s)
+      description: The switch, light, device, or area to turn on and off.
+      selector:
+        target: {}
+    timer_entity:
+      name: Timer Helper
+      description: The timer helper entity that manages the delay before turning off.
+      selector:
+        entity:
+          filter:
+            domain: timer
+    flexible_conditions:
+      name: Global Conditions (Optional)
+      description: Optional conditions that must be met for the automation to run at all (e.g. alarm is disarmed).
+      default: []
+      selector:
+        condition: {}
+    extra_turn_on_conditions:
+      name: Additional Turn On Conditions (Optional)
+      description: Conditions that must be met for Additional Actions on Motion to run.
+      default: []
+      selector:
+        condition: {}
+    extra_turn_on_actions:
+      name: Additional Actions on Motion (Optional)
+      description: Extra actions to run after motion is detected (e.g. secondary fan or scene controls).
+      default: []
+      selector:
+        action: {}
+    extra_turn_off_conditions:
+      name: Additional Turn Off Conditions (Optional)
+      description: Conditions that must be met for Additional Actions on Timer Finished to run.
+      default: []
+      selector:
+        condition: {}
+    extra_turn_off_actions:
+      name: Additional Actions on Timer Finished (Optional)
+      description: Extra actions to run when the timer finishes (e.g. secondary fan or button press).
+      default: []
+      selector:
+        action: {}
+mode: queued
+max: 10
+variables:
+  version: 20260903
+  extra_turn_on_conditions: !input extra_turn_on_conditions
+  extra_turn_off_conditions: !input extra_turn_off_conditions
+triggers:
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: "on"
+    id: motion_detected
+  - trigger: state
+    entity_id: !input motion_sensor
+    to: "off"
+    id: motion_clear
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_entity
+    id: timer_finished
+conditions: !input flexible_conditions
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id:
+              - motion_detected
+        sequence:
+          - if:
+              - condition: state
+                entity_id: !input timer_entity
+                state: active
+            then:
+              - action: timer.cancel
+                target:
+                  entity_id: !input timer_entity
+          - action: homeassistant.turn_on
+            target: !input target_device
+          - if:
+              - condition: template
+                value_template: "{{ extra_turn_on_conditions | length == 0 }}"
+            then:
+              - sequence: !input extra_turn_on_actions
+            else:
+              - if: !input extra_turn_on_conditions
+                then:
+                  - sequence: !input extra_turn_on_actions
+      - conditions:
+          - condition: trigger
+            id:
+              - motion_clear
+        sequence:
+          - action: timer.start
+            target:
+              entity_id: !input timer_entity
+      - conditions:
+          - condition: trigger
+            id:
+              - timer_finished
+        sequence:
+          - action: homeassistant.turn_off
+            target: !input target_device
+          - if:
+              - condition: template
+                value_template: "{{ extra_turn_off_conditions | length == 0 }}"
+            then:
+              - sequence: !input extra_turn_off_actions
+            else:
+              - if: !input extra_turn_off_conditions
+                then:
+                  - sequence: !input extra_turn_off_actions
