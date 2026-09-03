@@ -10,10 +10,10 @@
 > [!NOTE]
 > **Google has recently significantly cut back on the free Gemini API, making it almost impossible to meet the usage needs of Home Assistant. You can find [a completely free alternative solution here](https://github.com/luuquangvu/ha-addons).**
 
-_All blueprints in this collection are fine-tuned to work best with **Gemini Flash** models. Other models may require minor adjustments to behave as expected._
+_All blueprints in this collection are compatible with almost all local and online LLMs, though they are fine-tuned to work best with **Gemini Flash** models. Other models may require minor adjustments to behave as expected._
 
 > [!IMPORTANT]
-> **Crucial Setup Step:** Please make sure to read each blueprint's **Description** carefully and follow all instructions when installing or updating. Most blueprints require specific manual steps or dependencies that are essential for them to function correctly.
+> **Crucial Setup Step:** Please refer to the [Installation & Setup Guide](#installation--setup-guide) below before setting up your blueprints. Many blueprints rely on shared dependencies such as the Entity Aliases sensor, Pyscript helper scripts, or Assist tool configuration to function correctly.
 
 Transform Home Assistant into a fully-fledged personal teammate with this curated collection of blueprints and guides. Every scenario has been proven in real homes, backed by clear explanations, example voice prompts, and deployment tips so you can bring each idea to life right away.
 
@@ -23,6 +23,13 @@ Transform Home Assistant into a fully-fledged personal teammate with this curate
 
 - [Unique Home Assistant Blueprints & Tutorials](#unique-home-assistant-blueprints--tutorials)
   - [Table of Contents](#table-of-contents)
+  - [Installation & Setup Guide](#installation--setup-guide)
+    - [Universal Blueprint Installation Workflow](#universal-blueprint-installation-workflow)
+    - [Shared Dependency Modules](#shared-dependency-modules)
+      - [Module 1: Entity Aliases Sensor (Friendly-Name Lookup)](#module-1-entity-aliases-sensor-friendly-name-lookup)
+      - [Module 2: Pyscript Integration & Helper Scripts](#module-2-pyscript-integration--helper-scripts)
+      - [Module 3: Specialized Integrations & External Services](#module-3-specialized-integrations--external-services)
+    - [Blueprint Dependency Matrix](#blueprint-dependency-matrix)
   - [Voice Assist - Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers)
   - [Voice Assist - Memory & Information Retrieval](#voice-assist---memory--information-retrieval)
   - [Voice Assist - Camera Image Analysis](#voice-assist---camera-image-analysis)
@@ -55,6 +62,157 @@ Transform Home Assistant into a fully-fledged personal teammate with this curate
 
 ---
 
+## Installation & Setup Guide
+
+Installing blueprints from this repository follows a straightforward workflow. Because many blueprints share identical prerequisites (such as friendly-name alias resolution, Pyscript helper scripts, or Assist tool configuration), shared setup steps are documented in modular blocks below so you only need to configure them once.
+
+### Universal Blueprint Installation Workflow
+
+Every blueprint in this repository can be installed and activated using the following 3 steps:
+
+1. **Import the Blueprint:**
+   - Click the **Import Blueprint** badge under any blueprint section to open the import dialog directly in your Home Assistant instance via [My Home Assistant](https://my.home-assistant.io/).
+   - _Alternative (Manual):_ In Home Assistant, navigate to **Settings > Automations & Scenes > Blueprints > Add Blueprint** (bottom right), paste the raw GitHub URL of the blueprint `.yaml` file, and click **Preview** followed by **Import Blueprint**.
+
+2. **Create the Script or Automation:**
+   - In **Settings > Automations & Scenes > Blueprints**, locate the imported blueprint and click **Create Script** (or **Create Automation**).
+   - Configure the required inputs (e.g., selecting your entities, sensors, or helper scripts).
+   - Click **Save**. **Do not alter the default script name / entity ID** if companion blueprints or scripts reference it.
+
+3. **Configure as an Assist Tool (Essential for Voice Assist Blueprints):**
+   - **Expose to Assist:** In **Settings > Voice Assistants**, ensure the newly created script is exposed to your Assist pipeline or LLM Conversation Agent.
+   - **Restore LLM Description (Crucial Step):** When Home Assistant saves a script through the UI, it can overwrite the blueprint's carefully crafted description with a generic line. To restore it:
+     1. Open your saved script in the Home Assistant Script Editor.
+     2. Click the three dots (`⋮`) in the top-right corner and select **Edit in YAML**.
+     3. Locate and delete the `description: ...` line.
+     4. Click **Save Script**. Home Assistant will automatically revert to using the blueprint's native, optimized description, enabling your LLM (such as Gemini) to accurately understand when and how to call the tool.
+
+---
+
+### Shared Dependency Modules
+
+Many blueprints share one or more common configuration components. Set up the modules required for the blueprints you intend to use.
+
+#### Module 1: Entity Aliases Sensor (Friendly-Name Lookup)
+
+Several Voice Assist blueprints (including Smart Scheduling, Camera Snapshot, Fan/AC Control, YouTube playback, and Device Location) rely on friendly-name alias resolution so you can refer to devices by natural names (e.g., "standing fan", "ceiling light", "living room AC") rather than rigid entity IDs.
+
+1. Add the following `shell_command` and `template` sensor configuration to your Home Assistant `configuration.yaml`:
+
+   ```yaml
+   # configuration.yaml
+
+   shell_command:
+     get_entity_alias: >-
+       jq '[.data.entities[] | select(.options.conversation.should_expose == true) | {entity_id, aliases: (if has("aliases_v2") then ((if (.aliases_v2 | type) == "array" then .aliases_v2 else [] end) | map(select(. != null and . != ""))) else (if (.aliases | type) == "array" then .aliases else [] end) end)} | select(.aliases | length > 0)]' ./.storage/core.entity_registry
+
+   template:
+     - triggers:
+         - trigger: homeassistant
+           event: start
+         - trigger: event
+           event_type: event_template_reloaded
+       actions:
+         - action: shell_command.get_entity_alias
+           response_variable: response
+       sensor:
+         - name: "Assist: Entity IDs and Aliases"
+           unique_id: entity_ids_and_aliases
+           icon: mdi:format-list-bulleted
+           device_class: timestamp
+           state: "{{ now().isoformat() }}"
+           attributes:
+             entities: "{{ response.stdout }}"
+   ```
+
+2. Restart Home Assistant (or reload YAML configuration).
+3. Ensure that any entities you want the assistant to control are **exposed to Assist** and have aliases configured in their entity settings.
+
+#### Module 2: Pyscript Integration & Helper Scripts
+
+Advanced features such as persistent multi-device scheduling, universal memory, lunar calendar calculations, YouTube searches, and interactive messaging (Telegram/Zalo) use lightweight Python backend scripts powered by the **Pyscript** integration.
+
+1. **Install Pyscript:**
+   - Install **Pyscript Python Scripting** via [HACS](https://hacs.xyz/) (Home Assistant Community Store).
+   - Restart Home Assistant.
+2. **Configure Pyscript in `configuration.yaml`:**
+   - Ensure imports and global `hass` access are enabled:
+
+   ```yaml
+   # configuration.yaml
+   pyscript:
+     allow_all_imports: true
+     hass_is_global: true
+   ```
+
+   _Note: If using Telegram, Zalo, or YouTube features, add their respective tokens/keys under `pyscript:` or reference them via `!secret` as documented below._
+
+3. **Deploy the Required Scripts to `config/pyscript/`:**
+   - In your Home Assistant `config/` directory, locate or create the `pyscript/` folder.
+   - Copy the required script(s) from this repository's [`scripts/`](scripts/) folder into your `config/pyscript/` directory based on what you are installing:
+     - [`scripts/common_utilities.py`](scripts/common_utilities.py) — Core utility functions (required by Smart Scheduling, Memory Tool Local, Telegram, Zalo).
+     - [`scripts/memory.py`](scripts/memory.py) — Memory engine (required by Memory Tool).
+     - [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) — Lunar/Solar conversion engine (required by Lunar Calendar).
+     - [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) — Telegram bot engine.
+     - [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) — Zalo bot engine.
+     - [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) — YouTube Data API tool.
+4. **Install Python Dependencies (When Required):**
+   - If using Telegram, Zalo, or YouTube scripts, copy [`scripts/requirements.txt`](scripts/requirements.txt) into your `config/pyscript/` folder. Pyscript will automatically install the necessary packages (`h2`, `google-api-python-client`).
+5. **Reload Pyscript:**
+   - Navigate to **Developer Tools > YAML** and click **Pyscript Python Scripting** reload (or restart Home Assistant).
+
+#### Module 3: Specialized Integrations & External Services
+
+Some blueprints connect to specific Home Assistant services or third-party APIs:
+
+- **AI Task Entity (Image Analysis):**
+  - Used by: _File Content Analyzer_ (and camera snapshots / chatbot image recognition).
+  - Go to **Settings > System > General** and configure an **AI Task** conversation model (e.g. Gemini).
+- **Google Generative AI with Google Search:**
+  - Used by: _Internet Knowledge Search_.
+  - Requires Google Generative AI (Gemini) integration. In your conversation agent settings, enable the **Google Search** tool and increase the maximum token limit to at least **16,384 tokens**.
+- **Calendar Integrations (Read/Write):**
+  - Used by: _Create Calendar Events_, _Create Lunar Calendar Events_, and _Calendar Events Lookup_.
+  - Make sure your Google Calendar or local calendar entity has write permissions enabled for event creation.
+- **Music Assistant:**
+  - Used by: _Music Control_.
+  - Requires the [Music Assistant](https://music-assistant.io/) integration to be installed and active.
+- **Device Tracking & Notifications:**
+  - Used by: _Device Location & Find_.
+  - Expose your **Bermuda Device Tracker** or **Home Assistant Mobile App** tracker to Assist. For phone ringing, ensure notification and critical alert permissions are enabled on the target mobile device.
+
+---
+
+### Blueprint Dependency Matrix
+
+Use this quick reference table to find the exact requirements for each blueprint:
+
+| Blueprint                                                                | Type                 | Companion Blueprints Needed                                                                       | Required Modules                                                                                                                    | Python Scripts & Secrets                                                                     |
+| ------------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers)    | Script + Automations | Controller + Core (`devices_schedules.yaml`) + Restart (`devices_schedules_restart_handler.yaml`) | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `common_utilities.py`                                                                        |
+| [Memory Tool (LLM)](#voice-assist---memory--information-retrieval)       | Script               | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`                                                                                  |
+| [Memory Tool (Local)](#voice-assist---memory--information-retrieval)     | Automation           | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`, `common_utilities.py`                                                           |
+| [Camera Image Analysis](#voice-assist---camera-image-analysis)           | Scripts              | Snapshot + Analyzer (`file_content_analyzer_full_llm.yaml`)                                       | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | AI Task entity, `/media` storage folder                                                      |
+| [Create Calendar Events](#create-calendar-events)                        | Script               | None                                                                                              | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Calendar with Read/Write access                                                              |
+| [Calendar Events Lookup](#calendar-events-lookup)                        | Script               | None                                                                                              | None                                                                                                                                | Configured Calendar entity                                                                   |
+| [Lunar Calendar Conversion & Lookup](#lunar-calendar-conversion--lookup) | Script               | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `date_conversion_tool.py`                                                                    |
+| [Create Lunar Calendar Events](#create-lunar-calendar-events)            | Script               | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts), [Module 3](#module-3-specialized-integrations--external-services)       | `date_conversion_tool.py`, Calendar with Read/Write access                                   |
+| [Interactive Chatbot (Telegram)](#interactive-smart-home-chatbot)        | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                        | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Telegram Bot Token |
+| [Interactive Chatbot (Zalo)](#interactive-smart-home-chatbot)            | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                        | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Zalo Bot Token         |
+| [Send to Telegram](#voice-assist---send-messages--media)                 | Script               | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `requirements.txt`, Telegram Bot Token                        |
+| [Send to Zalo](#voice-assist---send-messages--media)                     | Script               | None                                                                                              | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `requirements.txt`, Zalo Bot Token                                |
+| [Internet Knowledge Search](#voice-assist---internet-knowledge-search)   | Script               | None                                                                                              | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Gemini Agent with Google Search & 16k+ tokens                                                |
+| [YouTube Search & Playback](#voice-assist---youtube-search--playback)    | Scripts              | Search + Player (`play_youtube_video_full_llm.yaml`)                                              | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
+| [Favorite YouTube Channels](#voice-assist---favorite-youtube-channels)   | Scripts              | Info Getter + Player (`play_youtube_video_full_llm.yaml`)                                         | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
+| [Smart Fan Control](#voice-assist---smart-fan-control)                   | Script               | None                                                                                              | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Fan entities exposed to Assist                                                               |
+| [Smart AC Control](#voice-assist---smart-ac-control)                     | Script               | None                                                                                              | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Climate entity exposed to Assist                                                             |
+| [Weather Forecast](#voice-assist---weather-forecast)                     | Script               | None                                                                                              | None                                                                                                                                | Weather entity with hourly & daily forecasts                                                 |
+| [Music Control](#voice-assist---music-control)                           | Script               | None                                                                                              | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Music Assistant integration                                                                  |
+| [Device Location & Find](#voice-assist---device-location--find)          | Scripts              | Location Lookup + Ringing (`device_ringing_full_llm.yaml`)                                        | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | Bermuda / Mobile app tracker, HA Companion App notifications                                 |
+| [Device State Synchronization](#device-state-synchronization)            | Automation           | None                                                                                              | None                                                                                                                                | Controllable switch/light entities                                                           |
+
+---
+
 ## Voice Assist - Smart Scheduling & Timers
 
 Want to turn on the AC for 30 minutes and have it turn off automatically? Or dim the bedroom lights after an hour?
@@ -83,7 +241,12 @@ This blueprint transforms Voice Assist into a true time management assistant. Yo
 - **Hands-Free Cooking:** "Turn off the hood in 20 minutes" - Perfect when you've finished cooking and want to go for a walk.
 - **Sleep Comfort:** "Turn the fan to the lowest speed for 1 hour then turn off" - Avoid waking up cold or with a dry throat.
 
-For full functionality, you need to install **all 3 blueprints**:
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) configured in `configuration.yaml` for friendly device name resolution.
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/common_utilities.py`](scripts/common_utilities.py) placed in `config/pyscript/`.
+- Install all 3 blueprints below (Controller script, Core script, and Restart automation).
+- Expose the Controller script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (keep default name, delete `description:` in YAML edit).
 
 1. **Controller Blueprint (LLM):** Processes voice commands and coordinates actions.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_full_llm.yaml)
@@ -122,6 +285,12 @@ Forget where you parked the car? Keep forgetting the Wi-Fi password for guests? 
 - **Complex Info:** Store long Wi-Fi passwords or bank account numbers so you can provide them instantly when guests ask.
 - **Shopping Assistant:** Save clothing/shoe sizes for your spouse/kids to order online accurately without asking again.
 
+**Prerequisites & Setup:**
+
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/memory.py`](scripts/memory.py) placed in `config/pyscript/` (the Local version also requires [`scripts/common_utilities.py`](scripts/common_utilities.py)).
+- **LLM Version:** Expose the created script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+- **Local Version:** Configured as an automation; customize trigger phrases in settings if needed.
+
 _Choose the version you want to use:_
 
 **LLM Version (Multi-language):**
@@ -155,7 +324,12 @@ Turn your security cameras into "smart eyes" for your virtual assistant. No need
 - **Anxiety Relief:** Already in bed but suddenly panicked "Is the gate closed?", just ask Assistant to check for you.
 - **Pet Monitor:** Check if your pet is sleeping nicely or digging up the garden.
 
-To use this feature, you need to install **both blueprints**:
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) for camera friendly-name resolution.
+- Requires an **AI Task** entity configured under **Settings > System > General** (see [Module 3](#module-3-specialized-integrations--external-services)).
+- Ensure the capture storage directory exists (default is `/media`).
+- Install both blueprints below, expose the scripts to Assist, and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow).
 
 1. **Snapshot Blueprint:** Takes a picture from the requested camera.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcamera_snapshot_full_llm.yaml)
@@ -189,6 +363,11 @@ Organize your schedule by voice as if you're conversing with an assistant. This 
 - **Plan Anytime:** Quickly create reminders and appointments while driving, cooking, or when a sudden idea strikes.
 - **Never Miss Out:** Automate adding important family or work events to your calendar without manual input.
 
+**Prerequisites & Setup:**
+
+- Requires a Calendar entity configured with Read/Write permissions (see [Module 3](#module-3-specialized-integrations--external-services)).
+- Expose the created script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_calendar_event_full_llm.yaml)
 
 ### Calendar Events Lookup
@@ -204,6 +383,11 @@ Inquire about and retrieve information regarding existing events in your calenda
 
 - **Before Leaving Home:** Quickly check your schedule for the day or week without needing to open your calendar app on your phone.
 - **Confirm Plans:** Easily verify to ensure no double-bookings or missed important events.
+
+**Prerequisites & Setup:**
+
+- Select your target calendar entities in the blueprint input settings.
+- Expose the created script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcalendar_events_lookup_full_llm.yaml)
 
@@ -236,6 +420,11 @@ A powerful Solar-Lunar calendar conversion tool that works completely **Offline*
 - **Feng Shui & Spirituality:** Plan important events (weddings, groundbreakings, grand openings) based on auspicious days/hours.
 - **Traditional Observances:** Keep track of the 1st and 15th of the lunar month, or memorial days to prepare offerings.
 
+**Prerequisites & Setup:**
+
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) placed in `config/pyscript/`.
+- Expose the created script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdate_lookup_and_conversion_full_llm.yaml)
 
 ### Create Lunar Calendar Events
@@ -253,6 +442,12 @@ Automatically add important events based on the Lunar calendar (memorials, anniv
 
 - **Never Miss Memorials:** Ensure you never miss important family memorials or ceremonies.
 - **Lunar Birthdays:** Automatically get reminders for anniversaries or birthdays that are celebrated based on the lunar calendar for loved ones.
+
+**Prerequisites & Setup:**
+
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) placed in `config/pyscript/`.
+- Requires a Calendar entity with Read/Write permissions (see [Module 3](#module-3-specialized-integrations--external-services)).
+- Designed for manual UI execution or automations (does not require Assist exposure).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_lunar_events.yaml)
 
@@ -272,6 +467,13 @@ Don't just command; converse with your home. Create Telegram or Zalo Bots to con
 
 - **Remote Check-ins:** On your way to work and can't remember if you turned off the stove/lights? Just message the bot to check.
 - **Silent Monitoring:** Want to know if your kids are home yet (via device status) without bothering them? Ask the bot instead of calling.
+
+**Prerequisites & Setup:**
+
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/common_utilities.py`](scripts/common_utilities.py), [`scripts/requirements.txt`](scripts/requirements.txt), and the corresponding bot handler ([`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) or [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py)) placed in `config/pyscript/`.
+- Add your bot token (`telegram_bot_token` or `zalo_bot_token`) to `configuration.yaml` and `secrets.yaml` under `pyscript:`.
+- **For Telegram:** Disable Privacy Mode via BotFather or make the bot a group admin.
+- **For Image Analysis (Optional):** Install the File Content Analyzer blueprint and configure an AI Task entity (see [Module 3](#module-3-specialized-integrations--external-services)).
 
 _Install the webhook blueprint for your chosen platform. For image analysis, also install the Analyzer blueprint._
 
@@ -314,6 +516,12 @@ Driving or hands messy? Use your voice to send messages and share content with l
 - **Capture Moments:** "Take a photo from the yard camera and send it to the family group" - Instantly share interesting images.
 - **Rich Updates:** Send reports, recordings, videos, or voice messages alongside a concise summary.
 
+**Prerequisites & Setup:**
+
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/requirements.txt`](scripts/requirements.txt) and either [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) or [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) placed in `config/pyscript/`.
+- Add your bot token (`telegram_bot_token` or `zalo_bot_token`) to `configuration.yaml` and `secrets.yaml` under `pyscript:`.
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 _Install the blueprint for the platform you want to send messages to:_
 
 For Telegram map pins, use coordinates or a Google Maps URL that contains coordinates. A plain address or shortened Maps URL requires a separate geocoding step.
@@ -353,6 +561,12 @@ Don't let Assistant just toggle lights. Turn it into a living encyclopedia, read
 - **Quick Fact-Check:** Cooking and forgot a recipe? "Recipe for flan using a rice cooker?" - Look it up instantly without pausing your cooking.
 - **Convenience Anytime:** Driving or hands full? Still ask about the weather, news, history, etc.
 
+**Prerequisites & Setup:**
+
+- Exclusively designed for Google Generative AI (Gemini).
+- Requires a Conversation Agent configured with the **Google Search** tool enabled and maximum tokens set to at least **16,384** (see [Module 3](#module-3-specialized-integrations--external-services)).
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_google_search_full_llm.yaml)
 
 ---
@@ -379,7 +593,13 @@ Transform your TV into a smart home cinema. No remote needed, no typing required
 - **Elderly Friendly:** Grandparents who can't type or see well can just ask to listen to their favorite traditional opera.
 - **Work Focus:** "Play Lofi Chill music" to set the mood for work without touching your computer.
 
-To use this feature, you need to install **both blueprints**:
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) for TV/media player friendly-name resolution.
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) and [`scripts/requirements.txt`](scripts/requirements.txt) placed in `config/pyscript/`.
+- Configure your `youtube_api_key` in `configuration.yaml` and `secrets.yaml` under `pyscript:`.
+- Target TV or streaming device must have the official YouTube app installed.
+- Install both blueprints below, expose the scripts to Assist, and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow).
 
 1. **Search Blueprint (LLM):** Analyzes the query and finds the right video.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_youtube_search_full_llm.yaml)
@@ -410,7 +630,13 @@ Are you a die-hard fan of "MrBeast" or "Linus Tech Tips"? This blueprint ensures
 
 [**View the detailed guide**](/home_assistant_play_favorite_youtube_channel_videos_en.md)
 
-To use this feature, you need to install **both blueprints**:
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) for TV/media player friendly-name resolution.
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) and [`scripts/requirements.txt`](scripts/requirements.txt) placed in `config/pyscript/`.
+- Configure your `youtube_api_key` in `configuration.yaml` and `secrets.yaml` under `pyscript:`.
+- Target TV or streaming device must have the official YouTube app installed.
+- Install both blueprints below, expose the scripts to Assist, and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow).
 
 1. **Info Getter Blueprint (LLM):** Checks the channel and gets the latest video info.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fget_youtube_video_info_full_llm.yaml)
@@ -448,6 +674,12 @@ Although Home Assistant already supports basic fan control, this blueprint offer
 
 - **Comfort from Bed/Sofa:** Adjust the airflow to suit the room's temperature without leaving your comfy spot.
 - **Quick "Breeze" Setup:** Quickly set a "breeze" mode (low speed and oscillation) for the bedroom before going to sleep.
+
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) configured in `configuration.yaml`.
+- Expose your fan entities to Assist with custom aliases if desired.
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_and_oscillation_control_full_llm.yaml)
 
@@ -490,6 +722,13 @@ This blueprint solves these limitations entirely:
 - **Elderly & Child Friendly:** Instead of remembering complex symbols on the remote (snowflake, water drop...), family members can just use natural commands: _"Turn on dry mode"_.
 - **Totally Hands-Free:** Just got home with your hands full? Simply say: _"Turn on the AC to 20 degrees, max wind"_ to enjoy cool air instantly without manual operation.
 
+**Prerequisites & Setup:**
+
+- Requires a smart air conditioner (climate entity) integrated into Home Assistant.
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) configured in `configuration.yaml`.
+- Expose your climate entities to Assist with custom aliases if desired.
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fac_mode_and_fan_control_full_llm.yaml)
 
 ---
@@ -514,6 +753,11 @@ Retrieve home weather forecasts for specific periods (hourly or daily) using nat
 
 - Special thanks to the original blueprint from [TheFes/ha-blueprints](https://github.com/TheFes/ha-blueprints). This version has been refined and optimized specifically for use with Gemini.
 
+**Prerequisites & Setup:**
+
+- Configure a weather entity that provides both hourly and daily forecasts in the blueprint inputs.
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
+
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fweather_forecast_full_llm.yaml)
 
 ---
@@ -537,6 +781,11 @@ Control music via Music Assistant using voice commands. Supports searching by tr
 **Credit:**
 
 - Special thanks to the original blueprint from [music-assistant/voice-support](https://github.com/music-assistant/voice-support). This version has been refined and optimized specifically for use with Gemini.
+
+**Prerequisites & Setup:**
+
+- Requires the **Music Assistant** integration configured in Home Assistant (see [Module 3](#module-3-specialized-integrations--external-services)).
+- Expose the script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (delete `description:` in YAML edit).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcontrol_music_full_llm.yaml)
 
@@ -564,7 +813,12 @@ Control music via Music Assistant using voice commands. Supports searching by tr
 
 [**View the detailed guide**](/home_assistant_device_location_lookup_guide_en.md)
 
-To use this feature, you need to install **both blueprints**:
+**Prerequisites & Setup:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) for device friendly-name resolution.
+- Expose Bermuda Device Tracker or Mobile App Device Tracker entities to Assist (only one tracker per physical device; see [guide](/home_assistant_device_location_lookup_guide_en.md)).
+- For ringing: Target mobile device must have Home Assistant Companion App with notification permissions (and Critical Alerts on iOS).
+- Install both blueprints below, expose the scripts to Assist, and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow).
 
 1. **Location Finder Blueprint (LLM):** Processes the request and finds the device's location.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_location_lookup_full_llm.yaml)
@@ -581,6 +835,11 @@ Seamlessly synchronize the `on/off` state between multiple devices, acting like 
 
 - **Old House, Smart Switches:** Flexibly control lights in stairwells or hallways from multiple switches, including mechanical or wireless ones.
 - **Group Lighting:** Flipping one physical switch activates all lights in an area (ceiling light, accent lights, decorative lights) simultaneously, instantly creating the desired ambiance.
+
+**Prerequisites & Setup:**
+
+- Target entities must support `homeassistant.turn_on` and `homeassistant.turn_off`.
+- Standard automation blueprint; select the linked entities in the UI and save.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Flink_multiple_devices.yaml)
 
