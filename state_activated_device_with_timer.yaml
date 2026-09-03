@@ -1,7 +1,7 @@
 blueprint:
   name: Turn On/Off Device with State and Timer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/state_activated_device_with_timer.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/state_activated_device_with_timer.yaml
   description: |-
     # Turn On/Off Device with State and Timer
 
