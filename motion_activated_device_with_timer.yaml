@@ -1,7 +1,7 @@
 blueprint:
   name: Turn On/Off Device with Motion and Timer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/motion_activated_device_with_timer.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/main/motion_activated_device_with_timer.yaml
   description: |-
     # Turn On/Off Device with Motion and Timer
 
