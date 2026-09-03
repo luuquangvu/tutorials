@@ -50,9 +50,6 @@ Transform Home Assistant into a fully-fledged personal teammate with this curate
   - [Voice Assist - Music Control](#voice-assist---music-control)
   - [Voice Assist - Device Location & Find](#voice-assist---device-location--find)
   - [Device State Synchronization](#device-state-synchronization)
-  - [Obsolete Blueprints](#obsolete-blueprints)
-    - [Voice Assist - Smart Fan Control (Legacy)](#voice-assist---smart-fan-control-legacy)
-    - [Voice Assist - Device Control Timer (Legacy)](#voice-assist---device-control-timer-legacy)
   - [Additional Tutorials](#additional-tutorials)
     - [How to write custom system instructions for Voice Assist](#how-to-write-custom-system-instructions-for-voice-assist)
     - [Play new videos from favorite YouTube channels](#play-new-videos-from-favorite-youtube-channels)
@@ -842,33 +839,6 @@ Seamlessly synchronize the `on/off` state between multiple devices, acting like 
 - Standard automation blueprint; select the linked entities in the UI and save.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Flink_multiple_devices.yaml)
-
----
-
-## Obsolete Blueprints
-
-**Important Note:** To ensure optimal LLM performance and avoid confusion in tool selection, it is NOT RECOMMENDED to install blueprints in this section concurrently with their corresponding new versions. Always prioritize using the latest and recommended blueprints.
-
-### Voice Assist - Smart Fan Control (Legacy)
-
-**Use the new [Voice Assist - Smart Fan Control](#voice-assist---smart-fan-control) that integrates both speed and oscillation.**
-
-**Fan Speed Control:**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_control_full_llm.yaml)
-
-**Fan Oscillation Control:**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_oscillation_control_full_llm.yaml)
-
-### Voice Assist - Device Control Timer (Legacy)
-
-**Use the new [Voice Assist - Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers) for more features.**
-
-To use this, you need to install **both blueprints**:
-
-1. **Controller Blueprint (LLM):**
-   [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_timer_full_llm.yaml)
-2. **Timer Tool Blueprint:**
-   [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_tool.yaml)
 
 ---
 

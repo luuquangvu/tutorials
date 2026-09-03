@@ -50,9 +50,6 @@ Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ s
   - [Voice Assist - Điều khiển Nhạc](#voice-assist---điều-khiển-nhạc)
   - [Voice Assist - Định vị & Tìm kiếm Thiết bị](#voice-assist---định-vị--tìm-kiếm-thiết-bị)
   - [Đồng bộ Trạng thái Thiết bị](#đồng-bộ-trạng-thái-thiết-bị)
-  - [Các Blueprint đã lỗi thời](#các-blueprint-đã-lỗi-thời)
-    - [Voice Assist - Điều khiển Quạt (Cũ)](#voice-assist---điều-khiển-quạt-cũ)
-    - [Voice Assist - Hẹn giờ Bật/Tắt Thiết bị (Cũ)](#voice-assist---hẹn-giờ-bậttắt-thiết-bị-cũ)
   - [Hướng dẫn Thêm](#hướng-dẫn-thêm)
     - [Tùy chỉnh chỉ dẫn hệ thống cho Voice Assist](#tùy-chỉnh-chỉ-dẫn-hệ-thống-cho-voice-assist)
     - [Phát video mới từ kênh YouTube yêu thích](#phát-video-mới-từ-kênh-youtube-yêu-thích)
@@ -842,33 +839,6 @@ Tra cứu dự báo thời tiết tại nhà cho các khoảng thời gian cụ 
 - Blueprint tự động hóa tiêu chuẩn; chỉ cần chọn các thực thể liên kết trên giao diện và lưu lại.
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Flink_multiple_devices.yaml)
-
----
-
-## Các Blueprint đã lỗi thời
-
-**Lưu ý quan trọng:** Để đảm bảo LLM hoạt động hiệu quả và tránh nhầm lẫn trong việc lựa chọn công cụ, KHÔNG NÊN cài đặt đồng thời các blueprint trong mục này với các phiên bản blueprint mới tương ứng. Hãy luôn ưu tiên sử dụng các blueprint mới nhất và được khuyến nghị.
-
-### Voice Assist - Điều khiển Quạt (Cũ)
-
-**Sử dụng phiên bản mới [Voice Assist - Điều khiển Quạt Thông minh](#voice-assist---điều-khiển-quạt-thông-minh) tích hợp cả tốc độ và tuốc năng.**
-
-**Điều khiển Tốc độ quạt:**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_control_full_llm.yaml)
-
-**Điều khiển Xoay quạt:**
-[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_oscillation_control_full_llm.yaml)
-
-### Voice Assist - Hẹn giờ Bật/Tắt Thiết bị (Cũ)
-
-**Sử dụng phiên bản mới [Voice Assist - Hẹn giờ & Lên lịch Thông minh](#voice-assist---hẹn-giờ--lên-lịch-thông-minh) để có nhiều tính năng hơn.**
-
-Để sử dụng, bạn cần cài đặt **cả 2 blueprint**:
-
-1. **Blueprint Điều khiển (LLM):**
-   [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_timer_full_llm.yaml)
-2. **Blueprint Công cụ Hẹn giờ:**
-   [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_control_tool.yaml)
 
 ---
 
