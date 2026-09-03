@@ -1,20 +1,22 @@
 blueprint:
-  name: Turn On Device with Motion and Timer
+  name: Turn On/Off Device with Motion and Timer
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/motion_activated_device_with_timer.yaml
   description: |-
-    # Turn On Device with Motion and Timer
+    # Turn On/Off Device with Motion and Timer
 
     Automatically turn on a switch, light, or device when motion is detected, and start a timer helper when motion clears to turn it off when the timer finishes.
 
     ### Key Features:
-    - **Motion Triggered:** Turns on target devices immediately upon motion detection.
+    - **Motion Triggered:** Turns on target devices upon motion detection (with optional turn-on conditions, e.g. ambient light/lux threshold).
+    - **No-Op Turn On / Auto-Off Only:** Option to disable turning on devices on motion (turning on becomes a no-op, only resetting active timers). Perfect for living rooms where lights are turned on manually and only auto-turn off.
     - **Timer Reset:** Automatically cancels active timer if motion is re-detected while the device is on.
-    - **Graceful Turn Off:** Starts the timer when motion clears and turns off devices only after the timer finishes.
+    - **Graceful Turn Off:** Starts the timer when motion clears (with optional timer start conditions, e.g. only start if target devices are on) and turns off devices after the timer finishes (with optional turn-off conditions, e.g. manual override helpers).
     - **Global Conditions:** Gate the entire automation from triggering (e.g. alarm system status).
-    - **Extensible Action Sequences with Conditions:**
-      - *Additional Actions on Motion:* Optional custom actions that run when motion is detected, optionally gated by *Additional Turn On Conditions*.
-      - *Additional Actions on Timer Finished:* Optional custom actions that run when the timer finishes, optionally gated by *Additional Turn Off Conditions*.
+    - **Extensible Action Sequences (If-Then-Else):**
+      - *Additional Actions on Motion:* Optional custom actions that run when motion is detected, supporting conditional if-then-else branching (e.g. secondary fan controls or scenes).
+      - *Additional Actions on Motion Clear:* Optional custom actions that run when motion clears, supporting conditional if-then-else branching (e.g. dimming, alerts, or secondary transitions).
+      - *Additional Actions on Timer Finished:* Optional custom actions that run when the timer finishes, supporting conditional if-then-else branching (e.g. secondary fan shutoff, button toggle).
 
     ### Requirements:
     - A binary sensor (e.g., motion, occupancy, or presence sensor group).
@@ -36,8 +38,9 @@ blueprint:
               - occupancy
               - presence
     target_device:
-      name: Target Device(s)
-      description: The switch, light, device, or area to turn on and off.
+      name: Target Device(s) (Optional)
+      description: The switch, light, device, or area to turn on and off. If left empty, target device operations are a no-op.
+      default: {}
       selector:
         target: {}
     timer_entity:
@@ -47,33 +50,93 @@ blueprint:
         entity:
           filter:
             domain: timer
+    enable_turn_on:
+      name: Enable Turn On
+      description: Turn on the target device when motion is detected. If disabled, motion only cancels active timers (no-op for turning on), allowing auto-off-only automations.
+      default: true
+      selector:
+        boolean: {}
+    enable_turn_off:
+      name: Enable Turn Off
+      description: Turn off the target device when the timer finishes. If disabled, the device will not be turned off automatically (no-op for turning off).
+      default: true
+      selector:
+        boolean: {}
     flexible_conditions:
       name: Global Conditions (Optional)
       description: Optional conditions that must be met for the automation to run at all (e.g. alarm is disarmed).
       default: []
       selector:
         condition: {}
+    target_turn_on_conditions:
+      name: Target Turn On Conditions (Optional)
+      description: Conditions that must be met before turning on the target device (e.g. ambient light/lux below threshold, evening sensor is on). If left empty, the device turns on unconditionally.
+      default: []
+      selector:
+        condition: {}
+    timer_start_conditions:
+      name: Timer Start Conditions (Optional)
+      description: Optional conditions that must be met before starting the timer when motion clears (e.g. target device is currently on). If left empty, the timer starts unconditionally.
+      default: []
+      selector:
+        condition: {}
+    target_turn_off_conditions:
+      name: Target Turn Off Conditions (Optional)
+      description: Conditions that must be met before turning off the target device (e.g. manual override helper is off). If left empty, the device turns off unconditionally.
+      default: []
+      selector:
+        condition: {}
     extra_turn_on_conditions:
-      name: Additional Turn On Conditions (Optional)
-      description: Conditions that must be met for Additional Actions on Motion to run.
+      name: Extra Turn On Conditions (Optional)
+      description: Conditions that must be met for extra turn on actions to run.
       default: []
       selector:
         condition: {}
     extra_turn_on_actions:
-      name: Additional Actions on Motion (Optional)
-      description: Extra actions to run after motion is detected (e.g. secondary fan or scene controls).
+      name: Extra Turn On Actions (Optional)
+      description: Extra actions to run after motion is detected (or when Extra Turn On Conditions are met).
+      default: []
+      selector:
+        action: {}
+    extra_turn_on_else_actions:
+      name: Extra Turn On Else Actions (Optional)
+      description: Actions to run after motion is detected when Extra Turn On Conditions are not met.
+      default: []
+      selector:
+        action: {}
+    extra_motion_clear_conditions:
+      name: Extra Motion Clear Conditions (Optional)
+      description: Conditions that must be met for extra motion clear actions to run.
+      default: []
+      selector:
+        condition: {}
+    extra_motion_clear_actions:
+      name: Extra Motion Clear Actions (Optional)
+      description: Extra actions to run when motion clears (e.g. dim light, notification, or secondary controls).
+      default: []
+      selector:
+        action: {}
+    extra_motion_clear_else_actions:
+      name: Extra Motion Clear Else Actions (Optional)
+      description: Actions to run when motion clears when Extra Motion Clear Conditions are not met.
       default: []
       selector:
         action: {}
     extra_turn_off_conditions:
-      name: Additional Turn Off Conditions (Optional)
-      description: Conditions that must be met for Additional Actions on Timer Finished to run.
+      name: Extra Turn Off Conditions (Optional)
+      description: Conditions that must be met for extra turn off actions to run.
       default: []
       selector:
         condition: {}
     extra_turn_off_actions:
-      name: Additional Actions on Timer Finished (Optional)
-      description: Extra actions to run when the timer finishes (e.g. secondary fan or button press).
+      name: Extra Turn Off Actions (Optional)
+      description: Extra actions to run when the timer finishes (or when Extra Turn Off Conditions are met).
+      default: []
+      selector:
+        action: {}
+    extra_turn_off_else_actions:
+      name: Extra Turn Off Else Actions (Optional)
+      description: Actions to run when the timer finishes when Extra Turn Off Conditions are not met.
       default: []
       selector:
         action: {}
@@ -81,8 +144,22 @@ mode: queued
 max: 10
 variables:
   version: 20260903
+  target_device: !input target_device
+  has_target: "{{ target_device is mapping and (target_device.values() | select | list | length > 0) }}"
+  enable_turn_on: !input enable_turn_on
+  enable_turn_off: !input enable_turn_off
+  target_turn_on_conditions: !input target_turn_on_conditions
+  timer_start_conditions: !input timer_start_conditions
+  target_turn_off_conditions: !input target_turn_off_conditions
   extra_turn_on_conditions: !input extra_turn_on_conditions
+  extra_turn_on_actions: !input extra_turn_on_actions
+  extra_turn_on_else_actions: !input extra_turn_on_else_actions
+  extra_motion_clear_conditions: !input extra_motion_clear_conditions
+  extra_motion_clear_actions: !input extra_motion_clear_actions
+  extra_motion_clear_else_actions: !input extra_motion_clear_else_actions
   extra_turn_off_conditions: !input extra_turn_off_conditions
+  extra_turn_off_actions: !input extra_turn_off_actions
+  extra_turn_off_else_actions: !input extra_turn_off_else_actions
 triggers:
   - trigger: state
     entity_id: !input motion_sensor
@@ -108,13 +185,28 @@ actions:
           - if:
               - condition: state
                 entity_id: !input timer_entity
-                state: active
+                state:
+                  - active
+                  - paused
             then:
               - action: timer.cancel
                 target:
                   entity_id: !input timer_entity
-          - action: homeassistant.turn_on
-            target: !input target_device
+          - if:
+              - condition: template
+                value_template: "{{ enable_turn_on and has_target }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ target_turn_on_conditions | length == 0 }}"
+                then:
+                  - action: homeassistant.turn_on
+                    target: !input target_device
+                else:
+                  - if: !input target_turn_on_conditions
+                    then:
+                      - action: homeassistant.turn_on
+                        target: !input target_device
           - if:
               - condition: template
                 value_template: "{{ extra_turn_on_conditions | length == 0 }}"
@@ -124,21 +216,57 @@ actions:
               - if: !input extra_turn_on_conditions
                 then:
                   - sequence: !input extra_turn_on_actions
+                else:
+                  - sequence: !input extra_turn_on_else_actions
       - conditions:
           - condition: trigger
             id:
               - motion_clear
         sequence:
-          - action: timer.start
-            target:
-              entity_id: !input timer_entity
+          - if:
+              - condition: template
+                value_template: "{{ timer_start_conditions | length == 0 }}"
+            then:
+              - action: timer.start
+                target:
+                  entity_id: !input timer_entity
+            else:
+              - if: !input timer_start_conditions
+                then:
+                  - action: timer.start
+                    target:
+                      entity_id: !input timer_entity
+          - if:
+              - condition: template
+                value_template: "{{ extra_motion_clear_conditions | length == 0 }}"
+            then:
+              - sequence: !input extra_motion_clear_actions
+            else:
+              - if: !input extra_motion_clear_conditions
+                then:
+                  - sequence: !input extra_motion_clear_actions
+                else:
+                  - sequence: !input extra_motion_clear_else_actions
       - conditions:
           - condition: trigger
             id:
               - timer_finished
         sequence:
-          - action: homeassistant.turn_off
-            target: !input target_device
+          - if:
+              - condition: template
+                value_template: "{{ enable_turn_off and has_target }}"
+            then:
+              - if:
+                  - condition: template
+                    value_template: "{{ target_turn_off_conditions | length == 0 }}"
+                then:
+                  - action: homeassistant.turn_off
+                    target: !input target_device
+                else:
+                  - if: !input target_turn_off_conditions
+                    then:
+                      - action: homeassistant.turn_off
+                        target: !input target_device
           - if:
               - condition: template
                 value_template: "{{ extra_turn_off_conditions | length == 0 }}"
@@ -148,3 +276,5 @@ actions:
               - if: !input extra_turn_off_conditions
                 then:
                   - sequence: !input extra_turn_off_actions
+                else:
+                  - sequence: !input extra_turn_off_else_actions
