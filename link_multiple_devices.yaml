@@ -9,12 +9,12 @@ blueprint:
 
     ### Key Features:
     - **Smart Sync:** Only sends commands to devices that need a state change, preventing infinite loops and network congestion.
-    - **Ultra-Fast Performance:** Optimized using direct string-based filtering for near-zero latency.
+    - **Ultra-Fast Performance:** Evaluates target entities and conditions at the trigger boundary before spawning action runners, minimizing CPU overhead and latency.
     - **Fail-Safe:** Automatically excludes the trigger entity and ignores `unavailable/unknown` devices to prevent execution errors and keep system logs clean.
 
     ### Requirements:
     - Entities must support `homeassistant.turn_on` and `homeassistant.turn_off`.
-    - Requires Home Assistant 2024.10.0 or newer.
+    - Requires Home Assistant 2024.12.0 or newer.
   domain: automation
   homeassistant:
     min_version: 2024.12.0
@@ -26,10 +26,18 @@ blueprint:
         entity:
           multiple: true
 mode: parallel
+max: 25
 max_exceeded: silent
 variables:
-  version: 20251223
+  version: 20260903
   linked_entities: !input linked_entities
+  target_state: "{{ trigger.to_state.state }}"
+  opposite_state: "{{ 'off' if target_state == 'on' else 'on' }}"
+  target_entities: >-
+    {{ linked_entities
+       | reject('eq', trigger.entity_id)
+       | select('is_state', opposite_state)
+       | list }}
 triggers:
   - trigger: state
     entity_id: !input linked_entities
@@ -39,15 +47,10 @@ triggers:
     to:
       - "off"
       - "on"
-actions:
-  - variables:
-      target_entities: >-
-        {{ linked_entities
-           | reject('eq', trigger.entity_id)
-           | select('is_state', 'off' if trigger.to_state.state == 'on' else 'on')
-           | list }}
+conditions:
   - condition: template
     value_template: "{{ target_entities | length > 0 }}"
-  - action: "homeassistant.turn_{{ trigger.to_state.state }}"
+actions:
+  - action: "homeassistant.turn_{{ target_state }}"
     target:
       entity_id: "{{ target_entities }}"
