@@ -1,42 +1,45 @@
 blueprint:
-  name: Turn On/Off Device with Motion and Timer
+  name: Turn On/Off Device with State and Timer
   author: luuquangvu
-  source_url: https://github.com/luuquangvu/tutorials/blob/dev/motion_activated_device_with_timer.yaml
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/state_activated_device_with_timer.yaml
   description: |-
-    # Turn On/Off Device with Motion and Timer
+    # Turn On/Off Device with State and Timer
 
-    Automatically turn on a switch, light, or device when motion is detected, and start a timer helper when motion clears to turn it off when the timer finishes.
+    Automatically turn on a switch, light, or device when an entity (binary sensor, switch, light, input boolean, etc.) turns on, and start a timer helper when it turns off to turn it off when the timer finishes.
 
     ### Key Features:
-    - **Motion Triggered:** Turns on target devices upon motion detection (with optional turn-on conditions, e.g. ambient light/lux threshold).
-    - **No-Op Turn On / Auto-Off Only:** Option to disable turning on devices on motion (turning on becomes a no-op, only resetting active timers). Perfect for living rooms where lights are turned on manually and only auto-turn off.
-    - **Timer Reset:** Automatically cancels active timer if motion is re-detected while the device is on.
-    - **Graceful Turn Off:** Starts the timer when motion clears (with optional timer start conditions, e.g. only start if target devices are on) and turns off devices after the timer finishes (with optional turn-off conditions, e.g. manual override helpers).
+    - **State / Activation Triggered:** Turns on target devices upon entity turning on (with optional turn-on conditions, e.g. ambient light/lux threshold).
+    - **No-Op Turn On / Auto-Off Only:** Option to disable turning on devices on activation (turning on becomes a no-op, only resetting active timers). Perfect for spaces where lights or devices are turned on manually and only auto-turn off.
+    - **Timer Reset:** Automatically cancels active timer if the entity turns on again while the target device is on.
+    - **Graceful Turn Off:** Starts the timer when the entity turns off (with optional timer start conditions, e.g. only start if target devices are on) and turns off devices after the timer finishes (with optional turn-off conditions, e.g. manual override helpers).
     - **Global Conditions:** Gate the entire automation from triggering (e.g. alarm system status).
     - **Extensible Action Sequences (If-Then-Else):**
-      - *Additional Actions on Motion:* Optional custom actions that run when motion is detected, supporting conditional if-then-else branching (e.g. secondary fan controls or scenes).
-      - *Additional Actions on Motion Clear:* Optional custom actions that run when motion clears, supporting conditional if-then-else branching (e.g. dimming, alerts, or secondary transitions).
+      - *Additional Actions on Turn On:* Optional custom actions that run when the entity turns on, supporting conditional if-then-else branching (e.g. secondary fan controls or scenes).
+      - *Additional Actions on Turn Off:* Optional custom actions that run when the entity turns off, supporting conditional if-then-else branching (e.g. dimming, alerts, or secondary transitions).
       - *Additional Actions on Timer Finished:* Optional custom actions that run when the timer finishes, supporting conditional if-then-else branching (e.g. secondary fan shutoff, button toggle).
 
     ### Requirements:
-    - A binary sensor (e.g., motion, occupancy, or presence sensor group).
+    - An entity with two states (`on`/`off`), such as a binary sensor (motion, door, presence, window, etc.), switch, light, or input boolean.
     - A configured `timer` helper entity.
     - Requires Home Assistant 2024.12.0 or newer.
   domain: automation
   homeassistant:
     min_version: 2024.12.0
   input:
-    motion_sensor:
-      name: Motion Sensor
-      description: Binary sensor (e.g. motion, occupancy or presence sensor) that triggers the automation.
+    trigger_entity:
+      name: Trigger Entity
+      description: Entity with two states (e.g. binary sensor, switch, light, input boolean) that triggers the automation.
       selector:
         entity:
           filter:
-            domain: binary_sensor
-            device_class:
-              - motion
-              - occupancy
-              - presence
+            - domain:
+                - binary_sensor
+                - switch
+                - input_boolean
+                - light
+                - fan
+                - schedule
+                - siren
     target_device:
       name: Target Device(s) (Optional)
       description: The switch, light, device, or area to turn on and off. If left empty, target device operations are a no-op.
@@ -52,7 +55,7 @@ blueprint:
             domain: timer
     enable_turn_on:
       name: Enable Turn On
-      description: Turn on the target device when motion is detected. If disabled, motion only cancels active timers (no-op for turning on), allowing auto-off-only automations.
+      description: Turn on the target device when the trigger entity turns on. If disabled, turning on only cancels active timers (no-op for turning on), allowing auto-off-only automations.
       default: true
       selector:
         boolean: {}
@@ -76,7 +79,7 @@ blueprint:
         condition: {}
     timer_start_conditions:
       name: Timer Start Conditions (Optional)
-      description: Optional conditions that must be met before starting the timer when motion clears (e.g. target device is currently on). If left empty, the timer starts unconditionally.
+      description: Optional conditions that must be met before starting the timer when the trigger entity turns off (e.g. target device is currently on). If left empty, the timer starts unconditionally.
       default: []
       selector:
         condition: {}
@@ -94,31 +97,31 @@ blueprint:
         condition: {}
     extra_turn_on_actions:
       name: Extra Turn On Actions (Optional)
-      description: Extra actions to run after motion is detected (or when Extra Turn On Conditions are met).
+      description: Extra actions to run after the trigger entity turns on (or when Extra Turn On Conditions are met).
       default: []
       selector:
         action: {}
     extra_turn_on_else_actions:
       name: Extra Turn On Else Actions (Optional)
-      description: Actions to run after motion is detected when Extra Turn On Conditions are not met.
+      description: Actions to run after the trigger entity turns on when Extra Turn On Conditions are not met.
       default: []
       selector:
         action: {}
-    extra_motion_clear_conditions:
-      name: Extra Motion Clear Conditions (Optional)
-      description: Conditions that must be met for extra motion clear actions to run.
+    extra_entity_off_conditions:
+      name: Extra Entity Turn Off Conditions (Optional)
+      description: Conditions that must be met for extra entity turn off actions to run.
       default: []
       selector:
         condition: {}
-    extra_motion_clear_actions:
-      name: Extra Motion Clear Actions (Optional)
-      description: Extra actions to run when motion clears (e.g. dim light, notification, or secondary controls).
+    extra_entity_off_actions:
+      name: Extra Entity Turn Off Actions (Optional)
+      description: Extra actions to run when the trigger entity turns off (e.g. dim light, notification, or secondary controls).
       default: []
       selector:
         action: {}
-    extra_motion_clear_else_actions:
-      name: Extra Motion Clear Else Actions (Optional)
-      description: Actions to run when motion clears when Extra Motion Clear Conditions are not met.
+    extra_entity_off_else_actions:
+      name: Extra Entity Turn Off Else Actions (Optional)
+      description: Actions to run when the trigger entity turns off when Extra Entity Turn Off Conditions are not met.
       default: []
       selector:
         action: {}
@@ -154,21 +157,21 @@ variables:
   extra_turn_on_conditions: !input extra_turn_on_conditions
   extra_turn_on_actions: !input extra_turn_on_actions
   extra_turn_on_else_actions: !input extra_turn_on_else_actions
-  extra_motion_clear_conditions: !input extra_motion_clear_conditions
-  extra_motion_clear_actions: !input extra_motion_clear_actions
-  extra_motion_clear_else_actions: !input extra_motion_clear_else_actions
+  extra_entity_off_conditions: !input extra_entity_off_conditions
+  extra_entity_off_actions: !input extra_entity_off_actions
+  extra_entity_off_else_actions: !input extra_entity_off_else_actions
   extra_turn_off_conditions: !input extra_turn_off_conditions
   extra_turn_off_actions: !input extra_turn_off_actions
   extra_turn_off_else_actions: !input extra_turn_off_else_actions
 triggers:
   - trigger: state
-    entity_id: !input motion_sensor
+    entity_id: !input trigger_entity
     to: "on"
-    id: motion_detected
+    id: entity_turned_on
   - trigger: state
-    entity_id: !input motion_sensor
+    entity_id: !input trigger_entity
     to: "off"
-    id: motion_clear
+    id: entity_turned_off
   - trigger: event
     event_type: timer.finished
     event_data:
@@ -180,7 +183,7 @@ actions:
       - conditions:
           - condition: trigger
             id:
-              - motion_detected
+              - entity_turned_on
         sequence:
           - if:
               - condition: state
@@ -221,7 +224,7 @@ actions:
       - conditions:
           - condition: trigger
             id:
-              - motion_clear
+              - entity_turned_off
         sequence:
           - if:
               - condition: template
@@ -238,15 +241,15 @@ actions:
                       entity_id: !input timer_entity
           - if:
               - condition: template
-                value_template: "{{ extra_motion_clear_conditions | length == 0 }}"
+                value_template: "{{ extra_entity_off_conditions | length == 0 }}"
             then:
-              - sequence: !input extra_motion_clear_actions
+              - sequence: !input extra_entity_off_actions
             else:
-              - if: !input extra_motion_clear_conditions
+              - if: !input extra_entity_off_conditions
                 then:
-                  - sequence: !input extra_motion_clear_actions
+                  - sequence: !input extra_entity_off_actions
                 else:
-                  - sequence: !input extra_motion_clear_else_actions
+                  - sequence: !input extra_entity_off_else_actions
       - conditions:
           - condition: trigger
             id:
