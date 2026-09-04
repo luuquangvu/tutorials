@@ -11,8 +11,9 @@ Directly leverages Home Assistant Core's native validation engines:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -26,11 +27,33 @@ else:
     except ImportError:
         import voluptuous as vol
 
-from homeassistant.components.automation.config import AUTOMATION_BLUEPRINT_SCHEMA
+from homeassistant.components.automation.config import (
+    AUTOMATION_BLUEPRINT_SCHEMA,
+    PLATFORM_SCHEMA,
+)
+from homeassistant.components.automation.const import CONF_TRIGGER_VARIABLES
+from homeassistant.components.blueprint.const import CONF_INPUT
 from homeassistant.components.blueprint.errors import InvalidBlueprint
-from homeassistant.components.blueprint.models import Blueprint
+from homeassistant.components.blueprint.models import Blueprint, BlueprintInputs
 from homeassistant.components.blueprint.schemas import BLUEPRINT_SCHEMA
-from homeassistant.components.template.config import TEMPLATE_BLUEPRINT_SCHEMA
+from homeassistant.components.script.config import SCRIPT_ENTITY_SCHEMA
+from homeassistant.components.template.config import (
+    CONFIG_SECTION_SCHEMA,
+    TEMPLATE_BLUEPRINT_SCHEMA,
+)
+from homeassistant.const import (
+    CONF_ACTION,
+    CONF_DEFAULT,
+    CONF_SERVICE,
+    CONF_TARGET,
+    CONF_VARIABLES,
+)
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import selector
+from homeassistant.helpers.config_validation import (
+    TARGET_SERVICE_FIELDS,
+    comp_entity_ids_or_uuids,
+)
 from homeassistant.helpers.selector import validate_selector
 from homeassistant.helpers.template import TemplateEnvironment
 from homeassistant.util.yaml.loader import load_yaml
@@ -103,6 +126,172 @@ def extract_used_inputs(obj: Any) -> list[str]:
     return used
 
 
+def extract_input_configs(input_dict: Any) -> dict[str, dict[str, Any]]:
+    """Extract input definitions mapping input_name -> config dict."""
+    configs: dict[str, dict[str, Any]] = {}
+    if not isinstance(input_dict, Mapping):
+        return configs
+
+    for k, v in input_dict.items():
+        if isinstance(v, Mapping):
+            if CONF_INPUT in v and isinstance(v[CONF_INPUT], Mapping):
+                configs |= extract_input_configs(v[CONF_INPUT])
+            else:
+                configs[k] = dict(v)
+    return configs
+
+
+def _get_ha_target_field_keys() -> frozenset[str]:
+    """Dynamically extract target field keys from Home Assistant Core's TARGET_SERVICE_FIELDS schema."""
+    keys: set[str] = set()
+    for marker in TARGET_SERVICE_FIELDS:
+        schema_key = getattr(marker, "schema", marker)
+        if isinstance(schema_key, str):
+            keys.add(schema_key)
+    return frozenset(keys or {"entity_id", "device_id", "area_id", "floor_id", "label_id"})
+
+
+_HA_TARGET_FIELD_KEYS = _get_ha_target_field_keys()
+_HA_SERVICE_ACTION_KEYS = frozenset({CONF_ACTION, CONF_SERVICE})
+_HA_VARIABLE_BLOCK_KEYS = frozenset({CONF_VARIABLES, CONF_TRIGGER_VARIABLES})
+
+
+def _multi_or_single(sub_cfg: Any, dummy: str) -> list[str] | str:
+    """Return a list if multiple is True, else a single dummy string."""
+    return [dummy] if isinstance(sub_cfg, Mapping) and sub_cfg.get("multiple") else dummy
+
+
+def _generate_dummy_input_value(sel_cfg: Any) -> Any:
+    """Generate a minimal valid dummy input value for testing substituted blueprints."""
+    if not isinstance(sel_cfg, Mapping):
+        return "test_val"
+    if "target" in sel_cfg:
+        return {"entity_id": "test.dummy"}
+    if "entity" in sel_cfg:
+        return _multi_or_single(sel_cfg.get("entity"), "test.dummy")
+    if "device" in sel_cfg:
+        return _multi_or_single(sel_cfg.get("device"), "dummy_device")
+    if "area" in sel_cfg:
+        return _multi_or_single(sel_cfg.get("area"), "dummy_area")
+    if "boolean" in sel_cfg:
+        return True
+    if "number" in sel_cfg:
+        num_sel = sel_cfg.get("number")
+        return num_sel["min"] if isinstance(num_sel, Mapping) and "min" in num_sel else 0
+    if "text" in sel_cfg:
+        return "dummy_text"
+    if "time" in sel_cfg:
+        return "00:00:00"
+    if "select" in sel_cfg:
+        if opts := sel_cfg.get("select", {}).get("options", []):
+            first = opts[0]
+            return first.get("value", first) if isinstance(first, Mapping) else first
+        return "dummy_opt"
+    return [{"action": "test.dummy"}] if "action" in sel_cfg else "dummy_val"
+
+
+def _is_invalid_for_input_default(value: Any, cfg: Mapping[str, Any]) -> bool:
+    """Test if a default value is rejected by Home Assistant Core's selector or target validator."""
+    if value in ("", None):
+        return True
+
+    selector_cfg = cfg.get("selector")
+    if isinstance(selector_cfg, Mapping) and selector_cfg:
+        try:
+            sel = selector.selector(selector_cfg)
+            if isinstance(sel, Callable):
+                sel(value)
+                return False
+        except (vol.Invalid, Exception):
+            return True
+
+    try:
+        comp_entity_ids_or_uuids(value)
+        return False
+    except (vol.Invalid, Exception):
+        return True
+
+
+def _iter_input_nodes(value: Any, path: str) -> list[tuple[Input, str]]:
+    """Return (Input, path) pairs for a single Input or a sequence of Inputs."""
+    if isinstance(value, Input):
+        return [(value, path)]
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [(item, f"{path}[{idx}]") for idx, item in enumerate(value) if isinstance(item, Input)]
+    return []
+
+
+def _check_target_inputs(value: Any, path: str, empty_default_inputs: Mapping[str, Any]) -> list[str]:
+    """Validate that target and entity fields do not reference empty-default inputs."""
+    errors: list[str] = []
+    for inp, item_path in _iter_input_nodes(value, path):
+        if inp.name in empty_default_inputs:
+            default_repr = repr(empty_default_inputs[inp.name])
+            if item_path.startswith("trigger"):
+                errors.append(
+                    f"Unsafe '!input {inp.name}' at '{item_path}': trigger entity/device cannot default to "
+                    f"an invalid value ({default_repr}). Provide a non-empty default or make the input mandatory."
+                )
+            elif item_path.startswith("condition"):
+                errors.append(
+                    f"Unsafe '!input {inp.name}' at '{item_path}': condition entity/device cannot default to "
+                    f"an invalid value ({default_repr}). Provide a non-empty default or make the input mandatory."
+                )
+            else:
+                errors.append(
+                    f"Unsafe '!input {inp.name}' at '{item_path}': input defaults to an invalid target value "
+                    f"({default_repr}). Home Assistant requires a valid entity/device ID or template. "
+                    f"Use a Jinja template '{{{{ {inp.name} }}}}' referencing an automation variable instead, "
+                    "or provide a non-empty default."
+                )
+    return errors
+
+
+def _check_service_action_inputs(value: Any, path: str, empty_default_inputs: Mapping[str, Any]) -> list[str]:
+    """Validate that action or service names do not reference empty-default inputs."""
+    errors: list[str] = []
+    for inp, item_path in _iter_input_nodes(value, path):
+        if inp.name in empty_default_inputs:
+            default_repr = repr(empty_default_inputs[inp.name])
+            errors.append(
+                f"Unsafe '!input {inp.name}' at '{item_path}': service/action name cannot default to "
+                f"an empty value ({default_repr})."
+            )
+    return errors
+
+
+def validate_safe_input_usages(
+    obj: Any,
+    empty_default_inputs: Mapping[str, Any],
+    path: str = "root",
+) -> list[str]:
+    """Check for unsafe !input usages where the input defaults to empty/null in action targets or service calls."""
+    errors: list[str] = []
+
+    if isinstance(obj, Mapping):
+        for k, v in obj.items():
+            # Skip variable definition blocks since variables are designed to hold raw input values
+            if k in _HA_VARIABLE_BLOCK_KEYS:
+                continue
+
+            child_path = f"{path}.{k}" if path != "root" else str(k)
+
+            # Check target entity/device/area IDs dynamically derived from HA Core's TARGET_SERVICE_FIELDS
+            if k in _HA_TARGET_FIELD_KEYS or k == CONF_TARGET:
+                errors.extend(_check_target_inputs(v, child_path, empty_default_inputs))
+
+            # Check action/service names
+            if k in _HA_SERVICE_ACTION_KEYS:
+                errors.extend(_check_service_action_inputs(v, child_path, empty_default_inputs))
+
+            errors.extend(validate_safe_input_usages(v, empty_default_inputs, child_path))
+    elif isinstance(obj, Sequence) and not isinstance(obj, (str, bytes, bytearray)):
+        for idx, item in enumerate(obj):
+            errors.extend(validate_safe_input_usages(item, empty_default_inputs, f"{path}[{idx}]"))
+
+    return errors
+
+
 def _is_jinja_template(text: str) -> bool:
     """Check if a string contains Jinja2 template markers."""
     return "{{" in text or "{%" in text or "{#" in text
@@ -156,6 +345,42 @@ def validate_jinja_in_obj(
     return errors
 
 
+def validate_substituted_ha_domain_config(
+    bp: Blueprint,
+    file_path: Path,
+    domain: str,
+) -> list[str]:
+    """Proactively validate the substituted blueprint config against Home Assistant Core native domain schemas."""
+    errors: list[str] = []
+    dummy_inputs: dict[str, Any] = {
+        inp_name: _generate_dummy_input_value(inp_cfg.get("selector"))
+        for inp_name, inp_cfg in bp.inputs.items()
+        if isinstance(inp_cfg, Mapping) and CONF_DEFAULT not in inp_cfg
+    }
+    try:
+        inputs = BlueprintInputs(
+            bp,
+            {"use_blueprint": {"path": file_path.name, "input": dummy_inputs}},
+        )
+        sub_config = inputs.async_substitute()
+    except Exception as err:
+        return [f"Failed to substitute blueprint defaults: {err}"]
+
+    try:
+        if domain == "automation":
+            PLATFORM_SCHEMA(sub_config)
+        elif domain == "script":
+            SCRIPT_ENTITY_SCHEMA(sub_config)
+        elif domain == "template":
+            CONFIG_SECTION_SCHEMA(sub_config)
+    except vol.Invalid as err:
+        errors.append(f"Home Assistant Core domain validation error in substituted config: {err}")
+    except Exception as err:
+        errors.append(f"Unexpected error validating substituted config against HA Core: {err}")
+
+    return errors
+
+
 def validate_blueprint_file(
     file_path: Path, jinja_env: TemplateEnvironment, verbose: bool = False
 ) -> tuple[bool, list[str], list[str]]:
@@ -196,18 +421,32 @@ def validate_blueprint_file(
         errors.append(f"Home Assistant Blueprint schema error: {e}")
 
     # 3. Input Reference Validation
-    defined_inputs = extract_defined_inputs(blueprint_meta.get("input", {}))
+    defined_inputs = extract_defined_inputs(blueprint_meta.get(CONF_INPUT, {}))
     used_inputs = extract_used_inputs(data)
     errors.extend(f"Undefined input referenced: '!input {used}'" for used in used_inputs if used not in defined_inputs)
     # 4. Selector Configuration Validation
-    selector_errors = validate_selectors_in_inputs(blueprint_meta.get("input", {}))
+    selector_errors = validate_selectors_in_inputs(blueprint_meta.get(CONF_INPUT, {}))
     errors.extend(selector_errors)
 
-    # 5. Official Home Assistant Jinja2 Syntax Validation
+    # 5. Safe Input Usages Validation (prevent empty default inputs in action targets)
+    input_configs = extract_input_configs(blueprint_meta.get(CONF_INPUT, {}))
+    empty_default_inputs = {
+        name: cfg[CONF_DEFAULT]
+        for name, cfg in input_configs.items()
+        if CONF_DEFAULT in cfg and _is_invalid_for_input_default(cfg[CONF_DEFAULT], cfg)
+    }
+    unsafe_input_errors = validate_safe_input_usages(data, empty_default_inputs)
+    errors.extend(unsafe_input_errors)
+
+    # 6. Proactive Substituted Config Validation via Home Assistant Core Domain Schemas
+    ha_domain_errors = validate_substituted_ha_domain_config(bp, file_path, domain)
+    errors.extend(ha_domain_errors)
+
+    # 7. Official Home Assistant Jinja2 Syntax Validation
     jinja_errors = validate_jinja_in_obj(data, jinja_env, skip_blueprint_metadata=True)
     errors.extend(jinja_errors)
 
-    # 6. Structure Validation based on domain
+    # 8. Structure Validation based on domain
     if domain == "automation":
         if "trigger" not in data and "triggers" not in data:
             warnings.append("Automation blueprint has no 'trigger' or 'triggers' section")
@@ -337,8 +576,8 @@ def _print_summary(total_valid: int, total_invalid: int, total_skipped: int) -> 
     print(f"{'-' * _HEADER_WIDTH}\n")
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """CLI entrypoint for blueprint validator."""
+async def _async_main(argv: Sequence[str] | None = None) -> int:
+    """Async entrypoint initializing HomeAssistant instance and validating all blueprints."""
     args = _parse_args(argv)
     root_dir = Path(__file__).resolve().parent.parent
 
@@ -355,13 +594,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     print("=" * _HEADER_WIDTH)
     print(f"Scanning {len(target_files)} YAML files...\n")
 
-    jinja_env = TemplateEnvironment(None)
+    hass = HomeAssistant("")
+    jinja_env = TemplateEnvironment(hass)
     total_valid, total_invalid, total_skipped = _validate_all_files(
         target_files, root_dir, jinja_env, verbose=args.verbose
     )
     _print_summary(total_valid, total_invalid, total_skipped)
 
     return 0 if total_invalid == 0 else 1
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entrypoint for blueprint validator."""
+    return asyncio.run(_async_main(argv))
 
 
 if __name__ == "__main__":
