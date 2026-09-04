@@ -32,14 +32,18 @@ template:
         unique_id: unavailable_devices
         device_class: problem
         icon: >-
-          {{ iif((this.attributes.raw | default([], true) | length > 0), 'mdi:alert-circle', 'mdi:check-circle') }}
+          {% set raw_items = (this.attributes.raw if (this is defined and this and this.attributes is defined and 'raw' in this.attributes) else []) %}
+          {{ iif((raw_items | length > 0), 'mdi:alert-circle', 'mdi:check-circle') }}
         state: >-
-          {{ this.attributes.raw | default([], true) | length > 0 }}
+          {% set raw_items = (this.attributes.raw if (this is defined and this and this.attributes is defined and 'raw' in this.attributes) else []) %}
+          {{ raw_items | length > 0 }}
         attributes:
           devices: >-
-            {{ this.attributes.raw | default([], true) | map('device_id') | reject('none') | unique | map('device_attr', 'name') | list }}
+            {% set raw_items = (this.attributes.raw if (this is defined and this and this.attributes is defined and 'raw' in this.attributes) else []) %}
+            {{ raw_items | map('device_id') | reject('none') | unique | map('device_attr', 'name') | list }}
           entities: >-
-            {{ this.attributes.raw | default([], true) }}
+            {% set raw_items = (this.attributes.raw if (this is defined and this and this.attributes is defined and 'raw' in this.attributes) else []) %}
+            {{ raw_items }}
           raw: >-
             {% set ignored_domains = ['button', 'event', 'input_button', 'scene', 'stt', 'tts', 'zone'] %}
             {% set ignored_integrations = ['browser_mod', 'demo', 'group', 'mobile_app', 'private_ble_device'] %}
@@ -48,9 +52,10 @@ template:
             {% for integration in ignored_integrations %}
               {% set ignored_integration_entities.entities = ignored_integration_entities.entities + integration_entities(integration) %}
             {% endfor %}
+            {% set current_entity = this.entity_id if (this is defined and this and this.entity_id is defined) else 'binary_sensor.unavailable_devices' %}
             {% set candidates = states
               | selectattr('state', 'eq', 'unavailable')
-              | rejectattr('entity_id', 'eq', this.entity_id)
+              | rejectattr('entity_id', 'eq', current_entity)
               | rejectattr('domain', 'in', ignored_domains)
               | rejectattr('entity_id', 'in', ignored_integration_entities.entities)
               | map(attribute='entity_id')
@@ -65,7 +70,7 @@ template:
             {{ ns.final }}
 ```
 
-_Sau khi lưu file, hãy **Khởi động lại (Restart)** Home Assistant để áp dụng._
+_Sau khi lưu file, hãy **Khởi động lại (Restart)** Home Assistant (hoặc reload Template Entities) để áp dụng._
 
 ## Bước 2: Tạo Thông báo Tự động (Automation)
 
@@ -83,14 +88,12 @@ triggers:
     attribute: entities
 conditions:
   - condition: template
-    value_template: "{{ trigger.from_state is not none and trigger.from_state.state not in ['unavailable', 'unknown'] }}"
-  - condition: template
     value_template: "{{ trigger.to_state is not none and trigger.to_state.state not in ['unavailable', 'unknown'] }}"
 actions:
   - variables:
       entities: "{{ state_attr(trigger.entity_id, 'entities') | default([], true) }}"
       devices: "{{ state_attr(trigger.entity_id, 'devices') | default([], true) }}"
-      notify_tag: "{{ 'tag_' ~ this.attributes.id }}"
+      notify_tag: "{{ 'tag_' ~ (this.attributes.id | default(this.entity_id.split('.')[1] | default('unavailable_devices', true), true)) }}"
   - if:
       - condition: template
         value_template: "{{ entities | length > 0 }}"
@@ -129,19 +132,17 @@ triggers:
     attribute: entities
 conditions:
   - condition: template
-    value_template: "{{ trigger.from_state is not none and trigger.from_state.state not in ['unavailable', 'unknown'] }}"
-  - condition: template
     value_template: "{{ trigger.to_state is not none and trigger.to_state.state not in ['unavailable', 'unknown'] }}"
 actions:
   - variables:
       entities: "{{ state_attr(trigger.entity_id, 'entities') | default([], true) }}"
       devices: "{{ state_attr(trigger.entity_id, 'devices') | default([], true) }}"
-      notify_tag: "{{ 'tag_' ~ this.attributes.id }}"
+      notify_tag: "{{ 'tag_' ~ (this.attributes.id | default(this.entity_id.split('.')[1] | default('unavailable_devices_mobile', true), true)) }}"
   - if:
       - condition: template
         value_template: "{{ entities | length > 0 }}"
     then:
-      - action: notify.mobile_app_iphone # Thay bằng tên điện thoại của bạn
+      - action: notify.mobile_app_iphone # Thay bằng action thông báo điện thoại của bạn (ví dụ notify.mobile_app_<tên_máy>)
         data:
           title: "Mất kết nối thiết bị"
           message: >-
@@ -150,7 +151,7 @@ actions:
             tag: "{{ notify_tag }}"
             url: /lovelace/system # (Tùy chọn) Đường dẫn đến dashboard hệ thống của bạn
     else:
-      - action: notify.mobile_app_iphone # Thay bằng tên điện thoại của bạn
+      - action: notify.mobile_app_iphone # Thay bằng action thông báo điện thoại của bạn
         data:
           message: clear_notification
           data:

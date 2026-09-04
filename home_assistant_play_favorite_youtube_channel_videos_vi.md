@@ -11,9 +11,10 @@ Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát
 
 ### Hạn chế
 
-- Không hỗ trợ tìm kiếm các video cũ từ một kênh.
-- Không hỗ trợ tìm kiếm một video bất kỳ trong toàn bộ YouTube (chỉ tìm video mới nhất của kênh đã theo dõi).
-- Yêu cầu cần có một Smart TV hoặc thiết bị phát hỗ trợ tích hợp vào Home Assistant và đã cài đặt ứng dụng YouTube chính thức.
+- Tập trung vào việc theo dõi các video mới nhất qua RSS feed của kênh (hoàn toàn miễn phí, không tiêu tốn hạn ngạch API Google Cloud).
+- Không tìm kiếm các video cũ trong quá khứ hoặc một video bất kỳ trong toàn bộ YouTube.
+  - _Mẹo:_ Nếu bạn muốn tìm kiếm và phát _bất kỳ_ video nào trên toàn bộ YouTube bằng từ khóa tùy ý, hãy sử dụng blueprint đồng hành **[advanced_youtube_search_full_llm.yaml](README_vi.md#voice-assist---tìm-kiếm--phát-youtube)**.
+- Yêu cầu cần có một Smart TV hoặc thiết bị phát hỗ trợ tích hợp vào Home Assistant (Chromecast, Android TV, Google TV, Apple TV, Roku) và đã cài đặt ứng dụng YouTube chính thức.
 
 ![image](images/20250528_210348.jpg)
 
@@ -128,7 +129,7 @@ template:
           entities: "{{ response.stdout }}"
 ```
 
-- Sau khi thêm xong, **khởi động lại** Home Assistant.
+- Sau khi thêm xong, **khởi động lại** Home Assistant (hoặc reload cấu hình YAML).
 - **Lưu ý:** Mỗi khi bạn thay đổi Alias, bạn cần **reload template entities** (từ Developer Tools > YAML) hoặc khởi động lại HA để cập nhật.
 
 ## Bước 2: Thêm Kịch bản (Script) cho Assist
@@ -143,8 +144,9 @@ Blueprint này giúp Assist lấy thông tin video mới nhất từ kênh YouTu
   1. Import blueprint.
   2. Tạo một **Script** mới từ blueprint này.
   3. Chỉ định Template Sensor (`sensor.assist_entity_ids_and_aliases`) đã tạo ở bước 1.5.
-  4. **Quan trọng:** Giữ nguyên tên Script mặc định.
-  5. Sau khi tạo xong, **Expose** script đó cho Voice Assist.
+  4. **Quan trọng:** Giữ nguyên tên Script mặc định (`Get YouTube Video Info`).
+  5. **Khôi phục mô tả chuẩn cho LLM (Bước cực kỳ quan trọng):** Sau khi lưu script, bấm vào dấu ba chấm (`⋮`) ở góc trên bên phải, chọn **Edit in YAML**, xóa bỏ dòng `description: ...` rồi bấm **Save Script**.
+  6. Sau khi tạo xong, **Expose** script đó cho Voice Assist.
 
 ### 2.2. Cài đặt Blueprint Play Video
 
@@ -157,8 +159,9 @@ Blueprint này có nhiệm vụ phát video đã tìm được lên thiết bị
   2. Tạo một **Script** mới từ blueprint này.
   3. Chỉ định Template Sensor (`sensor.assist_entity_ids_and_aliases`) đã tạo ở bước 1.5.
   4. Chọn một Smart TV **Mặc định** để phát video (Assist sẽ dùng thiết bị này nếu bạn không chỉ định thiết bị trong câu lệnh).
-  5. **Quan trọng:** Giữ nguyên tên Script mặc định.
-  6. Sau khi tạo xong, **Expose** script đó cho Voice Assist.
+  5. **Quan trọng:** Giữ nguyên tên Script mặc định (`Play YouTube Video`).
+  6. **Khôi phục mô tả chuẩn cho LLM (Bước cực kỳ quan trọng):** Sau khi lưu script, bấm vào dấu ba chấm (`⋮`) ở góc trên bên phải, chọn **Edit in YAML**, xóa bỏ dòng `description: ...` rồi bấm **Save Script**.
+  7. Sau khi tạo xong, **Expose** script đó cho Voice Assist.
 
 ## 3. Ví dụ lệnh thoại
 

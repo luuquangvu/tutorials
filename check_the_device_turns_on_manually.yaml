@@ -5,7 +5,17 @@ blueprint:
   description: |-
     # Verify whether the device activated manually or via automation/application
 
-    - Prevents false triggers when device comes back from unavailable/unknown state.
+    Identifies whether a device was turned on physically by a human (e.g., pressing a physical wall switch) versus triggered programmatically by an automation, script, or user in the Home Assistant app/dashboard.
+
+    ### Key Features:
+    - **Physical Activation Detection:** Uses Home Assistant event context (`parent_id` and `user_id`) to reliably differentiate physical button presses from software-initiated commands.
+    - **State Synchronization:** Updates an `input_boolean` helper entity (`on` when turned on manually/physically, `off` when turned off or triggered programmatically).
+    - **Fail-Safe Filtering:** Restricts state transitions strictly between `on` and `off`, preventing false activations when devices recover or reboot from `unavailable` or `unknown` states.
+
+    ### Requirements:
+    - A target switch or light entity (`switch` or `light`).
+    - An `input_boolean` helper entity to reflect the manual activation state.
+    - Requires Home Assistant 2024.12.0 or newer.
   domain: automation
   homeassistant:
     min_version: 2024.12.0

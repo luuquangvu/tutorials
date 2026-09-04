@@ -32,7 +32,7 @@ blueprint:
 
     ### Required
 
-    - The `devices_schedules.yaml` and `devices_schedules_restart_handler.yaml` blueprints needs to be installed.
+    - The `devices_schedules.yaml` and `devices_schedules_restart_handler.yaml` blueprints need to be installed.
     - The mentioned file(s) is/are included in the repository.
     - A template sensor stores all information about entity aliases needs to be configured in `config/configuration.yaml`; The sensor is required for friendly-name lookup.
 

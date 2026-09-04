@@ -9,7 +9,7 @@ blueprint:
 
     ### Required
 
-    - Check out the guide for further details.
+    - Check out the guide `home_assistant_play_favorite_youtube_channel_videos_en.md` for further details.
     - The Feedparser integration needs to be installed from HACS.
     - Expose YouTube Channel entities after created to Assist.
     - Consider adding entity aliases to make them easier to remember if needed.

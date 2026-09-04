@@ -11,9 +11,10 @@ This guide allows you to use Home Assistant Voice to play the latest videos from
 
 ### Limitations
 
-- Does not support searching for old videos from a channel.
-- Does not support searching for arbitrary videos across all of YouTube (only searches the latest video of followed channels).
-- Requires a supported Smart TV or streaming device integrated into Home Assistant with the official YouTube app installed.
+- Focuses on tracking latest video uploads via channel RSS feeds (100% free, no Google Cloud API key or quota required).
+- Does not search for older back-catalog videos or arbitrary videos across all of YouTube.
+  - _Tip:_ If you want to search and play _any_ video across the entire YouTube catalog by keywords, use the companion blueprint **[advanced_youtube_search_full_llm.yaml](README.md#voice-assist---youtube-search--playback)** instead.
+- Requires a supported Smart TV or streaming device integrated into Home Assistant (Chromecast, Android TV, Google TV, Apple TV, Roku) with the official YouTube app installed.
 
 ![image](images/20250528_210348.jpg)
 
@@ -128,7 +129,7 @@ template:
           entities: "{{ response.stdout }}"
 ```
 
-- After adding, **restart** Home Assistant.
+- After adding, **restart** Home Assistant (or reload YAML configurations).
 - **Note:** Whenever you change an Alias, you must **reload template entities** (from Developer Tools > YAML) or restart HA to update.
 
 ## Step 2: Add Scripts for Assist
@@ -143,8 +144,9 @@ This blueprint helps Assist fetch the latest video info from the requested YouTu
   1. Import the blueprint.
   2. Create a new **Script** from this blueprint.
   3. Select the Template Sensor (`sensor.assist_entity_ids_and_aliases`) created in step 1.5.
-  4. **Important:** Keep the default Script name.
-  5. After creating, **Expose** that script to Voice Assist.
+  4. **Important:** Keep the default Script name (`Get YouTube Video Info`).
+  5. **Restore LLM Description (Crucial Step):** After saving, click the three dots (`⋮`) in the top-right corner, select **Edit in YAML**, delete the `description: ...` line, and click **Save Script**.
+  6. After creating, **Expose** that script to Voice Assist.
 
 ### 2.2. Install "Play Video" Blueprint
 
@@ -157,8 +159,9 @@ This blueprint is responsible for playing the found video on your media player d
   2. Create a new **Script** from this blueprint.
   3. Select the Template Sensor (`sensor.assist_entity_ids_and_aliases`) created in step 1.5.
   4. Select a **Default** Smart TV to play the video on (Assist will use this if you don't specify a device).
-  5. **Important:** Keep the default Script name.
-  6. After creating, **Expose** that script to Voice Assist.
+  5. **Important:** Keep the default Script name (`Play YouTube Video`).
+  6. **Restore LLM Description (Crucial Step):** After saving, click the three dots (`⋮`) in the top-right corner, select **Edit in YAML**, delete the `description: ...` line, and click **Save Script**.
+  7. After creating, **Expose** that script to Voice Assist.
 
 ## 3. Example Voice Commands
 
