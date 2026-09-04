@@ -12,6 +12,11 @@ blueprint:
     - **No-Op Turn On / Auto-Off Only:** Option to disable turning on devices on activation (turning on becomes a no-op, only resetting active timers). Perfect for spaces where lights or devices are turned on manually and only auto-turn off.
     - **Timer Reset:** Automatically cancels active timer if the entity turns on again while the target device is on.
     - **Graceful Turn Off:** Starts the timer when the entity turns off (with optional timer start conditions, e.g. only start if target devices are on) and turns off devices after the timer finishes (with optional turn-off conditions, e.g. manual override helpers).
+    - **Dynamic Timer Duration:**
+      - *Default:* Use the timer helper's configured default duration.
+      - *Dynamic / Active Runtime Proportional:* Calculate timer duration dynamically based on how long the trigger entity was active (e.g. exhaust fan runs after kitchen hood or shower for 50% or 100% of runtime), with configurable multiplier, minimum, and maximum limits. Supports optional `input_datetime` helper to persist start times across Home Assistant restarts.
+      - *Fixed Duration:* Specify a custom duration override directly in the blueprint.
+      - *From Helper Entity:* Read the timer duration dynamically from an `input_number`, `number`, or `sensor` helper entity.
     - **Global Conditions:** Gate the entire automation from triggering (e.g. alarm system status).
     - **Extensible Action Sequences (If-Then-Else):**
       - *Additional Actions on Turn On:* Optional custom actions that run when the entity turns on, supporting conditional if-then-else branching (e.g. secondary fan controls or scenes).
@@ -53,6 +58,95 @@ blueprint:
         entity:
           filter:
             domain: timer
+    timer_duration_mode:
+      name: Timer Duration Mode
+      description: |-
+        How the timer duration is determined when starting the timer:
+        - Timer Helper Default: Use the duration pre-configured on the timer helper entity.
+        - Dynamic (Active Runtime Proportional): Dynamically set duration based on how long the trigger entity was active ('on'), with configurable multiplier, minimum, and maximum limits (e.g. run fan after kitchen hood or shower).
+        - Fixed Duration: Override with a fixed custom duration.
+        - From Helper Entity: Read duration dynamically from an input_number, number, or sensor helper entity.
+      default: default
+      selector:
+        select:
+          options:
+            - label: Timer Helper Default
+              value: default
+            - label: Dynamic (Proportional to Active Runtime)
+              value: dynamic
+            - label: Fixed Duration
+              value: fixed
+            - label: From Helper Entity
+              value: entity
+    dynamic_timer_multiplier:
+      name: Dynamic Timer Multiplier (Optional)
+      description: Multiplier factor applied to the trigger entity's active runtime when in Dynamic mode. E.g. 0.5 runs the timer for half the time the entity was on, 1.0 runs for the exact same duration, and 2.0 runs for double the duration.
+      default: 1.0
+      selector:
+        number:
+          min: 0.05
+          max: 10.0
+          step: 0.05
+          mode: box
+    dynamic_timer_min:
+      name: Dynamic Timer Minimum Duration (Optional)
+      description: Minimum duration in seconds the timer will run in Dynamic mode (e.g. 180 for 3 minutes). Set to 0 for no minimum limit (defaults to at least 1 second).
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    dynamic_timer_max:
+      name: Dynamic Timer Maximum Duration (Optional)
+      description: Maximum duration in seconds the timer will run in Dynamic mode (e.g. 1800 for 30 minutes). Set to 0 for no maximum limit.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 86400
+          step: 1
+          unit_of_measurement: s
+          mode: box
+    dynamic_timer_start_time_helper:
+      name: Dynamic Timer Start Time Helper (Optional)
+      description: Optional input_datetime helper entity used to store the activation timestamp when the trigger entity turns on. Highly recommended if you want the start time to survive Home Assistant restarts or reloads while the trigger entity is on. If left empty, Home Assistant's previous state timestamp (trigger.from_state.last_changed) is used automatically.
+      default: ""
+      selector:
+        entity:
+          filter:
+            domain: input_datetime
+    fixed_timer_duration:
+      name: Fixed Timer Duration (Optional)
+      description: Custom duration used when Timer Duration Mode is set to 'Fixed Duration'.
+      default: "00:05:00"
+      selector:
+        duration:
+          enable_day: false
+    timer_duration_entity:
+      name: Timer Duration Entity (Optional)
+      description: Helper entity (input_number, number, or sensor) that specifies the duration when Timer Duration Mode is set to 'From Helper Entity'.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_number
+                - number
+                - sensor
+    timer_duration_entity_unit:
+      name: Timer Duration Entity Unit
+      description: Time unit of the numeric value provided by the Timer Duration Entity.
+      default: seconds
+      selector:
+        select:
+          options:
+            - label: Seconds
+              value: seconds
+            - label: Minutes
+              value: minutes
     enable_turn_on:
       name: Enable Turn On
       description: Turn on the target device when the trigger entity turns on. If disabled, turning on only cancels active timers (no-op for turning on), allowing auto-off-only automations.
@@ -65,7 +159,7 @@ blueprint:
       default: true
       selector:
         boolean: {}
-    flexible_conditions:
+    global_conditions:
       name: Global Conditions (Optional)
       description: Optional conditions that must be met for the automation to run at all (e.g. alarm is disarmed).
       default: []
@@ -146,11 +240,19 @@ blueprint:
 mode: queued
 max: 10
 variables:
-  version: 20260903
+  version: 20260904
   target_device: !input target_device
   has_target: "{{ target_device is mapping and (target_device.values() | select | list | length > 0) }}"
   enable_turn_on: !input enable_turn_on
   enable_turn_off: !input enable_turn_off
+  timer_duration_mode: !input timer_duration_mode
+  dynamic_timer_multiplier: !input dynamic_timer_multiplier
+  dynamic_timer_min: !input dynamic_timer_min
+  dynamic_timer_max: !input dynamic_timer_max
+  dynamic_timer_start_time_helper: !input dynamic_timer_start_time_helper
+  fixed_timer_duration: !input fixed_timer_duration
+  timer_duration_entity: !input timer_duration_entity
+  timer_duration_entity_unit: !input timer_duration_entity_unit
   target_turn_on_conditions: !input target_turn_on_conditions
   timer_start_conditions: !input timer_start_conditions
   target_turn_off_conditions: !input target_turn_off_conditions
@@ -177,7 +279,7 @@ triggers:
     event_data:
       entity_id: !input timer_entity
     id: timer_finished
-conditions: !input flexible_conditions
+conditions: !input global_conditions
 actions:
   - choose:
       - conditions:
@@ -185,6 +287,15 @@ actions:
             id:
               - entity_turned_on
         sequence:
+          - if:
+              - condition: template
+                value_template: "{{ dynamic_timer_start_time_helper is string and dynamic_timer_start_time_helper | length > 0 }}"
+            then:
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: "{{ dynamic_timer_start_time_helper }}"
+                data:
+                  timestamp: "{{ now().timestamp() }}"
           - if:
               - condition: state
                 entity_id: !input timer_entity
@@ -226,19 +337,95 @@ actions:
             id:
               - entity_turned_off
         sequence:
+          - variables:
+              calculated_timer_duration: >-
+                {% if timer_duration_mode == 'dynamic' %}
+                  {% set helper = dynamic_timer_start_time_helper %}
+                  {% if helper is string and helper | length > 0 %}
+                    {% set helper_ts = state_attr(helper, 'timestamp') %}
+                    {% if helper_ts is none %}
+                      {% set helper_ts = as_timestamp(states(helper), none) %}
+                    {% endif %}
+                    {% set start_ts = helper_ts %}
+                  {% else %}
+                    {% set start_ts = as_timestamp(trigger.from_state.last_changed) if trigger is defined and trigger.from_state is defined and trigger.from_state.last_changed is defined else none %}
+                  {% endif %}
+                  {% if start_ts is none or start_ts <= 0 %}
+                    {% set active_seconds = 0 %}
+                  {% else %}
+                    {% set active_seconds = (as_timestamp(now()) - (start_ts | float(as_timestamp(now())))) | int(0) %}
+                    {% set active_seconds = [0, active_seconds] | max %}
+                  {% endif %}
+                  {% set raw_duration = (active_seconds * (dynamic_timer_multiplier | float(1.0))) | round | int %}
+                  {% set min_dur = dynamic_timer_min | int(0) %}
+                  {% set max_dur = dynamic_timer_max | int(0) %}
+                  {% set bounded = raw_duration %}
+                  {% if min_dur > 0 and bounded < min_dur %}
+                    {% set bounded = min_dur %}
+                  {% endif %}
+                  {% if max_dur > 0 and bounded > max_dur %}
+                    {% set bounded = max_dur %}
+                  {% endif %}
+                  {{ [1, bounded] | max }}
+                {% elif timer_duration_mode == 'fixed' %}
+                  {% if fixed_timer_duration is mapping %}
+                    {% set h = fixed_timer_duration.get('hours', 0) | int(0) %}
+                    {% set m = fixed_timer_duration.get('minutes', 0) | int(0) %}
+                    {% set s = fixed_timer_duration.get('seconds', 0) | int(0) %}
+                    {{ [1, (h * 3600 + m * 60 + s)] | max }}
+                  {% elif fixed_timer_duration is number %}
+                    {{ [1, fixed_timer_duration | int] | max }}
+                  {% else %}
+                    {{ fixed_timer_duration }}
+                  {% endif %}
+                {% elif timer_duration_mode == 'entity' %}
+                  {% if timer_duration_entity is string and timer_duration_entity | length > 0 %}
+                    {% set entity_val = states(timer_duration_entity) | float(0) %}
+                    {% if timer_duration_entity_unit == 'minutes' %}
+                      {% set entity_secs = (entity_val * 60) | round | int %}
+                    {% else %}
+                      {% set entity_secs = entity_val | round | int %}
+                    {% endif %}
+                    {{ [1, entity_secs] | max }}
+                  {% else %}
+                    60
+                  {% endif %}
+                {% else %}
+                  0
+                {% endif %}
           - if:
               - condition: template
                 value_template: "{{ timer_start_conditions | length == 0 }}"
             then:
-              - action: timer.start
-                target:
-                  entity_id: !input timer_entity
-            else:
-              - if: !input timer_start_conditions
+              - if:
+                  - condition: template
+                    value_template: "{{ timer_duration_mode == 'default' }}"
                 then:
                   - action: timer.start
                     target:
                       entity_id: !input timer_entity
+                else:
+                  - action: timer.start
+                    target:
+                      entity_id: !input timer_entity
+                    data:
+                      duration: "{{ calculated_timer_duration }}"
+            else:
+              - if: !input timer_start_conditions
+                then:
+                  - if:
+                      - condition: template
+                        value_template: "{{ timer_duration_mode == 'default' }}"
+                    then:
+                      - action: timer.start
+                        target:
+                          entity_id: !input timer_entity
+                    else:
+                      - action: timer.start
+                        target:
+                          entity_id: !input timer_entity
+                        data:
+                          duration: "{{ calculated_timer_duration }}"
           - if:
               - condition: template
                 value_template: "{{ extra_entity_off_conditions | length == 0 }}"
