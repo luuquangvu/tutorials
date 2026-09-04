@@ -268,10 +268,12 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input trigger_entity
+    from: "off"
     to: "on"
     id: entity_turned_on
   - trigger: state
     entity_id: !input trigger_entity
+    from: "on"
     to: "off"
     id: entity_turned_off
   - trigger: event
