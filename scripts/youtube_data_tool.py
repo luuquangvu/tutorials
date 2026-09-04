@@ -1,3 +1,5 @@
+"""YouTube Data API tools for searching videos, playlists, and channels in Home Assistant."""
+
 import asyncio
 from typing import Any
 
@@ -98,6 +100,17 @@ async def youtube_search_tool(query: str, **kwargs) -> dict[str, Any]:
         return {"error": "Missing a required argument: query"}
 
     def _coerce_results(value: Any) -> int:
+        """Coerce and validate the requested search results count.
+
+        Args:
+            value: Raw results limit from service call parameters.
+
+        Returns:
+            Validated integer count between 1 and 50.
+
+        Raises:
+            ValueError: If the value cannot be coerced to an integer or is out of range.
+        """
         try:
             coerced = int(value)
         except (TypeError, ValueError) as err:
@@ -107,6 +120,17 @@ async def youtube_search_tool(query: str, **kwargs) -> dict[str, Any]:
         return coerced
 
     def _coerce_search_types(value: Any) -> list[str]:
+        """Normalize and filter requested search types.
+
+        Args:
+            value: Search type string, list, tuple, or set of types.
+
+        Returns:
+            List of valid lowercase search types (video, channel, playlist).
+
+        Raises:
+            ValueError: If the value is not a supported string or sequence.
+        """
         valid_types = {"video", "channel", "playlist"}
         if value is None:
             items: list[str] = []

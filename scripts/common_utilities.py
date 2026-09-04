@@ -1,3 +1,5 @@
+"""Common cache and locking utilities for Home Assistant Pyscript automations."""
+
 import asyncio
 import sqlite3
 import threading
@@ -22,12 +24,15 @@ _INDEX_LOCKS_GUARD = threading.Lock()
 
 
 class _IndexLockContext:
+    """Async context manager for acquiring named index locks safely."""
+
     key: str
     lock: asyncio.Lock | None
 
     # Pyscript handles __init__ specially; initialize these attributes in the factory below.
     @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
     async def __aenter__(self):
+        """Acquire the index lock asynchronously."""
         key = self.key
         with _INDEX_LOCKS_GUARD:
             if key not in _INDEX_LOCKS:
@@ -41,6 +46,7 @@ class _IndexLockContext:
 
     @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Release the index lock and clean up unused locks."""
         if self.lock:
             self.lock.release()
 
@@ -54,6 +60,7 @@ class _IndexLockContext:
 
 
 def _acquire_index_lock(key: str):
+    """Create a context manager for acquiring a named index lock."""
     context = _IndexLockContext()
     context.key = key
     context.lock = None
@@ -475,6 +482,14 @@ async def memory_cache_index_update(
         }
 
     def _normalize(_value: Any) -> list[str]:
+        """Normalize input value into a list of non-empty strings.
+
+        Args:
+            _value: Input data which may be a primitive, list, tuple, or set.
+
+        Returns:
+            List of stripped strings extracted from the input value.
+        """
         if _value is None:
             return []
         if isinstance(_value, (str, int, float, bool)):

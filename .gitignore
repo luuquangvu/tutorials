@@ -1,6 +1,7 @@
-.env
 .venv/
 .vscode/
 __pycache__/
 .ruff_cache/
+node_modules/
 uv.lock
+package-lock.json
