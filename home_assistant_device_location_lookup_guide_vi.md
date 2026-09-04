@@ -17,8 +17,8 @@
 
 ## Yêu cầu trước khi cài đặt
 
-- **Bermuda BLE Trilateration:** (Khuyên dùng) Cài đặt qua HACS để có khả năng định vị chính xác theo từng phòng.
-- **Home Assistant Companion App:** Cài trên điện thoại/máy tính bảng để sử dụng tính năng đổ chuông.
+- **Bermuda BLE Trilateration:** (Khuyên dùng) Cài đặt qua HACS để có khả năng định vị chính xác theo từng phòng. Hãy đảm bảo các Bluetooth proxy hoặc scanner (ESPHome, Shelly...) đã được gán vào đúng các **Khu vực (Areas)** tương ứng trong Home Assistant để Bermuda có thể xác định tên phòng.
+- **Home Assistant Companion App:** Cài trên điện thoại/máy tính bảng để sử dụng tính năng đổ chuông (cần cấp quyền thông báo và thông báo khẩn cấp/critical alerts trên iOS).
 
 ## Hướng dẫn Cài đặt
 
@@ -32,9 +32,9 @@
 Nếu điện thoại của bạn có cả tracker từ Mobile App và Bermuda:
 
 1. **Chỉ expose tracker của Bermuda** cho Voice Assist (để định vị phòng chính xác hơn).
-2. **Đổi tên thiết bị Bermuda** trùng với tên thiết bị Mobile App.
-   - _Ví dụ:_ Nếu Mobile App tên là `Pixel 9`, hãy đổi tên thiết bị Bermuda thành `Pixel 9` (hoặc `Pixel 9 BLE`).
-   - _Tại sao?_ Việc này giúp liên kết vị trí chính xác từ Bermuda với khả năng "Đổ chuông" của Mobile App.
+2. **Đảm bảo tên thiết bị / entity ID của Bermuda trùng hoặc chứa tên thiết bị Mobile App**:
+   - _Ví dụ:_ Nếu thực thể tracker của Mobile App là `device_tracker.pixel_9`, bạn đặt tên thiết bị Bermuda là `Pixel 9` hoặc `Pixel 9 BLE` (tạo ra `device_tracker.pixel_9_ble`). Blueprint sẽ tự động phát hiện `pixel_9` khớp với thiết bị di động của bạn.
+   - _Tại sao?_ Việc này giúp liên kết vị trí phòng chính xác từ Bermuda với action đổ chuông `notify.mobile_app_pixel_9` của Mobile App.
 
 ### Bước 2: Tạo Shell Command lấy Alias
 
@@ -72,7 +72,7 @@ template:
 
 **Sau khi thêm mã:**
 
-1. **Khởi động lại (Restart)** Home Assistant.
+1. **Khởi động lại (Restart)** Home Assistant (hoặc reload YAML cấu hình).
 2. **Lưu ý:** Nếu sau này bạn thêm hoặc sửa Alias, hãy nhớ reload Template entities (Developer Tools > YAML > Template Entities) hoặc khởi động lại HA.
 
 ### Bước 4: Cài đặt Blueprints
@@ -86,8 +86,9 @@ Blueprint này xử lý logic để xác định vị trí thiết bị.
 1. Import blueprint.
 2. Tạo một **Script** từ blueprint này.
 3. Trong cấu hình script, chọn **Template Sensor** (`sensor.assist_entity_ids_and_aliases`) đã tạo ở Bước 3.
-4. **Giữ nguyên tên script mặc định** (hoặc đặt tên dễ hiểu để LLM nhận diện).
-5. **Expose** script này cho Voice Assist.
+4. **Giữ nguyên tên script mặc định** (`Find Device`).
+5. **Khôi phục mô tả chuẩn cho LLM (Bước cực kỳ quan trọng):** Sau khi lưu script, bấm vào dấu ba chấm (`⋮`) ở góc trên bên phải, chọn **Edit in YAML**, xóa bỏ dòng `description: ...` rồi bấm **Save Script**. Thao tác này giúp script lấy lại phần mô tả gốc của blueprint, giúp LLM hiểu chính xác mục đích sử dụng kịch bản.
+6. **Expose** script này cho Voice Assist.
 
 #### 2. Blueprint Đổ chuông (Ringing)
 
@@ -97,8 +98,9 @@ Blueprint này cho phép Voice Assist kích hoạt thiết bị đổ chuông.
 
 1. Import blueprint.
 2. Tạo một **Script** từ blueprint này.
-3. **Giữ nguyên tên script mặc định**.
-4. **Expose** script này cho Voice Assist.
+3. **Giữ nguyên tên script mặc định** (`Ring Device`).
+4. **Khôi phục mô tả chuẩn cho LLM (Bước cực kỳ quan trọng):** Sau khi lưu script, bấm vào dấu ba chấm (`⋮`) ở góc trên bên phải, chọn **Edit in YAML**, xóa bỏ dòng `description: ...` rồi bấm **Save Script**.
+5. **Expose** script này cho Voice Assist.
 
 ## Ví dụ sử dụng
 

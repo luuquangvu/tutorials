@@ -83,8 +83,7 @@ def sun_longitude(jdn: float) -> float:
     dl += (0.019993 - 0.000101 * t) * math.sin(dr * 2 * m) + 0.000290 * math.sin(dr * 3 * m)
     longitude = l0 + dl
     longitude = longitude * dr
-    longitude = longitude - math.pi * 2 * (int(longitude / (math.pi * 2)))
-    return longitude
+    return longitude - math.pi * 2 * (int(longitude / (math.pi * 2)))
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -185,7 +184,7 @@ def lunar_to_solar(
             leap_month += 12
         if lunar_leap != 0 and lunar_month != leap_month:
             return [0, 0, 0]
-        elif lunar_leap != 0 or off >= leap_off:
+        if lunar_leap != 0 or off >= leap_off:
             off += 1
     month_start = get_new_moon_day(k + off, time_zone)
     return jd_to_date(month_start + lunar_day - 1)
@@ -965,9 +964,9 @@ def get_auspicious_day(lunar_month: int, jd: int) -> dict[str, Any]:
 
     if AUSPICIOUS_DAY_STATUS[offset] == "T":
         return {"day_type": "hoang_dao", "name": "Ngày Hoàng Đạo"}
-    elif AUSPICIOUS_DAY_STATUS[offset] == "X":
+    if AUSPICIOUS_DAY_STATUS[offset] == "X":
         return {"day_type": "hac_dao", "name": "Ngày Hắc Đạo"}
-    elif AUSPICIOUS_DAY_STATUS[offset] == "B":
+    if AUSPICIOUS_DAY_STATUS[offset] == "B":
         return {
             "day_type": "neutral",
             "name": "Ngày trung bình (Không tốt không xấu)",

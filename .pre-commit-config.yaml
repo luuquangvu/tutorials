@@ -1,0 +1,44 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Run Ruff Check
+        entry: uv run ruff check --fix
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ruff-format
+        name: Run Ruff Format
+        entry: uv run ruff format
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: ty-check
+        name: Run Ty Check
+        entry: uv run ty check
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: interrogate
+        name: Run Interrogate
+        entry: uv run interrogate
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: prettier
+        name: Run Prettier
+        entry: npx prettier --write .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: blueprints-check
+        name: Run Blueprints Check
+        entry: uv run tools/validate_blueprints.py
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -16,8 +16,8 @@ blueprint:
     ### Required
 
     - The Pyscript integration needs to be installed through HACS and properly configured.
-    - The `scripts/common_utilities.py` script need to be copied into the `config/pyscript` folder.
-    - This blueprint is a dependency for the `devices_schedules_full_llm.yaml` and the `devices_schedules_restart_handler.yaml` blueprints.
+    - The `scripts/common_utilities.py` script needs to be copied into the `config/pyscript` folder.
+    - This blueprint is a dependency for the `devices_schedules_controller_full_llm.yaml` and the `devices_schedules_restart_handler.yaml` blueprints.
     - The mentioned file(s) is/are included in the repository.
     - You need to enable two Pyscript options through the UI or via YAML to allow importing all Python packages and to make hass available as a global variable.
 

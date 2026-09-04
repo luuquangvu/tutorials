@@ -1,3 +1,5 @@
+"""Persistent memory and semantic retrieval engine for Home Assistant Pyscript automations."""
+
 import asyncio
 import re
 import sqlite3
@@ -245,8 +247,7 @@ def _normalize_key(s: str) -> str:
     s = s.strip().lower()
     s = _strip_diacritics(s)
     s = re.sub(r"[^a-z0-9_]", "_", s)
-    s = re.sub(r"_+", "_", s).strip("_")
-    return s
+    return re.sub(r"_+", "_", s).strip("_")
 
 
 def _condense_candidate_for_selection(entry: dict[str, Any], *, score: float | None = None) -> dict[str, Any]:

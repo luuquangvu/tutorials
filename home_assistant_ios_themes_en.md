@@ -14,11 +14,8 @@ This guide helps you install a beautiful set of iOS themes, automatically switch
 
 ### Install via HACS
 
-1. Go to **HACS** > **Frontend**.
-2. Search for and install **iOS Themes** ([basnijholt/lovelace-ios-themes](https://github.com/basnijholt/lovelace-ios-themes)).
-3. Go to **HACS** > **Integrations**.
-4. Search for and install **Spook** ([frenck/spook](https://github.com/frenck/spook)).
-   - _Note:_ Spook provides the `input_select.random` feature required for this guide.
+1. In Home Assistant, open **HACS**.
+2. Search for and download **iOS Themes** ([basnijholt/lovelace-ios-themes](https://github.com/basnijholt/lovelace-ios-themes)).
 
 ## 2. Configure Local Backgrounds
 
@@ -102,9 +99,11 @@ actions:
       - action: input_boolean.turn_{{ 'on' if trigger.event == 'sunset' else 'off' }}
         target:
           entity_id: input_boolean.ios_themes_dark_mode
-      - action: input_select.random
+      - action: input_select.select_option
         target:
           entity_id: input_select.ios_themes
+        data:
+          option: "{{ state_attr('input_select.ios_themes', 'options') | random }}"
       - stop: Settings updated. Waiting for re-trigger to apply theme.
   - delay: "00:00:01"
   - action: frontend.set_theme
@@ -118,9 +117,11 @@ actions:
 mode: restart
 ```
 
+_Note: If you have Spook installed, you can also use `action: input_select.random` instead of `input_select.select_option`._
+
 ## 4. Activate Theme on Your Device
 
-**Most Important Step:** For the automation to change your interface, you must select **Use default theme** mode in your user settings.
+**Most Important Step:** For the automation to change your interface, you must select **Backend-selected** (or **Use default theme**) mode in your user settings.
 
-1. Click on the **User Profile** icon in the bottom-left corner of the sidebar.
-2. Under **Theme**, select **Use default theme**.
+1. Click on your **User Profile** icon in the bottom-left corner of the sidebar.
+2. Under **Theme**, select **Backend-selected** (or **Use default theme**).

@@ -1,3 +1,5 @@
+"""Telegram Bot integration tools and service handlers for Home Assistant."""
+
 import asyncio
 import contextlib
 import mimetypes

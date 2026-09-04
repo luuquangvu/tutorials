@@ -14,11 +14,8 @@ Hướng dẫn này giúp bạn cài đặt bộ giao diện iOS đẹp mắt, t
 
 ### Cài đặt qua HACS
 
-1. Truy cập **HACS** > **Frontend**.
-2. Tìm kiếm và cài đặt **iOS Themes** ([basnijholt/lovelace-ios-themes](https://github.com/basnijholt/lovelace-ios-themes)).
-3. Truy cập **HACS** > **Integrations**.
-4. Tìm kiếm và cài đặt **Spook** ([frenck/spook](https://github.com/frenck/spook)).
-   - _Lưu ý:_ Spook cung cấp tính năng `input_select.random` cần thiết cho hướng dẫn này.
+1. Trong Home Assistant, mở **HACS**.
+2. Tìm kiếm và tải về **iOS Themes** ([basnijholt/lovelace-ios-themes](https://github.com/basnijholt/lovelace-ios-themes)).
 
 ## 2. Cấu hình hình nền cục bộ (Local Backgrounds)
 
@@ -102,9 +99,11 @@ actions:
       - action: input_boolean.turn_{{ 'on' if trigger.event == 'sunset' else 'off' }}
         target:
           entity_id: input_boolean.ios_themes_dark_mode
-      - action: input_select.random
+      - action: input_select.select_option
         target:
           entity_id: input_select.ios_themes
+        data:
+          option: "{{ state_attr('input_select.ios_themes', 'options') | random }}"
       - stop: Settings updated. Waiting for re-trigger to apply theme.
   - delay: "00:00:01"
   - action: frontend.set_theme
@@ -118,9 +117,11 @@ actions:
 mode: restart
 ```
 
+_Lưu ý: Nếu bạn đã cài đặt Spook, bạn cũng có thể sử dụng `action: input_select.random` thay cho `input_select.select_option`._
+
 ## 4. Kích hoạt Theme trên thiết bị
 
-**Bước quan trọng nhất:** Để automation có thể thay đổi giao diện của bạn, bạn phải chọn chế độ **Use default theme** trong cài đặt người dùng.
+**Bước quan trọng nhất:** Để automation có thể thay đổi giao diện của bạn, bạn phải chọn chế độ **Backend-selected** (hoặc **Use default theme**) trong cài đặt hồ sơ người dùng.
 
 1. Nhấn vào biểu tượng **Hồ sơ người dùng (User Profile)** ở góc dưới cùng bên trái thanh menu.
-2. Tại mục **Theme**, chọn **Use default theme**.
+2. Tại mục **Theme**, chọn **Backend-selected** (hoặc **Use default theme**).
