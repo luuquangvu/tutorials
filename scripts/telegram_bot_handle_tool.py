@@ -19,12 +19,25 @@ TOKEN = pyscript.config.get("telegram_bot_token")  # noqa: F821  # ty:ignore[unr
 if TOKEN:
     TOKEN = TOKEN.strip()
 
+if (
+    API_URL := pyscript.config.get("telegram_bot_api_url")  # noqa: F821  # ty:ignore[unresolved-reference]
+    or "https://api.telegram.org"
+):
+    API_URL = API_URL.strip().rstrip("/")
+
 _session: httpx.AsyncClient | None = None
 _session_lock = asyncio.Lock()
 
 
 if not TOKEN:
     raise ValueError("Telegram bot token is missing")
+
+
+def _clean_error(error: Exception | str) -> str:
+    """Sanitize error message to prevent leaking bot token."""
+    err_str = str(error)
+    return err_str.replace(TOKEN, "[REDACTED]") if TOKEN else err_str
+
 
 ACTIONS_CHAT: tuple[str, ...] = (
     "typing",
@@ -106,38 +119,63 @@ async def _ensure_dir(path: str) -> None:
     await asyncio.to_thread(os.makedirs, path, exist_ok=True)
 
 
-async def _get_file(client: httpx.AsyncClient, file_id: str) -> str | None:
+async def _get_file(client: httpx.AsyncClient, file_id: str) -> tuple[str | None, str | None]:
     """Resolve a Telegram file identifier to its server path."""
-    url = f"https://api.telegram.org/bot{TOKEN}/getFile"
-    payload = {"file_id": file_id}
+    url = f"{API_URL}/bot{TOKEN}/getFile"
+    payload = {"file_id": file_id.strip()}
     data = orjson.dumps(payload).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
-    resp.raise_for_status()
-    result = orjson.loads(resp.content)
-    return result.get("result", {}).get("file_path")
-
-
-async def _download_file(client: httpx.AsyncClient, file_id: str) -> tuple[str, None] | tuple[None, str]:
-    """Download a file from Telegram and save it locally."""
     try:
-        online_file_path = await _get_file(client, file_id)
+        result = orjson.loads(resp.content)
+    except Exception:
+        result = {}
+    if not resp.is_success or not result.get("ok"):
+        description = result.get("description") or resp.reason_phrase or f"HTTP {resp.status_code}"
+        if "file is too big" in description.lower():
+            return (
+                None,
+                f"File size exceeds Telegram Bot API 20MB download limit for public servers ({description}). "
+                "To download files up to 2GB, configure a local Telegram Bot API server via 'telegram_bot_api_url'.",
+            )
+        return None, f"Telegram API error ({resp.status_code}): {description}"
+    if file_path := result.get("result", {}).get("file_path"):
+        return file_path, None
+    return None, "Unable to retrieve the file_path from Telegram."
+
+
+async def _download_file(
+    client: httpx.AsyncClient,
+    file_id: str,
+    file_name: str | None = None,
+) -> tuple[str, None] | tuple[None, str]:
+    """Download a file from Telegram and save it locally."""
+    file_path = None
+    try:
+        online_file_path, err = await _get_file(client, file_id)
         if not online_file_path:
-            return None, "Unable to retrieve the file_path from Telegram."
+            return None, err or "Unable to retrieve the file_path from Telegram."
 
-        url = f"https://api.telegram.org/file/bot{TOKEN}/{online_file_path}"
+        url = f"{API_URL}/file/bot{TOKEN}/{online_file_path}"
 
-        file_name = os.path.basename(online_file_path)
-        base, ext = os.path.splitext(file_name)
+        target_file_name = os.path.basename(online_file_path)
+        base, ext = os.path.splitext(target_file_name)
+        if not ext and file_name:
+            _, fallback_ext = os.path.splitext(file_name)
+            ext = fallback_ext
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-        file_name = f"{base}_{timestamp}_{secrets.token_hex(4)}{ext}"
+        target_file_name = f"{base}_{timestamp}_{secrets.token_hex(4)}{ext}"
 
-        file_path = os.path.join(DIRECTORY, file_name)
+        file_path = os.path.join(DIRECTORY, target_file_name)
 
         await asyncio.to_thread(_download_file_chunks, url, file_path)
 
         return file_path, None
     except Exception as error:
-        return None, f"Download failed: {error}"
+        if file_path and os.path.exists(file_path):
+            with contextlib.suppress(OSError):
+                os.remove(file_path)
+        clean_error = _clean_error(error)
+        return None, f"Download failed: {clean_error}"
 
 
 async def _send_message(
@@ -149,7 +187,7 @@ async def _send_message(
     parse_mode: str | None = None,
 ) -> dict[str, Any]:
     """Send a text message via the Telegram API."""
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    url = f"{API_URL}/bot{TOKEN}/sendMessage"
     text = message
     if len(text) > 4096:
         text = f"{text[:4093]}..."
@@ -213,7 +251,7 @@ async def _send_location(
     if reply_to_message_id is not None:
         payload["reply_parameters"] = {"message_id": reply_to_message_id}
 
-    url = f"https://api.telegram.org/bot{TOKEN}/sendLocation"
+    url = f"{API_URL}/bot{TOKEN}/sendLocation"
     data = orjson.dumps(payload).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
     resp.raise_for_status()
@@ -257,7 +295,7 @@ async def _send_photo(
     f = await asyncio.to_thread(_open_file, file_path, "rb")
     try:
         files = {"photo": (filename, f, content_type)}
-        url = f"https://api.telegram.org/bot{TOKEN}/sendPhoto"
+        url = f"{API_URL}/bot{TOKEN}/sendPhoto"
         resp = await client.post(url, data=form_data, files=files)
         resp.raise_for_status()
         return orjson.loads(resp.content)
@@ -315,7 +353,7 @@ async def _send_media_file(
             opened_files[field] = attachment_file
             files[field] = (attachment_name, attachment_file, attachment_type or "application/octet-stream")
 
-        url = f"https://api.telegram.org/bot{TOKEN}/{endpoint}"
+        url = f"{API_URL}/bot{TOKEN}/{endpoint}"
         resp = await client.post(url, data=form_data, files=files)
         resp.raise_for_status()
         return orjson.loads(resp.content)
@@ -576,7 +614,7 @@ async def _send_voice(
 
 async def _get_webhook_info(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve current Telegram webhook status."""
-    url = f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo"
+    url = f"{API_URL}/bot{TOKEN}/getWebhookInfo"
     resp = await client.get(url)
     resp.raise_for_status()
     return orjson.loads(resp.content)
@@ -589,7 +627,7 @@ async def _set_webhook(
     secret_token: str,
 ) -> dict[str, Any]:
     """Configure the Telegram webhook URL."""
-    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook"
+    url = f"{API_URL}/bot{TOKEN}/setWebhook"
     params = {
         "url": f"{base_url}/api/webhook/{webhook_id}",
         "drop_pending_updates": True,
@@ -603,7 +641,7 @@ async def _set_webhook(
 
 async def _delete_webhook(client: httpx.AsyncClient) -> dict[str, Any]:
     """Remove the Telegram webhook configuration."""
-    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
+    url = f"{API_URL}/bot{TOKEN}/deleteWebhook"
     params = {"drop_pending_updates": True}
     data = orjson.dumps(params).decode("utf-8")
     resp = await client.post(url, content=data, headers={"Content-Type": "application/json"})
@@ -618,7 +656,7 @@ async def _get_updates(
     limit: int | None = None,
 ) -> dict[str, Any]:
     """Fetch updates from Telegram using long polling."""
-    url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
+    url = f"{API_URL}/bot{TOKEN}/getUpdates"
     params: dict[str, Any] = {"timeout": timeout}
     if offset is not None:
         params["offset"] = offset
@@ -632,7 +670,7 @@ async def _get_updates(
 
 async def _get_me(client: httpx.AsyncClient) -> dict[str, Any]:
     """Retrieve basic bot account information."""
-    url = f"https://api.telegram.org/bot{TOKEN}/getMe"
+    url = f"{API_URL}/bot{TOKEN}/getMe"
     resp = await client.get(url)
     resp.raise_for_status()
     return orjson.loads(resp.content)
@@ -647,7 +685,7 @@ async def _send_chat_action(
     """Broadcast a chat action status to a conversation."""
     if action not in ACTIONS_CHAT:
         raise ValueError(f"Unsupported chat action: {action}. Allowed: {', '.join(ACTIONS_CHAT)}")
-    url = f"https://api.telegram.org/bot{TOKEN}/sendChatAction"
+    url = f"{API_URL}/bot{TOKEN}/sendChatAction"
     params = {
         "chat_id": chat_id,
         "action": action,
@@ -802,12 +840,17 @@ async def send_telegram_message(
         )
         return response or {"error": "Failed to send message"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
-async def get_telegram_file(file_id: str) -> dict[str, Any]:
+async def get_telegram_file(
+    file_id: str,
+    mime_type: str | None = None,
+    file_name: str | None = None,
+) -> dict[str, Any]:
     """
     yaml
     name: Get Telegram File
@@ -819,19 +862,31 @@ async def get_telegram_file(file_id: str) -> dict[str, Any]:
         required: true
         selector:
           text:
+      mime_type:
+        name: MIME Type
+        description: Optional MIME type of the file if known from Telegram metadata.
+        selector:
+          text:
+      file_name:
+        name: File Name
+        description: Optional original filename from Telegram metadata.
+        selector:
+          text:
     """
     if not file_id:
         return {"error": "Missing a required argument: file_id"}
+    cleaned_file_id = file_id.strip()
     try:
         client = await _ensure_session()
         await _ensure_dir(DIRECTORY)
 
-        file_path, error = await _download_file(client, file_id)
+        file_path, error = await _download_file(client, cleaned_file_id, file_name=file_name)
         if not file_path:
             return {"error": f"Unable to download the file from Telegram. {error}"}
 
         mimetypes.add_type("text/plain", ".yaml")
-        mime_type, _ = mimetypes.guess_file_type(file_path)
+        detected_mime, _ = mimetypes.guess_file_type(file_path)
+        resolved_mime = detected_mime or (mime_type.strip().lower() if mime_type else None)
         file_path = _to_relative_path(file_path)
         support_file_types = (
             "image/",
@@ -849,13 +904,14 @@ async def get_telegram_file(file_id: str) -> dict[str, Any]:
         )
         response: dict[str, Any] = {
             "file_path": file_path,
-            "mime_type": mime_type,
-            "supported": bool(mime_type and mime_type.lower().startswith(support_file_types)),
+            "mime_type": resolved_mime,
+            "supported": bool(resolved_mime and resolved_mime.lower().startswith(support_file_types)),
         }
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -869,8 +925,9 @@ async def get_telegram_webhook() -> dict[str, Any]:
         client = await _ensure_session()
         return await _get_webhook_info(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -899,8 +956,9 @@ async def set_telegram_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             response["webhook_id"] = webhook_id
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -914,8 +972,9 @@ async def delete_telegram_webhook() -> dict[str, Any]:
         client = await _ensure_session()
         return await _delete_webhook(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -964,8 +1023,9 @@ async def get_telegram_updates(
             }
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -979,8 +1039,9 @@ async def get_telegram_bot_info() -> dict[str, Any]:
         client = await _ensure_session()
         return await _get_me(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -1041,8 +1102,9 @@ async def send_telegram_chat_action(
         )
         return response or {"error": "Failed to send message"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -1228,8 +1290,9 @@ async def send_telegram_location(
         )
         return response or {"error": "Failed to send location"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -1305,8 +1368,9 @@ async def send_telegram_photo(
         )
         return response or {"error": "Failed to send photo"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 async def _send_telegram_media_action(
@@ -1326,8 +1390,9 @@ async def _send_telegram_media_action(
         response = await sender(client, chat_id, file_path, **kwargs)
         return response or {"error": f"Failed to send {media_name}"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
