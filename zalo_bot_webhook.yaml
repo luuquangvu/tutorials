@@ -135,7 +135,7 @@ conditions:
 actions:
   - variables:
       chat_id: >-
-        {{ ('id_' ~ trigger.json.message.chat.id ~ '_' ~ trigger.json.message.from.id) | slugify }}
+        {{ ('id_' ~ trigger.json.message.chat.id ~ ('_' ~ trigger.json.message.from.id if trigger.json.message.from is defined and trigger.json.message.from.id is defined else '')) | slugify }}
   - action: pyscript.memory_cache_get
     data:
       key: "{{ chat_id }}"
@@ -153,7 +153,7 @@ actions:
                 system: |-
                   Respond in language: {{ language | trim }}
                 prompt: |-
-                  {{ trigger.json.message.text }}
+                  {{ trigger.json.message.text | trim }}
                 zalo_chat_id: "{{ trigger.json.message.chat.id }}"
         alias: Process text
       - conditions:
@@ -162,20 +162,29 @@ actions:
         sequence:
           - action: pyscript.get_zalo_file
             data:
-              url: "{{ trigger.json.message.photo_url }}"
+              url: "{{ trigger.json.message.photo_url if trigger.json.message.photo_url is defined else trigger.json.message.photo }}"
             response_variable: file
           - variables:
               agent_input:
                 system: |-
                   Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
                 prompt: |-
-                  {{ trigger.json.message.caption }}
+                  {{ (trigger.json.message.caption if trigger.json.message.caption is defined else trigger.json.message.text) | default('') | trim }}
                 file_path: "{{ file.file_path if file.file_path is defined }}"
                 mime_type: "{{ file.mime_type if file.mime_type is defined }}"
                 zalo_chat_id: "{{ trigger.json.message.chat.id }}"
               supported: "{{ file.supported if file.supported is defined }}"
         alias: Process photo
   - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ file is defined and file.error is defined }}"
+        sequence:
+          - action: pyscript.send_zalo_message
+            data:
+              chat_id: "{{ trigger.json.message.chat.id }}"
+              message: "{{ file.error }}"
+            response_variable: zalo_response
       - conditions:
           - condition: template
             value_template: "{{ supported is defined and not supported | bool(true) }}"

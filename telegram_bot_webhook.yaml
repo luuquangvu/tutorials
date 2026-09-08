@@ -25,6 +25,7 @@ blueprint:
       allow_all_imports: true
       hass_is_global: true
       telegram_bot_token: !secret telegram_bot_token
+      telegram_bot_api_url: http://localhost:8081  # Optional: local Telegram Bot API server for downloading/uploading files up to 2GB
     ```
 
     ```
@@ -144,198 +145,230 @@ actions:
   - variables:
       conversation_id: >-
         {{ get_chat.value if (get_chat.status == 'ok' and get_chat.value | default('', true) | length > 0) }}
+      msg: "{{ trigger.json.message }}"
+      media_type: >-
+        {% if trigger.json.message.photo is defined %}photo
+        {% elif trigger.json.message.video is defined %}video
+        {% elif trigger.json.message.video_note is defined %}video_note
+        {% elif trigger.json.message.voice is defined %}voice
+        {% elif trigger.json.message.audio is defined %}audio
+        {% elif trigger.json.message.document is defined %}document
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.photo is defined %}photo
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.video is defined %}video
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.video_note is defined %}video_note
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.voice is defined %}voice
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.audio is defined %}audio
+        {% elif trigger.json.message.reply_to_message is defined and trigger.json.message.reply_to_message.document is defined %}document
+        {% elif trigger.json.message.text is defined %}text
+        {% else %}unknown
+        {% endif %}
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ trigger.json.message.text is defined }}"
+            value_template: "{{ media_type == 'photo' }}"
+        sequence:
+          - variables:
+              target_photo: "{{ msg.photo if msg.photo is defined else msg.reply_to_message.photo }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_photo[-1].file_id }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process photo
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'video' }}"
+        sequence:
+          - variables:
+              target_video: "{{ msg.video if msg.video is defined else msg.reply_to_message.video }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_video.file_id }}"
+              mime_type: "{{ target_video.mime_type if target_video.mime_type is defined }}"
+              file_name: "{{ target_video.file_name if target_video.file_name is defined }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process video
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'video_note' }}"
+        sequence:
+          - variables:
+              target_video_note: "{{ msg.video_note if msg.video_note is defined else msg.reply_to_message.video_note }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_video_note.file_id }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process video note
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'voice' }}"
+        sequence:
+          - variables:
+              target_voice: "{{ msg.voice if msg.voice is defined else msg.reply_to_message.voice }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_voice.file_id }}"
+              mime_type: "{{ target_voice.mime_type if target_voice.mime_type is defined }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process voice
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'audio' }}"
+        sequence:
+          - variables:
+              target_audio: "{{ msg.audio if msg.audio is defined else msg.reply_to_message.audio }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_audio.file_id }}"
+              mime_type: "{{ target_audio.mime_type if target_audio.mime_type is defined }}"
+              file_name: "{{ target_audio.file_name if target_audio.file_name is defined }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process audio
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'document' }}"
+        sequence:
+          - variables:
+              target_document: "{{ msg.document if msg.document is defined else msg.reply_to_message.document }}"
+          - action: pyscript.get_telegram_file
+            data:
+              file_id: "{{ target_document.file_id }}"
+              mime_type: "{{ target_document.mime_type if target_document.mime_type is defined }}"
+              file_name: "{{ target_document.file_name if target_document.file_name is defined }}"
+            response_variable: file
+          - variables:
+              agent_input:
+                system: |-
+                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    (msg.caption if msg.caption is defined else ''),
+                    (msg.text if msg.text is defined else '')
+                  ] | select('ne', '') | join(' ') | trim }}
+                file_path: "{{ file.file_path if file.file_path is defined }}"
+                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
+              supported: "{{ file.supported if file.supported is defined }}"
+        alias: Process document
+      - conditions:
+          - condition: template
+            value_template: "{{ media_type == 'text' }}"
         sequence:
           - variables:
               agent_input:
                 system: |-
                   Respond in language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {{ trigger.json.message.text }}
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
+                prompt: >-
+                  {{ [
+                    (msg.reply_to_message.text if msg.reply_to_message is defined and msg.reply_to_message.text is defined else ''),
+                    (msg.reply_to_message.caption if msg.reply_to_message is defined and msg.reply_to_message.caption is defined else ''),
+                    msg.text
+                  ] | select('ne', '') | join(' ') | trim }}
+                telegram_chat_id: "{{ msg.chat.id }}"
+                telegram_message_thread_id: "{{ msg.message_thread_id if msg.message_thread_id is defined }}"
         alias: Process text
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.photo is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.photo[-1].file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process photo
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.video is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.video.file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process video
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.video_note is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.video_note.file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process video note
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.voice is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.voice.file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process voice
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.audio is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.audio.file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process audio
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.json.message.document is defined }}"
-        sequence:
-          - action: pyscript.get_telegram_file
-            data:
-              file_id: "{{ trigger.json.message.document.file_id }}"
-            response_variable: file
-          - variables:
-              agent_input:
-                system: |-
-                  Use `File Content Analyzer`. If prompt empty, follow file instructions. Else return summary. No confirmation. Language: {{ language | trim }}
-                prompt: |-
-                  {% if trigger.json.message.reply_to_message is defined %} {%
-                  if trigger.json.message.reply_to_message.text is defined %} {{
-                  trigger.json.message.reply_to_message.text }} {% endif %} {%
-                  if trigger.json.message.reply_to_message.caption is defined %}
-                  {{ trigger.json.message.reply_to_message.caption }} {% endif
-                  %} {% endif %}
-                  {% if trigger.json.message.caption is defined %} {{
-                  trigger.json.message.caption }} {% endif %}
-                file_path: "{{ file.file_path if file.file_path is defined }}"
-                mime_type: "{{ file.mime_type if file.mime_type is defined }}"
-                telegram_chat_id: "{{ trigger.json.message.chat.id }}"
-                telegram_message_thread_id: "{{trigger.json.message.message_thread_id if trigger.json.message.message_thread_id is defined }}"
-              supported: "{{ file.supported if file.supported is defined }}"
-        alias: Process document
   - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ file is defined and file.error is defined }}"
+        sequence:
+          - action: pyscript.send_telegram_message
+            data:
+              chat_id: "{{ msg.chat.id }}"
+              message: "{{ file.error }}"
+              reply_to_message_id: "{{ msg.message_id }}"
+            response_variable: telegram_response
       - conditions:
           - condition: template
             value_template: "{{ supported is defined and not supported | bool(true) }}"
         sequence:
           - action: pyscript.send_telegram_message
             data:
-              chat_id: "{{ trigger.json.message.chat.id }}"
+              chat_id: "{{ msg.chat.id }}"
               message: This file type is not supported for analysis at the moment. The file has been stored without further processing.
-              reply_to_message_id: "{{ trigger.json.message.message_id }}"
+              reply_to_message_id: "{{ msg.message_id }}"
             response_variable: telegram_response
       - conditions:
           - condition: template
@@ -343,17 +376,17 @@ actions:
         sequence:
           - if:
               - condition: template
-                value_template: "{{ trigger.json.message.message_thread_id is defined }}"
+                value_template: "{{ msg.message_thread_id is defined }}"
             then:
               - action: pyscript.send_telegram_chat_action
                 data:
-                  chat_id: "{{ trigger.json.message.chat.id }}"
-                  message_thread_id: "{{ trigger.json.message.message_thread_id }}"
+                  chat_id: "{{ msg.chat.id }}"
+                  message_thread_id: "{{ msg.message_thread_id }}"
                 response_variable: telegram_chat_action
             else:
               - action: pyscript.send_telegram_chat_action
                 data:
-                  chat_id: "{{ trigger.json.message.chat.id }}"
+                  chat_id: "{{ msg.chat.id }}"
                 response_variable: telegram_chat_action
           - if:
               - condition: template
@@ -393,14 +426,14 @@ actions:
                 response_variable: set_chat
           - action: pyscript.send_telegram_message
             data:
-              chat_id: "{{ trigger.json.message.chat.id }}"
+              chat_id: "{{ msg.chat.id }}"
               message: "{{ response | trim }}"
-              reply_to_message_id: "{{ trigger.json.message.message_id }}"
+              reply_to_message_id: "{{ msg.message_id }}"
             response_variable: telegram_response
     default:
       - action: pyscript.send_telegram_message
         data:
-          chat_id: "{{ trigger.json.message.chat.id }}"
+          chat_id: "{{ msg.chat.id }}"
           message: This type of message is not supported by the current handler.
-          reply_to_message_id: "{{ trigger.json.message.message_id }}"
+          reply_to_message_id: "{{ msg.message_id }}"
         response_variable: telegram_response

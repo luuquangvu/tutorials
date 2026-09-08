@@ -32,6 +32,12 @@ if not TOKEN:
 ZALO_API_BASE_URL = f"https://bot-api.zaloplatforms.com/bot{TOKEN}"
 
 
+def _clean_error(error: Exception | str) -> str:
+    """Sanitize error message to prevent leaking bot token."""
+    err_str = str(error)
+    return err_str.replace(TOKEN, "[REDACTED]") if TOKEN else err_str
+
+
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
 def _create_session() -> httpx.AsyncClient:
     """Create the HTTPX client in native Python for executor-safe SSL setup."""
@@ -119,7 +125,7 @@ def _open_file(path: str, mode: str):
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
-def _download_file_chunks_with_headers(url: str, original_name: str, directory: str) -> str:
+def _download_file_chunks_with_headers(url: str, original_name: str, directory: str) -> tuple[str, str]:
     """Download a file in chunks using httpx.Client, guess the extension, and write to disk."""
     with httpx.Client(timeout=300) as client, client.stream("GET", url) as resp:
         resp.raise_for_status()
@@ -135,14 +141,20 @@ def _download_file_chunks_with_headers(url: str, original_name: str, directory: 
         file_name = f"{base}_{timestamp}_{secrets.token_hex(4)}{extension}"
         file_path = os.path.join(directory, file_name)
 
-        with open(file_path, "wb") as f:
-            for chunk in resp.iter_bytes(65536):
-                f.write(chunk)
-            f.flush()
+        try:
+            with open(file_path, "wb") as f:
+                for chunk in resp.iter_bytes(65536):
+                    f.write(chunk)
+                f.flush()
+                with contextlib.suppress(OSError):
+                    os.fsync(f.fileno())
+        except Exception:
             with contextlib.suppress(OSError):
-                os.fsync(f.fileno())
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            raise
 
-        return file_path
+        return file_path, content_type
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -165,23 +177,24 @@ async def _cleanup_old_files(directory: str, days: int = 30) -> None:
     await asyncio.to_thread(_cleanup_disk_sync, directory, cutoff)
 
 
-async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, None] | tuple[None, str]:
+async def _download_file(client: httpx.AsyncClient, url: str) -> tuple[str, str, None] | tuple[None, None, str]:
     """Download a file from a URL and save it locally."""
     try:
         safe_url = _validate_download_url(url)
         parsed_url = urlparse(safe_url)
         original_name = Path(parsed_url.path).name or "zalo_file"
 
-        file_path = await asyncio.to_thread(
+        file_path, content_type = await asyncio.to_thread(
             _download_file_chunks_with_headers,
             safe_url,
             original_name,
             DIRECTORY,
         )
 
-        return file_path, None
+        return file_path, content_type, None
     except Exception as error:
-        return None, f"Download failed: {error}"
+        clean_error = _clean_error(error)
+        return None, None, f"Download failed: {clean_error}"
 
 
 async def _send_message(client: httpx.AsyncClient, chat_id: str, message: str) -> dict[str, Any]:
@@ -418,8 +431,9 @@ async def send_zalo_message(chat_id: str, message: str) -> dict[str, Any]:
         response = await _send_message(client, chat_id, message)
         return response or {"error": "Failed to send message"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -443,12 +457,18 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
         client = await _ensure_session()
         await _ensure_dir(DIRECTORY)
 
-        file_path, error = await _download_file(client, url)
+        file_path, header_content_type, error = await _download_file(client, url)
         if not file_path:
             return {"error": f"Unable to download the file from Zalo. {error}"}
 
         mimetypes.add_type("text/plain", ".yaml")
-        mime_type, _ = mimetypes.guess_file_type(file_path)
+        guessed_mime, _ = (
+            mimetypes.guess_file_type(file_path)
+            if hasattr(mimetypes, "guess_file_type")
+            else mimetypes.guess_type(file_path)
+        )
+        header_mime = header_content_type.split(";")[0].strip() if header_content_type else None
+        resolved_mime = guessed_mime or header_mime
         file_path = _to_relative_path(file_path)
         support_file_types = (
             "image/",
@@ -456,16 +476,24 @@ async def get_zalo_file(url: str) -> dict[str, Any]:
             "audio/",
             "text/",
             "application/pdf",
+            "application/rtf",
+            "application/msword",
+            "application/vnd.ms-excel",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
         response: dict[str, Any] = {
             "file_path": file_path,
-            "mime_type": mime_type,
-            "supported": bool(mime_type and mime_type.startswith(support_file_types)),
+            "mime_type": resolved_mime,
+            "supported": bool(resolved_mime and resolved_mime.lower().startswith(support_file_types)),
         }
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -479,8 +507,9 @@ async def get_zalo_webhook() -> dict[str, Any]:
         client = await _ensure_session()
         return await _get_webhook_info(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -496,8 +525,9 @@ async def test_zalo_webhook() -> dict[str, Any]:
         client = await _ensure_session()
         return await _test_webhook(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -526,8 +556,9 @@ async def set_zalo_webhook(webhook_id: str | None = None) -> dict[str, Any]:
             response["webhook_id"] = webhook_id
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -541,8 +572,9 @@ async def delete_zalo_webhook() -> dict[str, Any]:
         client = await _ensure_session()
         return await _delete_webhook(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -574,8 +606,9 @@ async def get_zalo_updates(timeout: int = 30) -> dict[str, Any]:
             }
         return response
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -589,8 +622,9 @@ async def get_zalo_bot_info() -> dict[str, Any]:
         client = await _ensure_session()
         return await _get_me(client)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -614,8 +648,9 @@ async def send_zalo_chat_action(chat_id: str) -> dict[str, Any]:
         response = await _send_chat_action(client, chat_id)
         return response or {"error": "Failed to send message"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -657,8 +692,9 @@ async def send_zalo_photo(
         public_url, published_path = await _copy_to_www(file_path)
         return await _send_photo(client, chat_id, public_url, caption=caption)
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
     finally:
         if published_path:
             task.create(_delayed_remove, published_path, 30)  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -691,8 +727,9 @@ async def send_zalo_sticker(chat_id: str, sticker: str) -> dict[str, Any]:
         response = await _send_sticker(client, chat_id, sticker)
         return response or {"error": "Failed to send sticker"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
 
 
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -728,5 +765,6 @@ async def send_zalo_voice(chat_id: str, voice_url: str) -> dict[str, Any]:
         response = await _send_voice(client, chat_id, safe_voice_url)
         return response or {"error": "Failed to send voice message"}
     except Exception as error:
-        log.error(f"{__name__}: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
-        return {"error": f"An unexpected error occurred during processing: {error}"}
+        clean_error = _clean_error(error)
+        log.error(f"{__name__}: {clean_error}")  # noqa: F821  # ty:ignore[unresolved-reference]
+        return {"error": f"An unexpected error occurred during processing: {clean_error}"}
