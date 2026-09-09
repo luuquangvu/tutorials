@@ -11,6 +11,7 @@ blueprint:
     - **State / Activation Triggered:** Turns on target devices upon entity turning on (with optional turn-on conditions, e.g. ambient light/lux threshold).
     - **No-Op Turn On / Auto-Off Only:** Option to disable turning on devices on activation (turning on becomes a no-op, only resetting active timers). Perfect for spaces where lights or devices are turned on manually and only auto-turn off.
     - **Timer Reset:** Automatically cancels active timer if the entity turns on again while the target device is on.
+    - **Restart Sensitivity Control:** Option to allow triggering when the entity transitions after Home Assistant restarts (enabled by default so lights reliably activate even if HA recently rebooted), or disable it to restrict triggers strictly from 'off'/'on' for sensitive automations.
     - **Graceful Turn Off:** Starts the timer when the entity turns off (with optional timer start conditions, e.g. only start if target devices are on) and turns off devices after the timer finishes (with optional turn-off conditions, e.g. manual override helpers).
     - **Dynamic Timer Duration:**
       - *Default:* Use the timer helper's configured default duration.
@@ -159,6 +160,14 @@ blueprint:
       default: true
       selector:
         boolean: {}
+    allow_trigger_after_restart:
+      name: Allow Trigger After Restart
+      description: |-
+        Allow the automation to trigger when the trigger entity transitions to on or off after Home Assistant restarts (from unknown or unavailable states).
+        Enabled by default so lights and devices reliably activate after reboots. When disabled, the entity must transition strictly from 'off' to 'on' or 'on' to 'off' (useful to avoid re-triggers for sensitive automations).
+      default: true
+      selector:
+        boolean: {}
     global_conditions:
       name: Global Conditions (Optional)
       description: Optional conditions that must be met for the automation to run at all (e.g. alarm is disarmed).
@@ -240,11 +249,12 @@ blueprint:
 mode: queued
 max: 10
 variables:
-  version: 20260904
+  version: 20260909
   target_device: !input target_device
   has_target: "{{ target_device is mapping and (target_device.values() | select | list | length > 0) }}"
   enable_turn_on: !input enable_turn_on
   enable_turn_off: !input enable_turn_off
+  allow_trigger_after_restart: !input allow_trigger_after_restart
   timer_duration_mode: !input timer_duration_mode
   dynamic_timer_multiplier: !input dynamic_timer_multiplier
   dynamic_timer_min: !input dynamic_timer_min
@@ -268,12 +278,10 @@ variables:
 triggers:
   - trigger: state
     entity_id: !input trigger_entity
-    from: "off"
     to: "on"
     id: entity_turned_on
   - trigger: state
     entity_id: !input trigger_entity
-    from: "on"
     to: "off"
     id: entity_turned_off
   - trigger: event
@@ -288,6 +296,8 @@ actions:
           - condition: trigger
             id:
               - entity_turned_on
+          - condition: template
+            value_template: "{{ allow_trigger_after_restart or (trigger.from_state is defined and trigger.from_state and trigger.from_state.state == 'off') }}"
         sequence:
           - if:
               - condition: template
@@ -338,6 +348,8 @@ actions:
           - condition: trigger
             id:
               - entity_turned_off
+          - condition: template
+            value_template: "{{ allow_trigger_after_restart or (trigger.from_state is defined and trigger.from_state and trigger.from_state.state == 'on') }}"
         sequence:
           - variables:
               calculated_timer_duration: >-
