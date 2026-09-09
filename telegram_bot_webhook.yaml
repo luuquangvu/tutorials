@@ -25,7 +25,6 @@ blueprint:
       allow_all_imports: true
       hass_is_global: true
       telegram_bot_token: !secret telegram_bot_token
-      telegram_bot_api_url: http://localhost:8081  # Optional: local Telegram Bot API server for downloading/uploading files up to 2GB
     ```
 
     ```

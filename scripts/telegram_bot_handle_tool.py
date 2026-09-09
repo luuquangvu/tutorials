@@ -19,11 +19,7 @@ TOKEN = pyscript.config.get("telegram_bot_token")  # noqa: F821  # ty:ignore[unr
 if TOKEN:
     TOKEN = TOKEN.strip()
 
-if (
-    API_URL := pyscript.config.get("telegram_bot_api_url")  # noqa: F821  # ty:ignore[unresolved-reference]
-    or "https://api.telegram.org"
-):
-    API_URL = API_URL.strip().rstrip("/")
+API_URL = "https://api.telegram.org"
 
 _session: httpx.AsyncClient | None = None
 _session_lock = asyncio.Lock()
@@ -132,11 +128,7 @@ async def _get_file(client: httpx.AsyncClient, file_id: str) -> tuple[str | None
     if not resp.is_success or not result.get("ok"):
         description = result.get("description") or resp.reason_phrase or f"HTTP {resp.status_code}"
         if "file is too big" in description.lower():
-            return (
-                None,
-                f"File size exceeds Telegram Bot API 20MB download limit for public servers ({description}). "
-                "To download files up to 2GB, configure a local Telegram Bot API server via 'telegram_bot_api_url'.",
-            )
+            return (None, f"File size exceeds Telegram Bot API 20MB download limit for public servers ({description}).")
         return None, f"Telegram API error ({resp.status_code}): {description}"
     if file_path := result.get("result", {}).get("file_path"):
         return file_path, None
