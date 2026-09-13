@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import jinja2
+from jinja2 import nodes, sandbox
 
 if TYPE_CHECKING:
     import voluptuous as vol
@@ -43,10 +45,20 @@ from homeassistant.components.template.config import (
 )
 from homeassistant.const import (
     CONF_ACTION,
+    CONF_ACTIONS,
+    CONF_CONDITION,
+    CONF_CONDITIONS,
     CONF_DEFAULT,
+    CONF_IF,
+    CONF_SEQUENCE,
     CONF_SERVICE,
     CONF_TARGET,
+    CONF_TRIGGER,
+    CONF_TRIGGERS,
+    CONF_UNTIL,
     CONF_VARIABLES,
+    CONF_WAIT_FOR_TRIGGER,
+    CONF_WHILE,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import selector
@@ -148,7 +160,11 @@ def _get_ha_target_field_keys() -> frozenset[str]:
         schema_key = getattr(marker, "schema", marker)
         if isinstance(schema_key, str):
             keys.add(schema_key)
-    return frozenset(keys or {"entity_id", "device_id", "area_id", "floor_id", "label_id"})
+    if not keys:
+        raise RuntimeError(
+            "Failed to dynamically extract target field keys from Home Assistant Core's TARGET_SERVICE_FIELDS schema."
+        )
+    return frozenset(keys)
 
 
 _HA_TARGET_FIELD_KEYS = _get_ha_target_field_keys()
@@ -221,18 +237,28 @@ def _iter_input_nodes(value: Any, path: str) -> list[tuple[Input, str]]:
     return []
 
 
+_TRIGGER_PATH_SEGMENTS = frozenset({CONF_TRIGGER, CONF_TRIGGERS, CONF_WAIT_FOR_TRIGGER})
+_CONDITION_PATH_SEGMENTS = frozenset({CONF_CONDITION, CONF_CONDITIONS, CONF_IF, CONF_WHILE, CONF_UNTIL})
+
+
+def _get_path_segments(path: str) -> set[str]:
+    """Extract individual key segments from a dot/bracket notation path."""
+    return {seg.split("[")[0] for seg in path.split(".") if seg}
+
+
 def _check_target_inputs(value: Any, path: str, empty_default_inputs: Mapping[str, Any]) -> list[str]:
     """Validate that target and entity fields do not reference empty-default inputs."""
     errors: list[str] = []
     for inp, item_path in _iter_input_nodes(value, path):
         if inp.name in empty_default_inputs:
             default_repr = repr(empty_default_inputs[inp.name])
-            if item_path.startswith("trigger"):
+            segments = _get_path_segments(item_path)
+            if _TRIGGER_PATH_SEGMENTS & segments:
                 errors.append(
                     f"Unsafe '!input {inp.name}' at '{item_path}': trigger entity/device cannot default to "
                     f"an invalid value ({default_repr}). Provide a non-empty default or make the input mandatory."
                 )
-            elif item_path.startswith("condition"):
+            elif _CONDITION_PATH_SEGMENTS & segments:
                 errors.append(
                     f"Unsafe '!input {inp.name}' at '{item_path}': condition entity/device cannot default to "
                     f"an invalid value ({default_repr}). Provide a non-empty default or make the input mandatory."
@@ -297,6 +323,209 @@ def _is_jinja_template(text: str) -> bool:
     return "{{" in text or "{%" in text or "{#" in text
 
 
+def _get_ha_mutable_method_names() -> frozenset[str]:
+    """Dynamically extract mutable method names blocked by Home Assistant's sandboxed environment."""
+    mutable_spec = getattr(sandbox, "_mutable_spec", None)
+    if not mutable_spec:
+        raise RuntimeError(
+            "Failed to dynamically extract mutable method specifications from Jinja2 sandboxed environment."
+        )
+    names: set[str] = set()
+    for _, unsafe in mutable_spec:
+        names.update(unsafe)
+    if not names:
+        raise RuntimeError("Extracted mutable method specifications from Jinja2 sandboxed environment are empty.")
+    return frozenset(names)
+
+
+_HA_MUTABLE_METHOD_NAMES: frozenset[str] = _get_ha_mutable_method_names()
+_PYTHON_MATH_NAMES: frozenset[str] = frozenset(attr for attr in dir(math) if not attr.startswith("_"))
+
+
+def _extract_target_names(target: nodes.Node, names: set[str]) -> None:
+    """Recursively extract variable names from an assignment target node."""
+    if isinstance(target, nodes.Name):
+        names.add(target.name)
+    elif isinstance(target, (nodes.Tuple, nodes.List)):
+        for item in target.items:
+            _extract_target_names(item, names)
+    elif isinstance(target, nodes.Getattr) and isinstance(target.node, nodes.Name):
+        names.add(target.node.name)
+
+
+def _extract_locally_scoped_names(ast: nodes.Node) -> set[str]:
+    """Extract variable names scoped or assigned locally within a Jinja template."""
+    names: set[str] = set()
+
+    for node in ast.find_all(
+        (
+            nodes.Assign,
+            nodes.AssignBlock,
+            nodes.For,
+            nodes.Macro,
+            nodes.With,
+            nodes.CallBlock,
+        )
+    ):
+        if isinstance(node, (nodes.Assign, nodes.AssignBlock, nodes.For)):
+            _extract_target_names(node.target, names)
+        elif isinstance(node, nodes.Macro):
+            names.add(node.name)
+            for arg in node.args:
+                if isinstance(arg, nodes.Name):
+                    names.add(arg.name)
+        elif isinstance(node, nodes.With):
+            for target in getattr(node, "targets", []):
+                _extract_target_names(target, names)
+        elif isinstance(node, nodes.CallBlock):
+            for arg in getattr(node, "args", []):
+                if isinstance(arg, nodes.Name):
+                    names.add(arg.name)
+
+    return names
+
+
+def _check_math_getattr_usage(
+    node: nodes.Getattr,
+    env: TemplateEnvironment,
+    target: str,
+    math_globals_desc: str,
+) -> str:
+    """Format an error message for an invalid math.<attr> expression."""
+    attr_name = node.attr
+    if attr_name in env.globals:
+        return (
+            f"Home Assistant template error in {target} at line {node.lineno}: 'math' is not available "
+            f"in Home Assistant templates. '{attr_name}' is directly available as a Home Assistant global: "
+            f"use '{attr_name}' instead of 'math.{attr_name}'."
+        )
+    if attr_name in env.filters:
+        return (
+            f"Home Assistant template error in {target} at line {node.lineno}: 'math' is not available "
+            f"in Home Assistant templates. '{attr_name}' is available as a Home Assistant filter: "
+            f"use '| {attr_name}' instead of 'math.{attr_name}'."
+        )
+    return (
+        f"Home Assistant template error in {target} at line {node.lineno}: 'math' is not available "
+        f"in Home Assistant templates. Use direct Home Assistant math globals/filters instead"
+        f"{math_globals_desc}."
+    )
+
+
+def _check_math_module_usages(
+    ast: nodes.Node,
+    env: TemplateEnvironment,
+    target: str,
+    local_names: set[str],
+) -> list[str]:
+    """Flag undeclared 'math' module usage if not provided by Home Assistant globals."""
+    if "math" in env.globals:
+        return []
+
+    errors: list[str] = []
+    ha_math_globals = sorted(_PYTHON_MATH_NAMES & set(env.globals.keys()))
+    math_globals_desc = f" (available globals: {', '.join(ha_math_globals)})" if ha_math_globals else ""
+    reported_math_lines: set[int] = set()
+
+    for node in ast.find_all(nodes.Getattr):
+        if (
+            isinstance(node.node, nodes.Name)
+            and node.node.ctx == "load"
+            and node.node.name == "math"
+            and node.node.name not in local_names
+        ):
+            reported_math_lines.add(node.lineno)
+            errors.append(_check_math_getattr_usage(node, env, target, math_globals_desc))
+
+    for node in ast.find_all(nodes.Name):
+        if (
+            node.ctx == "load"
+            and node.name == "math"
+            and node.name not in local_names
+            and node.lineno not in reported_math_lines
+        ):
+            errors.append(
+                f"Home Assistant template error in {target} at line {node.lineno}: 'math' is not available "
+                f"in Home Assistant templates. Use direct Home Assistant math globals/filters instead"
+                f"{math_globals_desc}."
+            )
+            reported_math_lines.add(node.lineno)
+
+    return errors
+
+
+def _check_unsupported_math_calls(
+    ast: nodes.Node,
+    env: TemplateEnvironment,
+    target: str,
+    local_names: set[str],
+) -> list[str]:
+    """Flag unsupported Python math functions invoked directly as global calls."""
+    errors: list[str] = []
+    for node in ast.find_all(nodes.Call):
+        func_node = node.node
+        if (
+            isinstance(func_node, nodes.Name)
+            and func_node.ctx == "load"
+            and func_node.name in _PYTHON_MATH_NAMES
+            and func_node.name not in env.globals
+            and func_node.name not in local_names
+        ):
+            if func_node.name in env.filters:
+                hint = (
+                    f"'{func_node.name}' is registered as a filter in Home Assistant: use '| {func_node.name}' instead."
+                )
+            else:
+                hint = f"'{func_node.name}()' is not registered as a global function in Home Assistant."
+            errors.append(
+                f"Home Assistant template error in {target} at line {func_node.lineno}: "
+                f"'{func_node.name}()' is not an available function in Home Assistant. {hint}"
+            )
+    return errors
+
+
+def _check_mutating_method_calls(ast: nodes.Node, target: str) -> list[str]:
+    """Flag mutating collection methods blocked by Home Assistant's sandboxed environment."""
+    errors: list[str] = []
+    for node in ast.find_all(nodes.Call):
+        func_node = node.node
+        if isinstance(func_node, nodes.Getattr) and func_node.attr in _HA_MUTABLE_METHOD_NAMES:
+            errors.append(
+                f"Home Assistant template error in {target} at line {func_node.lineno}: "
+                f"calling mutating method '.{func_node.attr}()' is not allowed in Home Assistant's "
+                "sandboxed environment."
+            )
+    return errors
+
+
+def _check_template_imports(ast: nodes.Node, target: str) -> list[str]:
+    """Flag template imports attempting to load Python modules."""
+    errors: list[str] = []
+    for node in ast.find_all((nodes.Import, nodes.FromImport)):
+        tmpl_name = getattr(node, "template", None)
+        errors.append(
+            f"Home Assistant template error in {target} at line {node.lineno}: "
+            f"template import '{tmpl_name}' cannot import Python modules. Only custom templates in "
+            "'custom_templates/' are supported."
+        )
+    return errors
+
+
+def _check_ha_template_ast_compatibility(
+    ast: nodes.Node,
+    env: TemplateEnvironment,
+    target: str,
+) -> list[str]:
+    """Inspect Jinja2 AST for structures and math expressions incompatible with Home Assistant."""
+    local_names = _extract_locally_scoped_names(ast)
+    errors: list[str] = []
+    errors.extend(_check_math_module_usages(ast, env, target, local_names))
+    errors.extend(_check_unsupported_math_calls(ast, env, target, local_names))
+    errors.extend(_check_mutating_method_calls(ast, target))
+    errors.extend(_check_template_imports(ast, target))
+    return errors
+
+
 def _validate_jinja_string(
     text: str,
     env: TemplateEnvironment,
@@ -304,18 +533,35 @@ def _validate_jinja_string(
     *,
     is_key: bool = False,
 ) -> list[str]:
-    """Validate a single Jinja2 template string."""
+    """Validate a single Jinja2 template string against Home Assistant's template environment."""
     if not _is_jinja_template(text):
         return []
 
     target = f"key '{path}'" if is_key else f"'{path}'"
+    errors: list[str] = []
+
+    # 1. Parse AST to verify syntax
     try:
-        env.parse(text)
+        ast = env.parse(text)
     except jinja2.TemplateSyntaxError as e:
         return [f"Jinja2 syntax error in {target} at line {e.lineno}: {e.message}"]
     except Exception as e:
         return [f"Jinja2 parse error in {target}: {e}"]
-    return []
+
+    # 2. Compile AST using Home Assistant's TemplateEnvironment to validate filters & tests
+    try:
+        env.compile(ast)
+    except jinja2.TemplateAssertionError as e:
+        errors.append(f"Home Assistant template error in {target} at line {e.lineno}: {e.message}")
+    except jinja2.TemplateError as e:
+        errors.append(f"Home Assistant template compilation error in {target}: {e}")
+    except Exception as e:
+        errors.append(f"Home Assistant template error in {target}: {e}")
+
+    # 3. Inspect AST for Home Assistant specific compatibility (math variables, sandbox violations)
+    errors.extend(_check_ha_template_ast_compatibility(ast, env, target))
+
+    return errors
 
 
 def validate_jinja_in_obj(
@@ -448,13 +694,15 @@ def validate_blueprint_file(
 
     # 8. Structure Validation based on domain
     if domain == "automation":
-        if "trigger" not in data and "triggers" not in data:
-            warnings.append("Automation blueprint has no 'trigger' or 'triggers' section")
-        if "action" not in data and "actions" not in data and "sequence" not in data:
-            warnings.append("Automation blueprint has no 'action', 'actions', or 'sequence' section")
+        if CONF_TRIGGER not in data and CONF_TRIGGERS not in data:
+            warnings.append(f"Automation blueprint has no '{CONF_TRIGGER}' or '{CONF_TRIGGERS}' section")
+        if CONF_ACTION not in data and CONF_ACTIONS not in data and CONF_SEQUENCE not in data:
+            warnings.append(
+                f"Automation blueprint has no '{CONF_ACTION}', '{CONF_ACTIONS}', or '{CONF_SEQUENCE}' section"
+            )
     elif domain == "script":
-        if "sequence" not in data:
-            errors.append("Script blueprint is missing required 'sequence:' section")
+        if CONF_SEQUENCE not in data:
+            errors.append(f"Script blueprint is missing required '{CONF_SEQUENCE}:' section")
 
     is_valid = not errors
     return is_valid, errors, warnings
