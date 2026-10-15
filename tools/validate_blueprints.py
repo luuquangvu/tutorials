@@ -28,7 +28,7 @@ from jinja2 import nodes
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 if TYPE_CHECKING:
-    import voluptuous as vol
+    import probatio as vol
 else:
     try:
         import probatio as vol

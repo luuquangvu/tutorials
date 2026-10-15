@@ -6,12 +6,27 @@ import sqlite3
 import threading
 import time
 import unicodedata
-from contextlib import closing
+from contextlib import closing, suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path("/config/memory.db")
+
+def _resolve_db_path() -> Path:
+    """Resolve database path portably for standard or custom HA environments.
+
+    Returns:
+        Resolved Path object for the SQLite database.
+    """
+    if Path("/config").exists():
+        return Path("/config/memory.db")
+    with suppress(Exception):
+        if "hass" in globals() and hasattr(hass, "config"):  # noqa: F821  # ty:ignore[unresolved-reference]
+            return Path(hass.config.path("memory.db"))  # noqa: F821  # ty:ignore[unresolved-reference]
+    return Path("memory.db")
+
+
+DB_PATH = _resolve_db_path()
 RESULT_ENTITY = "sensor.memory_result"
 EXPIRATION_MAX_DAYS = 3650
 SEARCH_LIMIT_MAX = 50
@@ -21,6 +36,7 @@ HOUSEKEEPING_GRACE_DAYS = 10
 HOUSEKEEPING_GRACE_MAX_DAYS = 365
 VALUE_PREVIEW_CHARS = 120
 BM25_WEIGHT = 0.5
+CANDIDATE_SIMILARITY_THRESHOLD = 0.5
 
 EXTRA_CHAR_REPLACEMENTS = {
     "đ": "d",
@@ -270,27 +286,129 @@ def _condense_candidate_for_selection(entry: dict[str, Any], *, score: float | N
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
-def _calculate_match_score(source_tokens: set[str], candidate_tokens: set[str], bm25_raw: float | None) -> float:
-    """Calculate a combined match score using Jaccard similarity and BM25."""
-    if not source_tokens or not candidate_tokens:
-        jaccard_score = 0.0
-    else:
-        intersection = source_tokens.intersection(candidate_tokens)
-        if not intersection:
-            return 0.0
-        union = source_tokens.union(candidate_tokens)
-        union_size = len(union) or 1
-        jaccard_score = len(intersection) / union_size
-    if isinstance(bm25_raw, (int, float)):
-        if bm25_raw < 0:
-            # SQLite FTS5 exposes rank as a negative BM25 score; more negative is better.
-            bm25_magnitude = -bm25_raw
-            bm25_score = bm25_magnitude / (1 + bm25_magnitude)
-        else:
-            bm25_score = 1 / (1 + bm25_raw)
-        jaccard_weight = 1 - BM25_WEIGHT
-        return BM25_WEIGHT * bm25_score + jaccard_weight * jaccard_score
-    return jaccard_score
+def _field_term_frequency(tokens: list[str], term: str) -> float:
+    """Compute raw term frequency in a field token list with prefix fallback.
+
+    Args:
+        tokens: Tokenized words of a document field.
+        term: Query term to search for.
+
+    Returns:
+        Frequency count as a float.
+    """
+    exact_count = tokens.count(term)
+    if exact_count > 0:
+        return float(exact_count)
+    if len(term) >= 4:
+        prefix_matches = sum(bool(w.startswith(term) or term.startswith(w)) for w in tokens)
+        if prefix_matches > 0:
+            return 0.75 * prefix_matches
+    return 0.0
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _calculate_bm25_score(
+    query_tokens: set[str],
+    key_list: list[str],
+    tag_list: list[str],
+    val_list: list[str],
+    include_value: bool = True,
+) -> float:
+    """Calculate multi-field BM25F score across key, tags, and value fields.
+
+    Args:
+        query_tokens: Set of normalized query tokens.
+        key_list: Tokenized candidate key words.
+        tag_list: Tokenized candidate tag words.
+        val_list: Tokenized candidate value words.
+        include_value: Whether candidate value is factored into match score.
+
+    Returns:
+        Score between 0.0 and 1.0 representing BM25F relevance.
+    """
+    if not query_tokens:
+        return 0.0
+
+    # BM25F field parameters (weights, length penalties b, reference average lengths)
+    wk, bk, avg_k = 3.0, 0.75, 2.5
+    wt, bt, avg_t = 2.5, 0.75, 2.5
+    wv, bv, avg_v = 1.0, 0.50, 10.0
+    k1 = 1.5
+
+    # Field length normalization factors B_f = (1 - b_f) + b_f * (len / avgdl)
+    b_key = (1.0 - bk) + bk * (len(key_list) / avg_k) if key_list else 1.0
+    b_tag = (1.0 - bt) + bt * (len(tag_list) / avg_t) if tag_list else 1.0
+    b_val = (1.0 - bv) + bv * (len(val_list) / avg_v) if val_list else 1.0
+
+    total_score = 0.0
+    for q in query_tokens:
+        tf_k = _field_term_frequency(key_list, q)
+        tf_t = _field_term_frequency(tag_list, q)
+        tf_v = _field_term_frequency(val_list, q) if include_value else 0.0
+
+        tilde_f = (wk * (tf_k / b_key)) + (wt * (tf_t / b_tag))
+        if include_value:
+            tilde_f += wv * (tf_v / b_val)
+
+        if tilde_f > 0.0:
+            total_score += tilde_f / (k1 + tilde_f)
+
+    return total_score / len(query_tokens)
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _calculate_match_score(
+    query_tokens: set[str],
+    candidate_key: str,
+    candidate_tags: str,
+    candidate_value: str = "",
+    raw_query: str = "",
+    include_value: bool = True,
+) -> float:
+    """Calculate overall match score combining exact key match, BM25F, and phrase bonus.
+
+    Args:
+        query_tokens: Set of normalized search query tokens.
+        candidate_key: Normalized candidate key.
+        candidate_tags: Normalized candidate tags or tags_search text.
+        candidate_value: Normalized candidate value text.
+        raw_query: Raw query string for exact key and phrase matching.
+        include_value: Whether candidate value is factored into match score.
+
+    Returns:
+        Score between 0.0 and 1.0 representing match relevance.
+    """
+    if not query_tokens:
+        return 0.0
+
+    norm_query = _normalize_search_text(raw_query)
+    key_clean = candidate_key.replace("_", " ").strip()
+    if norm_query and norm_query in (candidate_key, key_clean):
+        return 1.0
+
+    key_list = key_clean.split()
+    tag_list = candidate_tags.split()
+    val_list = candidate_value.split() if include_value else []
+
+    score = _calculate_bm25_score(
+        query_tokens=query_tokens,
+        key_list=key_list,
+        tag_list=tag_list,
+        val_list=val_list,
+        include_value=include_value,
+    )
+
+    # Exact phrase bonus: contiguous substring match for multi-token queries
+    if (
+        norm_query
+        and len(query_tokens) > 1
+        and (
+            norm_query in key_clean or norm_query in candidate_tags or (include_value and norm_query in candidate_value)
+        )
+    ):
+        score = min(1.0, score + 0.15)
+
+    return round(score, 4)
 
 
 async def _search_tag_candidates(
@@ -322,18 +440,16 @@ async def _search_tag_candidates(
         existing_key = _normalize_key(item.get("key", ""))
         if not existing_key or existing_key in exclude_norm or existing_key in dedup:
             continue
-        score_raw = item.get("match_score", "")
-        score_val: float | None
-        if isinstance(score_raw, (int, float)):
-            score_val = float(score_raw)
-        else:
-            try:
-                score_val = float(score_raw)
-            except (TypeError, ValueError):
-                existing_tags_norm = _normalize_tags(item.get("tags", ""))
-                candidate_tokens = {token for token in existing_tags_norm.split() if token}
-                score_val = _calculate_match_score(tag_tokens, candidate_tokens, None)
-        if score_val is None or score_val <= 0:
+        existing_tags_norm = item.get("tags_search") or _normalize_tags(item.get("tags", ""))
+        score_val = _calculate_match_score(
+            query_tokens=tag_tokens,
+            candidate_key=existing_key,
+            candidate_tags=existing_tags_norm,
+            candidate_value="",
+            raw_query=tags_search,
+            include_value=False,
+        )
+        if score_val < CANDIDATE_SIMILARITY_THRESHOLD:
             continue
         dedup[existing_key] = (item, score_val)
     if not dedup:
@@ -573,6 +689,7 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
     if not normalized_query:
         return []
     query_tokens = set(normalized_query.split()) if normalized_query else set()
+    fetch_limit = min(max(limit * 3, 15), SEARCH_LIMIT_MAX)
     for attempt in range(2):
         try:
             _ensure_db_once(force=attempt == 1)
@@ -583,7 +700,7 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                 match_variants = _build_fts_queries(query)
 
                 for mv in match_variants:
-                    if len(found_by_key) >= limit:
+                    if len(found_by_key) >= fetch_limit:
                         break
                     try:
                         fetched = cur.execute(
@@ -604,7 +721,7 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                             ORDER BY rank, m.last_used_at DESC
                             LIMIT ?;
                             """,
-                            (mv, limit),
+                            (mv, fetch_limit),
                         ).fetchall()
                     except sqlite3.Error as error:
                         log.warning(f"FTS variant failed: {error}")  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -614,7 +731,7 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                         if key not in found_by_key:
                             found_by_key[key] = row
                             total_rows.append(row)
-                        if len(found_by_key) >= limit:
+                        if len(found_by_key) >= fetch_limit:
                             break
                 if not total_rows:
                     like_q = f"%{normalized_query}%"
@@ -637,13 +754,21 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                         ORDER BY m.last_used_at DESC
                         LIMIT ?;
                         """,
-                        (like_q, like_q, like_q, like_q, limit),
+                        (like_q, like_q, like_q, like_q, fetch_limit),
                     ).fetchall()
             results: list[dict[str, Any]] = []
             for row in total_rows:
-                candidate_source = row["tags_search"] or _normalize_tags(row["tags"])
-                candidate_tokens = {token for token in candidate_source.split() if token}
-                match_score = _calculate_match_score(query_tokens, candidate_tokens, row["rank"])
+                candidate_tags = row["tags_search"] or _normalize_tags(row["tags"] or "")
+                candidate_key = _normalize_key(row["key"] or "")
+                candidate_val = _normalize_search_text(row["value"] or "")
+                match_score = _calculate_match_score(
+                    query_tokens=query_tokens,
+                    candidate_key=candidate_key,
+                    candidate_tags=candidate_tags,
+                    candidate_value=candidate_val,
+                    raw_query=query,
+                    include_value=True,
+                )
                 results.append(
                     {
                         "key": row["key"],
@@ -656,7 +781,8 @@ def _memory_search_db_sync(query: str, limit: int) -> list[dict[str, Any]]:
                         "match_score": match_score,
                     }
                 )
-            return results
+            results.sort(key=lambda r: (r["match_score"], r.get("last_used_at") or ""), reverse=True)
+            return results[:limit]
         except sqlite3.OperationalError:
             _reset_db_ready()
             if attempt == 0:
@@ -783,6 +909,7 @@ def _memory_reindex_fts_db_sync() -> tuple[int, int]:
                 )
 
                 cur.execute("INSERT INTO mem_fts(mem_fts) VALUES('rebuild')")
+                cur.execute("INSERT INTO mem_fts(mem_fts) VALUES('optimize')")
                 cur.execute("SELECT COUNT(*) FROM mem_fts")
                 after = cur.fetchone()[0]
                 conn.commit()
@@ -794,6 +921,25 @@ def _memory_reindex_fts_db_sync() -> tuple[int, int]:
                 continue
             raise
     return 0, 0
+
+
+@pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
+def _memory_optimize_fts_db_sync() -> bool:
+    """Synchronously optimize FTS index segments to merge b-trees and purge tombstones."""
+    for attempt in range(2):
+        try:
+            _ensure_db_once(force=attempt == 1)
+            with closing(_get_db_connection()) as conn:
+                conn.execute("INSERT INTO mem_fts(mem_fts) VALUES('optimize');")
+                conn.commit()
+            return True
+        except sqlite3.OperationalError:
+            _reset_db_ready()
+            if attempt == 0:
+                time.sleep(0.1)
+                continue
+            raise
+    return False
 
 
 @pyscript_compile  # noqa: F821  # ty:ignore[unresolved-reference]
@@ -874,6 +1020,11 @@ async def _memory_purge_expired_db(grace_days: int = 0) -> int:
 async def _memory_reindex_fts_db() -> tuple[int, int]:
     """Async wrapper for rebuilding the FTS index."""
     return await asyncio.to_thread(_memory_reindex_fts_db_sync)
+
+
+async def _memory_optimize_fts_db() -> bool:
+    """Async wrapper for optimizing the FTS index."""
+    return await asyncio.to_thread(_memory_optimize_fts_db_sync)
 
 
 async def _memory_health_check_db() -> tuple[int, int, int]:
@@ -1383,5 +1534,6 @@ async def memory_daily_housekeeping():
     """Perform daily memory database maintenance."""
     try:
         await memory_purge_expired(grace_days=HOUSEKEEPING_GRACE_DAYS)
+        await _memory_optimize_fts_db()
     except Exception as e:
         log.error(f"memory_daily_housekeeping failed: {e}")  # noqa: F821  # ty:ignore[unresolved-reference]

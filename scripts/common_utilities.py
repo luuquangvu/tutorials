@@ -4,15 +4,30 @@ import asyncio
 import sqlite3
 import threading
 import time
-from contextlib import closing
+from contextlib import closing, suppress
 from pathlib import Path
 from typing import Any
 
 import orjson
 
+
+def _resolve_db_path() -> Path:
+    """Resolve database path portably for standard or custom HA environments.
+
+    Returns:
+        Resolved Path object for the SQLite database.
+    """
+    if Path("/config").exists():
+        return Path("/config/cache.db")
+    with suppress(Exception):
+        if "hass" in globals() and hasattr(hass, "config"):  # noqa: F821  # ty:ignore[unresolved-reference]
+            return Path(hass.config.path("cache.db"))  # noqa: F821  # ty:ignore[unresolved-reference]
+    return Path("cache.db")
+
+
 TTL = 300  # Retention period in Home Assistant is set to a fixed 5 minutes of idle time.
 INDEX_TTL = 2592000  # 30 days
-DB_PATH = Path("/config/cache.db")
+DB_PATH = _resolve_db_path()
 READY_ENTITY = "binary_sensor.pyscript_common_utilities"
 READY_ENTITY_FRIENDLY_NAME = "Pyscript Common Utilities"
 
