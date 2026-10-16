@@ -249,7 +249,7 @@ blueprint:
 mode: queued
 max: 10
 variables:
-  version: 20260909
+  version: 20261016
   target_device: !input target_device
   has_target: "{{ target_device is mapping and (target_device.values() | select | list | length > 0) }}"
   enable_turn_on: !input enable_turn_on
@@ -327,12 +327,12 @@ actions:
                     value_template: "{{ target_turn_on_conditions | length == 0 }}"
                 then:
                   - action: homeassistant.turn_on
-                    target: !input target_device
+                    target: "{{ target_device }}"
                 else:
                   - if: !input target_turn_on_conditions
                     then:
                       - action: homeassistant.turn_on
-                        target: !input target_device
+                        target: "{{ target_device }}"
           - if:
               - condition: template
                 value_template: "{{ extra_turn_on_conditions | length == 0 }}"
@@ -465,12 +465,12 @@ actions:
                     value_template: "{{ target_turn_off_conditions | length == 0 }}"
                 then:
                   - action: homeassistant.turn_off
-                    target: !input target_device
+                    target: "{{ target_device }}"
                 else:
                   - if: !input target_turn_off_conditions
                     then:
                       - action: homeassistant.turn_off
-                        target: !input target_device
+                        target: "{{ target_device }}"
           - if:
               - condition: template
                 value_template: "{{ extra_turn_off_conditions | length == 0 }}"
