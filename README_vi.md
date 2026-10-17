@@ -3,7 +3,7 @@
 **[🇺🇸 English](README.md) | 🇻🇳 Tiếng Việt**
 
 > [!TIP]
-> **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: Một tích hợp cực kỳ hữu ích giúp tự động cập nhật các blueprint trong bộ sưu tập này. Khi bạn cài đặt nhiều blueprint từ nhiều nguồn khác nhau, việc theo dõi cập nhật từ các tác giả trở nên khó khăn - tích hợp này sẽ giải quyết vấn đề đó cho bạn hoàn toàn tự động.
+> **[Blueprints Updater](https://github.com/luuquangvu/blueprints-updater)**: Một tích hợp cực kỳ hữu ích giúp tự động cập nhật các blueprint trong bộ sưu tập này. Khi bạn cài đặt nhiều blueprint từ nhiều nguồn khác nhau, việc theo dõi cập nhật từ các tác giả trở nên khó khăn thì tích hợp này sẽ giải quyết vấn đề đó cho bạn hoàn toàn tự động.
 
 <!-- MD028/no-blanks-blockquote: Blank line inside blockquote -->
 
@@ -31,6 +31,7 @@ Biến Home Assistant thành một trợ lý cá nhân thực thụ với bộ s
       - [Mô-đun 3: Các Tích hợp & Dịch vụ Chuyên biệt](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)
     - [Bảng Tra cứu Điều kiện Tiên quyết](#bảng-tra-cứu-điều-kiện-tiên-quyết)
   - [Voice Assist - Hẹn giờ & Lên lịch Thông minh](#voice-assist---hẹn-giờ--lên-lịch-thông-minh)
+    - [Phiên bản cũ (V1 - Deprecated)](#phiên-bản-cũ-v1---deprecated)
   - [Voice Assist - Ghi nhớ và Truy xuất Thông tin](#voice-assist---ghi-nhớ-và-truy-xuất-thông-tin)
   - [Voice Assist - Phân tích Hình ảnh Camera](#voice-assist---phân-tích-hình-ảnh-camera)
   - [Voice Assist - Quản lý Lịch trình & Sự kiện](#voice-assist---quản-lý-lịch-trình--sự-kiện)
@@ -77,7 +78,7 @@ Mọi blueprint trong kho này đều có thể cài đặt và kích hoạt qua
    - Nhấn **Lưu**. **Không đổi tên mặc định của script / entity ID** nếu các blueprint hoặc script khác cần tham chiếu đến nó.
 
 3. **Cấu hình làm công cụ cho Assist (Rất quan trọng đối với các công cụ Voice Assist):**
-   - **Bộc lộ cho Assist:** Vào **Cài đặt > Trợ lý giọng nói**, đảm bảo script vừa tạo đã được bộc lộ (expose) cho Assist hoặc Conversation Agent của bạn.
+   - **Hiển thị cho Assist (Expose):** Vào **Cài đặt > Trợ lý giọng nói**, đảm bảo script vừa tạo đã được bật tùy chọn **Hiển thị cho Assist (Expose to Assist)** hoặc Conversation Agent của bạn.
    - **Khôi phục Mô tả LLM (Bước quan trọng nhất):** Khi bạn lưu script qua giao diện người dùng, Home Assistant có thể ghi đè phần mô tả chi tiết bằng một dòng ngắn chung chung. Để khôi phục:
      1. Mở script đã lưu trong Trình chỉnh sửa Kịch bản của Home Assistant.
      2. Nhấn vào dấu ba chấm (`⋮`) ở góc trên bên phải và chọn **Chỉnh sửa trong YAML**.
@@ -123,11 +124,16 @@ Nhiều blueprint Voice Assist (như Hẹn giờ thông minh, Chụp ảnh camer
    ```
 
 2. Khởi động lại Home Assistant (hoặc tải lại cấu hình YAML).
-3. Đảm bảo các thiết bị bạn muốn điều khiển đã được **bộc lộ cho Assist** và có đặt bí danh (alias) trong cài đặt thực thể.
+3. Đảm bảo các thiết bị bạn muốn điều khiển đã được **hiển thị cho Assist (Expose to Assist)** và có đặt bí danh (alias) trong cài đặt thực thể.
 
 #### Mô-đun 2: Tích hợp Pyscript & Script Hỗ trợ
 
-Các tính năng nâng cao như hẹn giờ đa thiết bị bền bỉ, bộ nhớ thông minh, tính toán lịch âm, tìm kiếm YouTube và gửi tin nhắn bot tương tác (Telegram/Zalo) sử dụng các script Python nhẹ chạy qua tích hợp **Pyscript**.
+Các tính năng nâng cao như hẹn giờ đa thiết bị (tự khôi phục sau khởi động lại), bộ nhớ thông minh, tính toán lịch âm, tìm kiếm YouTube và gửi tin nhắn bot tương tác (Telegram/Zalo) sử dụng các script Python nhẹ chạy qua tích hợp **Pyscript**.
+
+> [!NOTE]
+> **Tại sao lại dùng Pyscript thay vì tạo Custom Integration riêng?**
+> Một số blueprint nâng cao đòi hỏi khả năng xử lý mạnh mẽ ở tầng backend (như lưu trữ dữ liệu an toàn vào SQLite, luồng tác vụ nền hay kết nối API bên thứ ba). Thay vì bắt người dùng phải cài thêm các custom integration đơn lẻ chỉ để phục vụ riêng cho từng blueprint, mình lựa chọn giải pháp chạy trên nền tảng [Pyscript](https://github.com/custom-components/pyscript).
+> Pyscript là một tích hợp nổi tiếng, được cộng đồng Home Assistant hỗ trợ mạnh mẽ, mang đến trải nghiệm "cắm là chạy" (plug-and-play) cùng đầy đủ sức mạnh của ngôn ngữ Python. Nhờ đó, bạn không phải cài đặt hàng loạt custom integration làm phân mảnh hệ thống, đồng thời một khi đã có Pyscript, bạn hoàn toàn có thể tái sử dụng, tùy biến và mở rộng linh hoạt các script này cho rất nhiều kịch bản tự động hóa khác trong nhà thông minh.
 
 1. **Cài đặt Pyscript:**
    - Cài đặt **Pyscript Python Scripting** qua [HACS](https://hacs.xyz/).
@@ -147,12 +153,13 @@ Các tính năng nâng cao như hẹn giờ đa thiết bị bền bỉ, bộ nh
 3. **Sao chép các script cần thiết vào `config/pyscript/`:**
    - Trong thư mục `config/` của Home Assistant, tìm hoặc tạo thư mục con `pyscript/`.
    - Sao chép các file từ thư mục [`scripts/`](scripts/) trong kho lưu trữ này vào `config/pyscript/` tùy theo blueprint bạn cài:
-     - [`scripts/common_utilities.py`](scripts/common_utilities.py) — Các hàm tiện ích cốt lõi (cần cho Hẹn giờ, Bộ nhớ cục bộ, Telegram, Zalo).
-     - [`scripts/memory.py`](scripts/memory.py) — Bộ máy ghi nhớ (cần cho Bộ nhớ Memory Tool).
-     - [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) — Chuyển đổi Âm - Dương lịch (cần cho Lịch âm).
-     - [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) — Bộ xử lý bot Telegram.
-     - [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) — Bộ xử lý bot Zalo.
-     - [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) — Công cụ gọi YouTube Data API.
+     - [`scripts/devices_scheduler.py`](scripts/devices_scheduler.py) - Mô-đun quản lý hẹn giờ và lịch trình thiết bị (tự khôi phục sau khởi động lại) kèm đánh giá điều kiện thực tế (cần cho Hẹn giờ & Lên lịch V2).
+     - [`scripts/common_utilities.py`](scripts/common_utilities.py) - Thư viện tiện ích dùng chung (cần cho Hẹn giờ v1, Bộ nhớ cục bộ, Telegram, Zalo).
+     - [`scripts/memory.py`](scripts/memory.py) - Mô-đun ghi nhớ thông minh (cần cho Bộ nhớ Memory Tool).
+     - [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) - Chuyển đổi Âm - Dương lịch (cần cho Lịch âm).
+     - [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) - Bộ xử lý bot Telegram.
+     - [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) - Bộ xử lý bot Zalo.
+     - [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) - Công cụ gọi YouTube Data API.
 4. **Cài đặt Thư viện Phụ thuộc (Khi cần):**
    - Nếu sử dụng script Telegram, Zalo hoặc YouTube, sao chép file [`scripts/requirements.txt`](scripts/requirements.txt) vào thư mục `config/pyscript/`. Pyscript sẽ tự động tải về các gói cần thiết (`h2`, `google-api-python-client`).
 5. **Tải lại Pyscript:**
@@ -176,7 +183,7 @@ Một số blueprint yêu cầu kết nối tới các dịch vụ tích hợp s
   - Cần cài đặt và cấu hình sẵn tích hợp [Music Assistant](https://music-assistant.io/).
 - **Theo dõi Vị trí Thiết bị & Thông báo:**
   - Sử dụng cho: _Định vị & Tìm kiếm thiết bị_.
-  - Bộc lộ thực thể **Bermuda Device Tracker** hoặc **Home Assistant Mobile App** cho Assist. Để đổ chuông, bật quyền thông báo và cảnh báo quan trọng (Critical Alerts) trên điện thoại mục tiêu.
+  - Hiển thị thực thể **Bermuda Device Tracker** hoặc **Home Assistant Mobile App** cho Assist. Để đổ chuông, bật quyền thông báo và cảnh báo quan trọng (Critical Alerts) trên điện thoại mục tiêu.
 
 ---
 
@@ -186,7 +193,8 @@ Bảng tóm tắt nhanh các thành phần cần chuẩn bị cho từng bluepri
 
 | Blueprint                                                                          | Loại                   | Blueprint Đi kèm Cần thiết                                                                                                                            | Mô-đun Bắt buộc                                                                                                                     | Script Python & Bí mật Cần có                                                                |
 | ---------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [Hẹn giờ & Lên lịch Thông minh](#voice-assist---hẹn-giờ--lên-lịch-thông-minh)      | Kịch bản + Tự động hóa | Điều khiển (`devices_schedules_controller_full_llm.yaml`) + Lõi (`devices_schedules.yaml`) + Khởi động lại (`devices_schedules_restart_handler.yaml`) | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)  | `common_utilities.py`                                                                        |
+| [Hẹn giờ & Lên lịch Thông minh (V2)](#voice-assist---hẹn-giờ--lên-lịch-thông-minh) | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)  | `devices_scheduler.py`                                                                       |
+| [Hẹn giờ & Lên lịch Thông minh (V1 - Deprecated)](#phiên-bản-cũ-v1---deprecated)   | Kịch bản + Tự động hóa | Điều khiển (`devices_schedules_controller_full_llm.yaml`) + Lõi (`devices_schedules.yaml`) + Khởi động lại (`devices_schedules_restart_handler.yaml`) | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)  | `common_utilities.py`                                                                        |
 | [Ghi nhớ và Truy xuất (LLM)](#voice-assist---ghi-nhớ-và-truy-xuất-thông-tin)       | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)                                                                              | `memory.py`                                                                                  |
 | [Ghi nhớ và Truy xuất (Cục bộ)](#voice-assist---ghi-nhớ-và-truy-xuất-thông-tin)    | Tự động hóa            | Không                                                                                                                                                 | [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)                                                                              | `memory.py`, `common_utilities.py`                                                           |
 | [Phân tích Hình ảnh Camera](#voice-assist---phân-tích-hình-ảnh-camera)             | Kịch bản               | Chụp ảnh (`camera_snapshot_full_llm.yaml`) + Phân tích (`file_content_analyzer_full_llm.yaml`)                                                        | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt) | Thực thể AI Task, thư mục `/media`                                                           |
@@ -201,8 +209,8 @@ Bảng tóm tắt nhanh các thành phần cần chuẩn bị cho từng bluepri
 | [Tra cứu Thông tin Internet](#voice-assist---tra-cứu-thông-tin-internet)           | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)                                                                             | Agent Gemini có Google Search & tối thiểu 16k token                                          |
 | [Tìm kiếm & Phát YouTube](#voice-assist---tìm-kiếm--phát-video-youtube)            | Kịch bản               | Tìm kiếm (`advanced_youtube_search_full_llm.yaml`) + Phát (`play_youtube_video_full_llm.yaml`)                                                        | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)  | `youtube_data_tool.py`, `requirements.txt`, Khóa YouTube API, Ứng dụng YouTube trên TV       |
 | [Theo dõi Kênh YouTube Yêu thích](#voice-assist---theo-dõi-kênh-youtube-yêu-thích) | Kịch bản               | Lấy thông tin (`get_youtube_video_info_full_llm.yaml`) + Phát (`play_youtube_video_full_llm.yaml`)                                                    | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 2](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ)  | `youtube_data_tool.py`, `requirements.txt`, Khóa YouTube API, Ứng dụng YouTube trên TV       |
-| [Điều khiển Quạt Thông minh](#voice-assist---điều-khiển-quạt-thông-minh)           | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện)                                                          | Thực thể quạt bộc lộ cho Assist                                                              |
-| [Điều khiển Điều hòa Thông minh](#voice-assist---điều-khiển-điều-hòa-thông-minh)   | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện)                                                          | Thực thể điều hòa bộc lộ cho Assist                                                          |
+| [Điều khiển Quạt Thông minh](#voice-assist---điều-khiển-quạt-thông-minh)           | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện)                                                          | Thực thể quạt hiển thị cho Assist                                                            |
+| [Điều khiển Điều hòa Thông minh](#voice-assist---điều-khiển-điều-hòa-thông-minh)   | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện)                                                          | Thực thể điều hòa hiển thị cho Assist                                                        |
 | [Dự báo Thời tiết](#voice-assist---dự-báo-thời-tiết)                               | Kịch bản               | Không                                                                                                                                                 | Không                                                                                                                               | Thực thể thời tiết có dự báo theo giờ & ngày                                                 |
 | [Điều khiển Nhạc](#voice-assist---điều-khiển-nhạc)                                 | Kịch bản               | Không                                                                                                                                                 | [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)                                                                             | Tích hợp Music Assistant                                                                     |
 | [Định vị & Tìm kiếm Thiết bị](#voice-assist---định-vị--tìm-kiếm-thiết-bị)          | Kịch bản               | Tìm vị trí (`device_location_lookup_full_llm.yaml`) + Đổ chuông (`device_ringing_full_llm.yaml`)                                                      | [Mô-đun 1](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện), [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt) | Thiết bị theo dõi Bermuda / Mobile app, Thông báo ứng dụng HA Companion                      |
@@ -212,44 +220,76 @@ Bảng tóm tắt nhanh các thành phần cần chuẩn bị cho từng bluepri
 
 ## Voice Assist - Hẹn giờ & Lên lịch Thông minh
 
-Bạn muốn bật điều hòa trong 30 phút rồi tự tắt? Hay muốn đèn ngủ tự động giảm độ sáng sau 1 tiếng?
-Blueprint này biến Voice Assist thành một trợ lý quản lý thời gian thực thụ. Bạn có thể ra lệnh giọng nói tự nhiên để **tạo, gia hạn, tạm dừng, tiếp tục hoặc hủy** lịch trình cho bất kỳ thiết bị nào.
+Bạn muốn bật điều hòa trong 30 phút rồi tự tắt? Muốn đèn ngủ tự động giảm độ sáng sau 1 tiếng? Hay muốn bật đèn hiên sau 3 tiếng nữa nếu trời có mưa?
+Blueprint này nâng cấp Voice Assist thành một trợ lý quản lý lịch trình và thời gian thực thụ. Được trang bị **Phiên bản 2 (V2)**, hệ thống cung cấp khả năng quản lý toàn diện vòng đời hẹn giờ đa thiết bị (**tạo, gia hạn, tạm dừng, tiếp tục, hủy**) cùng tính năng đánh giá điều kiện thực tế thông minh khi hết giờ, lưu trữ dữ liệu an toàn vào SQLite (tự khôi phục sau khởi động lại) và cảm biến trạng thái theo thời gian thực.
 
-**Tính năng nổi bật:**
+> [!TIP]
+> **Phiên bản 2 (Khuyên dùng)**: V2 tinh gọn toàn bộ quy trình cài đặt thành một blueprint điều khiển duy nhất hoạt động trực tiếp cùng mô-đun Pyscript `scripts/devices_scheduler.py`. Phiên bản này loại bỏ kiến trúc 3 blueprint phức tạp trước đây và bổ sung khả năng kiểm tra điều kiện thực tế linh hoạt ngay tại thời điểm kích hoạt. _(Xem [Tại sao dùng Pyscript?](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) để hiểu lý do giải pháp Pyscript được lựa chọn thay vì custom integration riêng.)_
 
-- **Hiểu ngôn ngữ tự nhiên:** Chỉ cần nói "Bật quạt 1 tiếng nữa tắt", không cần đúng cú pháp cứng nhắc.
-- **Quản lý toàn diện:** Hỗ trợ đầy đủ các lệnh như tạo mới, gia hạn thêm giờ, tạm dừng lịch đang chạy hoặc hủy bỏ.
-- **Bền bỉ & Tin cậy:** Mọi lịch trình đều được lưu lại và **tự động khôi phục** nếu Home Assistant khởi động lại. Bạn không lo bị mất hẹn giờ khi mất điện.
-- **Điều khiển đa dạng:** Hỗ trợ hầu hết các loại thiết bị: Đèn (độ sáng, màu), Rèm (đóng/mở/vị trí), Quạt (tốc độ/tuốc năng), Điều hòa, Robot hút bụi, Media Player, v.v.
-- **Nhận diện thông minh:** Tự động nhận diện thiết bị qua tên gọi thân mật (alias) mà bạn hay dùng.
-- **Phản hồi chi tiết:** Khi hỏi "Có lịch nào đang chạy không?", trợ lý sẽ liệt kê rõ ràng tên thiết bị và thời gian còn lại.
+**Tính năng nổi bật (V2):**
+
+- **Hiểu ngôn ngữ tự nhiên:** Chỉ cần nói "Bật quạt 1 tiếng nữa tắt" hoặc "Tắt điều hòa sau 30 phút nếu ngoài trời mát dưới 24 độ", không cần đúng cú pháp cứng nhắc.
+- **Đánh giá điều kiện thực tế linh hoạt:** Tự động kiểm tra điều kiện môi trường hoặc trạng thái thiết bị tại chính xác thời điểm đếm ngược kết thúc (thời tiết ngoài trời mưa/nắng/quang đãng, trạng thái có người/vắng nhà, vị trí mặt trời ngày/đêm, hoặc trạng thái thiết bị cụ thể như nhiệt độ, cảm biến cửa mở/đóng, công suất, pin). Nếu điều kiện không thỏa mãn, lệnh sẽ được bỏ qua an toàn.
+- **Kiến trúc Blueprint Tinh gọn:** Kết nối trực tiếp với `scripts/devices_scheduler.py`. Không cần thêm script lõi hay tự động hóa khôi phục đi kèm.
+- **Lưu trữ SQLite An toàn & Tự động Khôi phục:** Toàn bộ lịch trình được lưu vào cơ sở dữ liệu SQLite (`devices_schedules.db`), đảm bảo lịch không bao giờ bị mất khi khởi động lại, mất điện hay sự cố, đồng thời tự động thực thi các lịch đã hết hạn trong thời gian gián đoạn.
+- **Cảm biến Trạng thái Thời gian thực (`sensor.devices_scheduler`):** Tự động cung cấp số lượng lịch trình đang hoạt động cùng các thuộc tính chi tiết (`all_timers`, `running_timers`, `paused_timers`, `next_expiring`, `total_active_count`), tự động cập nhật mỗi 10 giây khi có lịch trình hoạt động để hiển thị thời gian thực trên dashboard và tự động hóa tùy chỉnh.
+- **Quản lý Toàn diện:** Hỗ trợ đầy đủ các lệnh tạo mới, gia hạn thêm thời gian, tạm dừng, tiếp tục lại, hủy từng lịch hoặc hủy tất cả, và tra cứu các lịch đang chạy.
+- **Điều khiển Đa dạng & Giá trị Tương đối:** Hỗ trợ công tắc, đèn (độ sáng, màu sắc), rèm/van (đóng, mở, vị trí %), quạt (tốc độ, tuốc năng), điều hòa/bình nóng lạnh (nhiệt độ, chế độ HVAC), máy hút ẩm, loa đa phương tiện (phát, tạm dừng, dừng, âm lượng %), robot hút bụi, nút bấm, kịch bản, ngữ cảnh và thông báo giọng nói TTS. Hỗ trợ điều chỉnh giá trị tương đối (ví dụ: `+2`, `-10`, `+20%`).
+- **Hẹn giờ Hàng loạt Đa thiết bị:** Lên lịch điều khiển cho nhiều thiết bị cùng lúc chỉ trong một khẩu lệnh duy nhất.
+- **Nhận diện Tên gọi Thông minh:** Tự động nhận diện thiết bị qua tên gọi thân mật (alias) và phòng ốc mà bạn thường dùng hàng ngày.
 
 **Ví dụ lệnh thoại:**
 
-- "Bật đèn phòng khách màu vàng 50% trong 2 tiếng."
-- "Mở rèm phòng ngủ 15 phút để thoáng khí rồi đóng lại."
-- "Gia hạn thêm 30 phút cho quạt phòng bé."
-- "Tạm dừng lịch tưới cây."
-- "Có thiết bị nào đang hẹn giờ không?"
+- _Lịch trình cơ bản:_
+  - "Bật đèn phòng khách màu vàng 50% trong 2 tiếng."
+  - "Mở rèm phòng ngủ 15 phút để thoáng khí rồi đóng lại."
+  - "Bật điều hòa phòng ngủ 25 độ lúc 10 giờ tối."
+  - "Sạc điện thoại 2 tiếng rồi tắt ổ cắm."
+- _Lịch trình kèm điều kiện (Mới trong V2):_
+  - "Bật đèn hiên nhà sau 4 tiếng nữa nếu trời mưa."
+  - "Tắt điều hòa phòng khách sau 30 phút nếu nhiệt độ phòng dưới 22 độ."
+  - "Tắt quạt phòng khách sau 20 phút nếu không có ai ở nhà."
+  - "Đóng rèm phòng ngủ lúc 6 giờ chiều nếu cửa ban công đã đóng."
+- _Quản lý & Tra cứu:_
+  - "Gia hạn thêm 30 phút cho quạt phòng bé."
+  - "Tạm dừng lịch tưới cây."
+  - "Tiếp tục lịch tưới cây."
+  - "Hủy tất cả hẹn giờ trong phòng ngủ."
+  - "Có thiết bị nào đang hẹn giờ không?"
 
 **Ứng dụng thực tế:**
 
-- **Bảo vệ Pin:** "Sạc điện thoại 2 tiếng rồi tắt ổ cắm" - Giúp bạn sạc qua đêm mà không lo chai pin.
-- **Nấu nướng rảnh tay:** "Bật hút mùi 20 phút nữa tắt" - Khi bạn kho cá xong và muốn ra ngoài đi dạo.
-- **Giấc ngủ ngon:** "Bật quạt số nhỏ nhất trong 1 tiếng rồi tắt hẳn" - Tránh bị lạnh hoặc khô họng khi về sáng.
+- **Tối ưu Năng lượng & Khí hậu:** "Tắt điều hòa sau 1 tiếng nếu ngoài trời dưới 24°C" - Tự động tiết kiệm điện khi thời tiết dịu mát về đêm.
+- **An ninh & Chiếu sáng Thông minh:** "Tắt toàn bộ đèn sau 15 phút nếu cả nhà đi vắng" - Đảm bảo không quên tắt đèn khi ra khỏi nhà.
+- **Bảo vệ Pin:** "Sạc điện thoại 2 tiếng rồi tắt ổ cắm" - Tránh sạc ngâm qua đêm gây chai pin.
+- **Nấu nướng Rảnh tay:** "Bật hút mùi 20 phút nữa tắt" - Rảnh tay sau khi nấu nướng mà không cần bận tâm tắt bếp.
+- **Giấc ngủ Thoải mái:** "Bật quạt số nhỏ nhất trong 90 phút rồi tắt hẳn" - Giúp dễ ngủ mà không bị lạnh về sáng.
 
-**Điều kiện tiên quyết & Cài đặt:**
+**Điều kiện tiên quyết & Cài đặt (V2):**
 
 - Cần cấu hình [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện) trong `configuration.yaml` để nhận diện tên thiết bị thân mật.
-- Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) và đặt file [`scripts/common_utilities.py`](scripts/common_utilities.py) vào thư mục `config/pyscript/`.
-- Cài đặt đủ 3 blueprint bên dưới (Script điều khiển, Script lõi và Tự động hóa khôi phục).
-- Bộc lộ script Điều khiển cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (giữ nguyên tên mặc định, xóa dòng `description:` khi sửa YAML).
+- Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) và đặt file [`scripts/devices_scheduler.py`](scripts/devices_scheduler.py) vào thư mục `config/pyscript/` (đảm bảo cấu hình `allow_all_imports: true` và `hass_is_global: true`).
+- Cài đặt blueprint **Devices Schedules Controller V2** bên dưới.
+- Hiển thị script Điều khiển cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (giữ nguyên tên mặc định, xóa dòng `description:` khi sửa YAML).
 
-1. **Blueprint Điều khiển (LLM):** Xử lý lệnh thoại và điều phối hành động.
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_v2_full_llm.yaml)
+
+### Phiên bản cũ (V1 - Deprecated)
+
+> [!WARNING]
+> **Phiên bản 1 (V1) hiện đã ngừng phát triển (deprecated)** và được thay thế hoàn toàn bởi V2. Phiên bản V1 trước đây sử dụng kiến trúc kết hợp 3 blueprint cùng bộ nhớ đệm Pyscript trong `scripts/common_utilities.py`. Người dùng mới nên cài đặt trực tiếp V2, người dùng V1 được khuyến nghị nâng cấp lên V2 để có trải nghiệm ổn định và nhiều tính năng hơn.
+
+**Điều kiện tiên quyết cho V1:**
+
+- Cần [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện).
+- Cần [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) với [`scripts/common_utilities.py`](scripts/common_utilities.py) trong `config/pyscript/`.
+- Cài đặt đủ 3 blueprint bên dưới:
+
+1. **Blueprint Điều khiển (LLM) (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_full_llm.yaml)
-2. **Blueprint Lõi Lịch trình:** Chịu trách nhiệm tạo và quản lý các lịch trình.
+2. **Blueprint Lõi Lịch trình (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules.yaml)
-3. **Blueprint Khôi phục:** Tự động khôi phục các lịch trình đang hoạt động khi Home Assistant khởi động lại.
+3. **Blueprint Khôi phục (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_restart_handler.yaml)
 
 ---
@@ -278,14 +318,14 @@ Bạn hay quên mật khẩu Wi-Fi? Hay không nhớ đã để xe ở cột nà
 
 **Ứng dụng thực tế:**
 
-- **Truy tìm đồ thất lạc:** "Hộ chiếu cất ở đâu?" - Cứu cánh cho những lúc cần gấp mà không nhớ đã cất ở ngăn kéo nào.
-- **Thông tin lắt léo:** Lưu mật khẩu Wifi dài ngoằng hoặc số tài khoản ngân hàng để khi khách hỏi là có ngay.
-- **Trợ lý mua sắm:** Lưu size quần áo, giày dép của vợ/chồng/con để order online chính xác mà không cần hỏi lại.
+- **Tìm kiếm đồ đạc thất lạc:** "Hộ chiếu cất ở đâu?" - Hỗ trợ nhanh chóng khi bạn cần gấp mà không nhớ đã cất ở ngăn kéo nào.
+- **Lưu trữ thông tin quan trọng:** Lưu mật khẩu Wi-Fi hoặc số tài khoản ngân hàng để tra cứu và chia sẻ ngay khi cần.
+- **Trợ lý mua sắm gia đình:** Ghi nhớ kích cỡ trang phục, giày dép của người thân để mua sắm trực tuyến thuận tiện mà không cần hỏi lại.
 
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) và đặt file [`scripts/memory.py`](scripts/memory.py) vào thư mục `config/pyscript/` (phiên bản Cục bộ cần thêm cả [`scripts/common_utilities.py`](scripts/common_utilities.py)).
-- **Phiên bản LLM:** Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- **Phiên bản LLM:** Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 - **Phiên bản Cục bộ:** Cấu hình dưới dạng tự động hóa, tùy chỉnh các cụm từ kích hoạt nếu muốn.
 
 _Tùy chọn phiên bản bạn muốn sử dụng:_
@@ -317,16 +357,16 @@ Biến camera an ninh thành "đôi mắt" thông minh cho trợ lý ảo. Khôn
 
 **Ứng dụng thực tế:**
 
-- **Shipper đến:** "Xem có gói hàng nào trước cửa không?" khi bạn đang ở tầng 3 ngại chạy xuống.
-- **Trị bệnh "Hay lo":** Đã lên giường đắp chăn nhưng chợt giật mình "Cổng đã đóng chưa?", chỉ cần hỏi để Assistant nhìn giúp.
-- **Trông chừng "Boss":** Xem thú cưng đang ngủ ngoan hay đang đào bới ngoài vườn.
+- **Kiểm tra giao hàng:** "Xem có gói hàng nào trước cửa không?" - Thuận tiện khi bạn đang ở phòng làm việc hoặc tầng trên.
+- **Kiểm tra an ninh nhanh chóng:** Khi đã nghỉ ngơi và muốn kiểm tra lại "Cổng đã đóng chưa?", chỉ cần hỏi để Assistant quan sát giúp bạn.
+- **Quan sát thú cưng:** Kiểm tra xem thú cưng đang ở đâu trong nhà hoặc ngoài sân một cách dễ dàng.
 
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cần cấu hình [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện) để nhận diện tên camera.
 - Cần cấu hình thực thể tác vụ **AI Task** trong **Cài đặt > Hệ thống > Chung** (xem [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)).
 - Đảm bảo thư mục lưu trữ ảnh tồn tại (mặc định là `/media`).
-- Cài đặt cả 2 blueprint bên dưới, bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
+- Cài đặt cả 2 blueprint bên dưới, hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
 
 1. **Blueprint Chụp ảnh:** Chụp lại hình ảnh từ camera được yêu cầu.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcamera_snapshot_full_llm.yaml)
@@ -363,7 +403,7 @@ Sắp xếp lịch trình bằng giọng nói như đang trò chuyện với tr�
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Yêu cầu thực thể Lịch có quyền Đọc/Ghi (xem [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)).
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_calendar_event_full_llm.yaml)
 
@@ -384,7 +424,7 @@ Hỏi và nhận thông tin về các sự kiện đã có trong lịch của b�
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Chọn các thực thể lịch cần tra cứu trong phần cài đặt blueprint.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcalendar_events_lookup_full_llm.yaml)
 
@@ -420,7 +460,7 @@ Công cụ chuyển đổi lịch Âm - Dương mạnh mẽ, hoạt động hoà
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) và đặt file [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) vào thư mục `config/pyscript/`.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdate_lookup_and_conversion_full_llm.yaml)
 
@@ -444,7 +484,7 @@ Tự động thêm các sự kiện quan trọng tính theo lịch Âm (giỗ, n
 
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) và đặt file [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) vào thư mục `config/pyscript/`.
 - Yêu cầu thực thể Lịch có quyền Đọc/Ghi (xem [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)).
-- Chạy thủ công qua giao diện hoặc tự động hóa (không yêu cầu bộc lộ cho Assist).
+- Chạy thủ công qua giao diện hoặc tự động hóa (không yêu cầu hiển thị cho Assist).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcreate_lunar_events.yaml)
 
@@ -517,7 +557,7 @@ _Cài đặt blueprint webhook cho nền tảng bạn chọn. Để phân tích 
 
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) với file [`scripts/requirements.txt`](scripts/requirements.txt) và bộ xử lý bot ([`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) hoặc [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py)) trong `config/pyscript/`.
 - Điền token của bot vào `configuration.yaml` và `secrets.yaml` trong mục `pyscript:`.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 _Cài đặt blueprint cho nền tảng bạn muốn gửi tin đến:_
 
@@ -562,7 +602,7 @@ _Cài đặt blueprint cho nền tảng bạn muốn gửi tin đến:_
 
 - Được thiết kế riêng cho Google Generative AI (Gemini).
 - Yêu cầu cấu hình Conversation Agent với công cụ **Google Search** được kích hoạt và giới hạn token tối thiểu là **16.384** (xem [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)).
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_google_search_full_llm.yaml)
 
@@ -596,7 +636,7 @@ Biến TV của bạn thành rạp chiếu phim thông minh. Không cần remote
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) với các file [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) và [`scripts/requirements.txt`](scripts/requirements.txt) đặt trong `config/pyscript/`.
 - Cấu hình khóa `youtube_api_key` trong `configuration.yaml` và `secrets.yaml` ở mục `pyscript:`.
 - TV hoặc thiết bị phát mục tiêu cần cài đặt ứng dụng YouTube chính thức.
-- Cài đặt cả 2 blueprint bên dưới, bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
+- Cài đặt cả 2 blueprint bên dưới, hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
 
 1. **Blueprint Tìm kiếm (LLM):** Phân tích câu hỏi và tìm kiếm video phù hợp.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fadvanced_youtube_search_full_llm.yaml)
@@ -633,7 +673,7 @@ Bạn là fan cứng của "Trực Tiếp Game" hay "MixiGaming"? Blueprint này
 - Cần cài đặt [Mô-đun 2: Tích hợp Pyscript](#mô-đun-2-tích-hợp-pyscript--script-hỗ-trợ) với các file [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) và [`scripts/requirements.txt`](scripts/requirements.txt) đặt trong `config/pyscript/`.
 - Cấu hình khóa `youtube_api_key` trong `configuration.yaml` và `secrets.yaml` ở mục `pyscript:`.
 - TV hoặc thiết bị phát mục tiêu cần cài đặt ứng dụng YouTube chính thức.
-- Cài đặt cả 2 blueprint bên dưới, bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
+- Cài đặt cả 2 blueprint bên dưới, hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
 
 1. **Blueprint Lấy thông tin (LLM):** Kiểm tra kênh và lấy thông tin video mới nhất.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fget_youtube_video_info_full_llm.yaml)
@@ -675,8 +715,8 @@ Mặc dù Home Assistant đã hỗ trợ điều khiển quạt cơ bản, nhưn
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cần cấu hình [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện) trong `configuration.yaml`.
-- Bộc lộ các thực thể quạt cho Assist kèm bí danh (alias) mong muốn.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị các thực thể quạt cho Assist kèm bí danh (alias) mong muốn.
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Ffan_speed_and_oscillation_control_full_llm.yaml)
 
@@ -723,8 +763,8 @@ Blueprint này giải quyết triệt để các hạn chế đó:
 
 - Yêu cầu điều hòa thông minh (thực thể climate) đã tích hợp trong Home Assistant.
 - Cần cấu hình [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện) trong `configuration.yaml`.
-- Bộc lộ các thực thể điều hòa cho Assist kèm bí danh (alias) mong muốn.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị các thực thể điều hòa cho Assist kèm bí danh (alias) mong muốn.
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fac_mode_and_fan_control_full_llm.yaml)
 
@@ -753,7 +793,7 @@ Tra cứu dự báo thời tiết tại nhà cho các khoảng thời gian cụ 
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cấu hình thực thể thời tiết hỗ trợ cả dự báo theo giờ và theo ngày trong các tham số blueprint.
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fweather_forecast_full_llm.yaml)
 
@@ -782,7 +822,7 @@ Tra cứu dự báo thời tiết tại nhà cho các khoảng thời gian cụ 
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Yêu cầu tích hợp **Music Assistant** đã được cấu hình trong Home Assistant (xem [Mô-đun 3](#mô-đun-3-các-tích-hợp--dịch-vụ-chuyên-biệt)).
-- Bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
+- Hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung) (xóa dòng `description:` khi sửa YAML).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fcontrol_music_full_llm.yaml)
 
@@ -813,9 +853,9 @@ Tra cứu dự báo thời tiết tại nhà cho các khoảng thời gian cụ 
 **Điều kiện tiên quyết & Cài đặt:**
 
 - Cần cấu hình [Mô-đun 1: Cảm biến Bí danh Thực thể](#mô-đun-1-cảm-biến-bí-danh-thực-thể-tra-cứu-tên-gọi-thân-thiện) để nhận diện tên thiết bị.
-- Bộc lộ thực thể Bermuda Device Tracker hoặc Mobile App Device Tracker cho Assist (mỗi thiết bị vật lý chỉ gán một bộ theo dõi; xem [hướng dẫn chi tiết](/home_assistant_device_location_lookup_guide_vi.md)).
+- Hiển thị thực thể Bermuda Device Tracker hoặc Mobile App Device Tracker cho Assist (mỗi thiết bị vật lý chỉ gán một bộ theo dõi; xem [hướng dẫn chi tiết](/home_assistant_device_location_lookup_guide_vi.md)).
 - Với tính năng đổ chuông: Thiết bị di động mục tiêu cần cài ứng dụng Home Assistant Companion và cấp quyền thông báo (bật Critical Alerts trên iOS).
-- Cài đặt cả 2 blueprint bên dưới, bộc lộ script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
+- Cài đặt cả 2 blueprint bên dưới, hiển thị script cho Assist và làm theo [Quy trình Cài đặt Blueprint Chung](#quy-trình-cài-đặt-blueprint-chung).
 
 1. **Blueprint Tìm vị trí (LLM):** Xử lý yêu cầu và tìm vị trí thiết bị.
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevice_location_lookup_full_llm.yaml)

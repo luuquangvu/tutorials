@@ -1,9 +1,12 @@
 blueprint:
-  name: Devices Schedules
+  name: Devices Schedules (Deprecated)
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/devices_schedules.yaml
   description: |-
-    # Voice assistant friendly multi-device timer controller
+    # Voice assistant friendly multi-device timer controller (Deprecated)
+
+    > [!WARNING]
+    > **DEPRECATED**: This legacy script blueprint is part of Devices Schedules V1 and is deprecated in favor of [Devices Schedules Controller V2](https://github.com/luuquangvu/tutorials/blob/main/devices_schedules_controller_v2_full_llm.yaml) with `scripts/devices_scheduler.py`.
 
     - Manages per-entity timers with caching and deduplication.
     - Supports start / cancel / cancel_all / extend / pause / resume / list modes.
@@ -91,7 +94,7 @@ max: !input simultaneous
 max_exceeded: silent
 
 variables:
-  version: 20260222
+  version: 20261017
 
 fields:
   mode:

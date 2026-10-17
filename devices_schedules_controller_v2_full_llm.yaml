@@ -1,0 +1,913 @@
+blueprint:
+  name: Devices Schedules Controller
+  author: luuquangvu
+  source_url: https://github.com/luuquangvu/tutorials/blob/dev/devices_schedules_controller_v2_full_llm.yaml
+  description: |-
+    # Devices Schedules Controller V2 used for Voice Assistant
+
+    - Upgraded multi-device scheduling engine with real-world condition evaluation.
+    - Integrates directly with the `scripts/devices_scheduler.py` Pyscript module for persistent timers and automatic restart recovery.
+    - Exposes real-time timer state and rich attributes via `sensor.devices_scheduler` (e.g. `all_timers`, `running_timers`, `paused_timers`, `next_expiring`, `total_active_count`), updated automatically every 10 seconds while a timer is active.
+    - Accepts friendly names from the LLM, resolves them to entity_ids via the provided alias sensor, and supports multiple devices in one request.
+    - Evaluates conditions dynamically at expiration time (e.g. "turn on light in 5 hours if outside is rain", "turn off in 15 minutes if no one home", "turn off AC in 30 minutes if temperature < 22").
+
+    ## Blueprint Capabilities
+
+    This controller can schedule actions for various device types with optional conditions:
+
+    - **Generic On/Off:** `turn_on`, `turn_off` (for switches, lights, fans, media players, generic climate devices).
+    - **Covers/Valves:** `open`, `close`, `stop_cover`, `set_position` (with a value 0-100%).
+    - **Lights:** `set_brightness` (0-100%), `set_color` (color name).
+    - **Fans:** `set_fan_speed` (0-100%), `set_oscillation` (true/false).
+    - **Climate/Water Heater:** `set_temperature` (target temperature), `set_hvac_mode` ('cool', 'heat', 'off', 'auto').
+    - **Humidifiers:** `set_humidity` (target percentage).
+    - **Scenes:** `activate`.
+    - **Scripts:** `run_script`.
+    - **Media Players:** `media_play`, `media_pause`, `media_stop`, `set_volume` (0-100%).
+    - **Vacuum Robots:** `start_vacuum`, `return_vacuum`.
+    - **Buttons:** `press`.
+    - **Notifications:** `announce` (speak text message via TTS).
+    - **Relative Adjustments:** Supports relative numeric adjustments (e.g., `+2`, `-10`, `+20%`).
+    - **Condition Logic:** Evaluates ambient environment (weather, occupancy, sun, time) or specific device properties (door, temperature, power, battery) at expiration.
+
+    ## Blueprint Setup
+
+    ### Required
+
+    - The Pyscript integration must be installed through HACS and configured with `allow_all_imports: true` and `hass_is_global: true`.
+    - The `scripts/devices_scheduler.py` script needs to be copied into the `config/pyscript` folder.
+    - A template sensor storing entity aliases must be configured in `configuration.yaml`:
+
+    ```yaml
+    # File configuration.yaml
+    pyscript:
+      allow_all_imports: true
+      hass_is_global: true
+
+    shell_command:
+      get_entity_alias: >-
+        jq '[.data.entities[] | select(.options.conversation.should_expose == true) | {entity_id, aliases: (if has("aliases_v2") then ((if (.aliases_v2 | type) == "array" then .aliases_v2 else [] end) | map(select(. != null and . != ""))) else (if (.aliases | type) == "array" then .aliases else [] end) end)} | select(.aliases | length > 0)]' ./.storage/core.entity_registry
+
+    template:
+      - triggers:
+          - trigger: homeassistant
+            event: start
+          - trigger: event
+            event_type: event_template_reloaded
+        actions:
+          - action: shell_command.get_entity_alias
+            response_variable: response
+        sensor:
+          - name: "Assist: Entity IDs and Aliases"
+            unique_id: entity_ids_and_aliases
+            icon: mdi:format-list-bulleted
+            device_class: timestamp
+            state: "{{ now().isoformat() }}"
+            attributes:
+              entities: "{{ response.stdout }}"
+    ```
+
+    ### Note
+
+    - Make sure to expose the entities you want to control to Assist.
+    - Make sure to expose this script to Assist after creating it.
+    - Do not alter the default script name.
+  domain: script
+  homeassistant:
+    min_version: 2024.12.0
+  input:
+    required_settings:
+      name: Required settings
+      icon: mdi:script-text
+      description: Select the dependencies used by this blueprint.
+      input:
+        entity_aliases:
+          name: Entity aliases sensor
+          description: Template sensor attribute that lists exposed entities with friendly-name aliases.
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  integration: template
+        tts_entity:
+          name: TTS Provider Entity
+          description: The TTS entity to use for 'announce' actions (e.g., tts.google_translate_en_com).
+          selector:
+            entity:
+              filter:
+                - domain: tts
+          default: ""
+    prompt_settings:
+      name: Prompt settings for the LLM
+      icon: mdi:robot
+      description: Optional prompt overrides used by the LLM when collecting arguments.
+      collapsed: true
+      input:
+        mode_prompt:
+          name: Mode prompt
+          description: The operation mode used by the AI
+          selector:
+            text:
+              multiline: true
+          default: |-
+            start, cancel, cancel_all, extend, pause, resume, or list
+        entities_prompt:
+          name: Entities prompt
+          description: Device names, IDs, or aliases to control
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Entities (name/ID/alias). Semicolon-separated. Duplicates allowed
+        action_prompt:
+          name: Action prompt
+          description: Action to schedule upon timer expiration
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Action to schedule
+        value_prompt:
+          name: Value prompt
+          description: Parameter value for the action
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Parameter value (e.g., 25, +2, -10, 50%). Relative (+/-) values use the current state.
+        duration_prompt:
+          name: Duration prompt
+          description: Timer duration (HH:MM:SS) or fixed target time (YYYY-MM-DD HH:MM:SS)
+          selector:
+            text:
+              multiline: true
+          default: |-
+            HH:MM:SS (duration) or YYYY-MM-DD HH:MM:SS (fixed time)
+        condition_entity_prompt:
+          name: Condition Entity prompt
+          description: Subject or entity to evaluate before executing actions (always in English)
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Subject or entity to check at expiration (always in English):
+            - Ambient environment: 'outside', 'weather', 'home' (or specific zone name/ID like 'zone.cottage'), 'sun', 'time'
+            - Specific devices: device friendly name, ID, or alias (e.g. 'balcony door', 'living room AC')
+            Leave blank if no condition.
+        condition_property_prompt:
+          name: Condition Property prompt
+          description: Specific attribute or metric to inspect on the condition entity (always in English)
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Attribute or metric to check in English (e.g., 'temperature', 'humidity', 'fan_mode', 'power', 'battery', 'brightness', 'pm25').
+            Leave blank for main state or ambient conditions.
+        condition_operator_prompt:
+          name: Condition Operator prompt
+          description: Comparison operator to evaluate condition
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Comparison operator: '==' (default), '!=', '>', '<', '>=', '<='.
+        condition_value_prompt:
+          name: Condition Value prompt
+          description: Expected target state or threshold (always in English)
+          selector:
+            text:
+              multiline: true
+          default: |-
+            Expected target value or state in English (e.g., 'clear', 'rain', 'sunny', 'cloudy', 'open', 'closed', 'connected', 'connecting', 'disconnected', 'locked', 'unlocked', 'on', 'off', 'nobody', 'someone', 'day', 'night', 'midnight', 'noon', 'sunrise', 'sunset', '22', '80%').
+
+mode: parallel
+max_exceeded: silent
+description: Manages device timers with condition evaluation and restart persistence (start, cancel, pause, resume, list)
+variables:
+  version: 20261017
+fields:
+  mode:
+    name: Mode
+    description: !input mode_prompt
+    required: true
+    selector:
+      select:
+        options: [start, cancel, cancel_all, extend, pause, resume, list]
+  entities:
+    name: Entities
+    description: !input entities_prompt
+    selector:
+      text:
+  action:
+    name: Expire action
+    description: !input action_prompt
+    selector:
+      select:
+        options:
+          - label: Turn on
+            value: turn_on
+          - label: Turn off
+            value: turn_off
+          - label: Activate Scene
+            value: activate
+          - label: Run Script
+            value: run_script
+          - label: Open Cover/Valve
+            value: open
+          - label: Close Cover/Valve
+            value: close
+          - label: Stop Cover
+            value: stop_cover
+          - label: Set Cover Position
+            value: set_position
+          - label: Set Brightness
+            value: set_brightness
+          - label: Set Color
+            value: set_color
+          - label: Set Fan Speed
+            value: set_fan_speed
+          - label: Set Oscillation
+            value: set_oscillation
+          - label: Set Temperature
+            value: set_temperature
+          - label: Set Humidity
+            value: set_humidity
+          - label: Set HVAC Mode
+            value: set_hvac_mode
+          - label: Media Play
+            value: media_play
+          - label: Media Pause
+            value: media_pause
+          - label: Media Stop
+            value: media_stop
+          - label: Set Volume
+            value: set_volume
+          - label: Start Vacuum
+            value: start_vacuum
+          - label: Return Vacuum
+            value: return_vacuum
+          - label: Press Button
+            value: press
+          - label: Announce (TTS)
+            value: announce
+  action_value:
+    name: Action Value
+    description: !input value_prompt
+    selector:
+      text:
+  duration:
+    name: Duration (HH:MM:SS)
+    description: !input duration_prompt
+    selector:
+      text:
+  condition_entity:
+    name: Condition Entity
+    description: !input condition_entity_prompt
+    selector:
+      text:
+  condition_property:
+    name: Condition Property
+    description: !input condition_property_prompt
+    selector:
+      text:
+  condition_operator:
+    name: Condition Operator
+    description: !input condition_operator_prompt
+    selector:
+      select:
+        options:
+          - label: "Equals (==)"
+            value: "=="
+          - label: "Not Equals (!=)"
+            value: "!="
+          - label: "Greater Than (>)"
+            value: ">"
+          - label: "Less Than (<)"
+            value: "<"
+          - label: "Greater Than or Equal (>=)"
+            value: ">="
+          - label: "Less Than or Equal (<=)"
+            value: "<="
+          - label: "In"
+            value: "in"
+  condition_value:
+    name: Condition Value
+    description: !input condition_value_prompt
+    selector:
+      text:
+
+sequence:
+  - variables:
+      _entity_aliases: !input entity_aliases
+      _tts_entity: !input tts_entity
+      _mode: "{{ (mode | default('list', true)) | string | lower | replace('-', '_') | replace(' ', '_') | trim('_') }}"
+      _entities_raw: "{{ entities | default('', true) }}"
+      _action_raw: "{{ action | default('', true) }}"
+      _value_raw: "{{ action_value | default('', true) }}"
+      _duration_raw: "{{ duration | default('00:00:00', true) }}"
+      _cond_entity_raw: "{{ condition_entity | default('', true) | string | trim }}"
+      _cond_property_raw: "{{ condition_property | default('', true) | string | trim }}"
+      _cond_operator_raw: "{{ condition_operator | default('==', true) | string | trim }}"
+      _cond_value_raw: "{{ condition_value | default('', true) | string | trim }}"
+      _entity_names: >-
+        {% set ns = namespace(items=[]) %}
+        {% if _entities_raw is iterable and _entities_raw is not string and _entities_raw is not mapping %}
+          {% for item in _entities_raw %}
+            {% set trimmed = (item | string | trim) %}
+            {% if trimmed | length > 0 and (trimmed not in ns.items) %}
+              {% set ns.items = ns.items + [trimmed] %}
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          {% set text = (_entities_raw | string) %}
+          {% set normalized = text.replace('\r\n','\n').replace('\r','\n').replace(',', ';').replace('\n',';') %}
+          {% for name in normalized.split(';') %}
+            {% set trimmed = name | trim %}
+            {% if trimmed | length > 0 and (trimmed not in ns.items) %}
+              {% set ns.items = ns.items + [trimmed] %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ ns.items }}
+      _alias_list: >-
+        {% set raw = state_attr(_entity_aliases, 'entities') %}
+        {% if raw is string %}
+          {% set trimmed = raw | trim %}
+          {% set first = trimmed[0:1] %}
+          {% if (trimmed | length) > 0 and first in ['[','{'] %}
+            {% set parsed = from_json(trimmed) %}
+          {% else %}
+            {% set parsed = [] %}
+          {% endif %}
+        {% else %}
+          {% set parsed = raw %}
+        {% endif %}
+        {{ parsed if parsed is sequence else [] }}
+      _resolved_details: >-
+        {% set ns = namespace(items=[]) %}
+        {% for name in _entity_names %}
+          {% set name_s = name | string | trim %}
+          {% set name_l = name_s | lower %}
+          {% set match = namespace(done=false, entity_id='') %}
+
+          {% if not match.done and '.' in name_s and states[name_s] is not none %}
+            {% set match.entity_id = name_s %}
+            {% set match.done = true %}
+          {% endif %}
+
+          {% if not match.done %}
+            {% set s_match = states | selectattr('attributes.friendly_name', 'defined') | selectattr('attributes.friendly_name', 'eq', name_s) | list %}
+            {% if s_match | length > 0 %}
+              {% set match.entity_id = s_match[0].entity_id %}
+              {% set match.done = true %}
+            {% else %}
+              {% for s in states if s.attributes.friendly_name is defined %}
+                {% if not match.done and (s.attributes.friendly_name | string | lower) == name_l %}
+                  {% set match.entity_id = s.entity_id %}
+                  {% set match.done = true %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+
+          {% if not match.done %}
+            {% for device in _alias_list %}
+              {% if not match.done %}
+                {% set aliases = device.aliases if device.aliases is sequence else [] %}
+                {% if name_s in aliases or name_l in (aliases | map('lower') | list) %}
+                  {% set match.entity_id = device.entity_id %}
+                  {% set match.done = true %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          {% if match.done %}
+            {% set ns.items = ns.items + [dict(name=name, entity_id=match.entity_id)] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items }}
+      _resolved_entities: >-
+        {% set ns = namespace(items=[]) %}
+        {% set ignored_domains = ['binary_sensor', 'calendar', 'device_tracker', 'person', 'sensor', 'sun', 'todo', 'weather', 'zone'] %}
+        {% for item in _resolved_details %}
+          {% set eid = item.entity_id | default('', true) | string %}
+          {% set domain = eid.split('.')[0] if '.' in eid else '' %}
+          {% if eid | length > 0 and eid not in ns.items and domain not in ignored_domains %}
+            {% set ns.items = ns.items + [eid] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items }}
+      _missing_entities: >-
+        {% set resolved_names = _resolved_details | map(attribute='name') | list %}
+        {% set ns = namespace(items=[]) %}
+        {% for name in _entity_names %}
+          {% if name not in resolved_names %}
+            {% set ns.items = ns.items + [name] %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.items }}
+      _duration_seconds: >-
+        {% set raw = _duration_raw | string | trim %}
+        {% if '-' in raw and ' ' in raw %}
+          {% set target = as_datetime(raw) %}
+          {% if target is not none %}
+            {% set diff = (as_timestamp(target) - as_timestamp(now())) | int(0) %}
+            {{ diff if diff > 0 else 0 }}
+          {% else %}
+            0
+          {% endif %}
+        {% elif raw | regex_match('^\d+$') %}
+          {{ raw | int(0) }}
+        {% elif raw | length > 0 %}
+          {% set td = as_timedelta(raw) %}
+          {% if td is not none and td is not string %}
+            {{ td.total_seconds() | round(0) | int(0) }}
+          {% else %}
+            {% set parts = raw.split(':') %}
+            {% if parts | length >= 3 %}
+              {% set hours = (parts[-3] | default('0') | float(0)) %}
+              {% set minutes = (parts[-2] | default('0') | float(0)) %}
+              {% set seconds = (parts[-1] | default('0') | float(0)) %}
+              {{ (hours * 3600 + minutes * 60 + seconds) | round(0) | int(0) }}
+            {% elif parts | length == 2 %}
+              {% set minutes = (parts[0] | default('0') | float(0)) %}
+              {% set seconds = (parts[1] | default('0') | float(0)) %}
+              {{ (minutes * 60 + seconds) | round(0) | int(0) }}
+            {% else %}
+              {{ parts[0] | float(0) | round(0) | int(0) }}
+            {% endif %}
+          {% endif %}
+        {% else %}
+          0
+        {% endif %}
+      _action_normalized: >-
+        {{ _action_raw | string | lower | replace(' ', '_') | trim }}
+      _action_service_map:
+        turn_on: "homeassistant.turn_on"
+        turn_off: "homeassistant.turn_off"
+        activate: "scene.turn_on"
+        run_script: "script.turn_on"
+        open: "cover.open_cover"
+        close: "cover.close_cover"
+        set_brightness: "light.turn_on"
+        set_color: "light.turn_on"
+        stop_cover: "cover.stop_cover"
+        set_position: "cover.set_cover_position"
+        set_fan_speed: "fan.set_percentage"
+        set_oscillation: "fan.oscillate"
+        set_temperature: "climate.set_temperature"
+        set_humidity: "humidifier.set_humidity"
+        set_hvac_mode: "climate.set_hvac_mode"
+        media_play: "media_player.media_play"
+        media_pause: "media_player.media_pause"
+        media_stop: "media_player.media_stop"
+        set_volume: "media_player.volume_set"
+        start_vacuum: "vacuum.start"
+        return_vacuum: "vacuum.return_to_base"
+        press: "button.press"
+      _responses: []
+      _is_relative: "{{ (_value_raw | string).startswith('+') or (_value_raw | string).startswith('-') }}"
+      _value_delta: "{{ (_value_raw | replace('%','') | float(0)) if _is_relative else 0 }}"
+      _clean_value: >-
+        {% set a = _action_normalized %}
+        {% set v = _value_raw %}
+        {% if a in ['set_position','set_brightness','set_fan_speed','set_humidity'] %}
+          {% set num = (v | float(0)) %}
+          {% if num < 0 %}{% set num = 0 %}{% endif %}
+          {% if num > 100 %}{% set num = 100 %}{% endif %}
+          {{ num | round(0) | int(0) }}
+        {% elif a == 'set_volume' %}
+          {% set num = (v | float(0)) %}
+          {% if num < 0 %}{% set num = 0 %}{% endif %}
+          {% if num > 100 %}{% set num = 100 %}{% endif %}
+          {{ (num / 100.0) | round(2) }}
+        {% elif a == 'set_oscillation' %}
+          {% set t = (v | string | lower | trim) %}
+          {% if t in ['true','on','yes','1'] %}
+            true
+          {% else %}
+            false
+          {% endif %}
+        {% elif a == 'set_temperature' %}
+          {{ (v | float(0)) | round(1) }}
+        {% elif a in ['set_hvac_mode','set_color','announce'] %}
+          {{ (v | string | trim) }}
+        {% else %}
+          {{ v }}
+        {% endif %}
+
+      # Condition Resolver & Specification Packager
+      _condition_spec: >-
+        {% set c_ent = _cond_entity_raw | lower %}
+        {% set c_prop = _cond_property_raw %}
+        {% set c_op = _cond_operator_raw | default('==', true) %}
+        {% set c_val = _cond_value_raw %}
+        {% set c_val_l = c_val | lower %}
+
+        {% if c_ent | length == 0 and c_val | length == 0 %}
+          {{ dict(type='none') }}
+        {% elif c_ent in ['outside', 'weather'] or c_val_l in ['rain', 'raining', 'clear', 'sunny', 'cloudy', 'snow', 'fog', 'windy', 'storm'] %}
+          {% set weather_eid = (states.weather | map(attribute='entity_id') | list | first) | default('weather', true) %}
+          {{ dict(type='weather', entity_id=weather_eid, property=c_prop, operator=c_op, value=c_val) }}
+        {% elif c_ent in ['home', 'house'] or c_ent.startswith('zone.') or c_val_l in ['nobody', 'no one', 'no_one', 'someone'] %}
+          {{ dict(type='occupancy', entity_id=c_ent, operator=c_op, value=c_val) }}
+        {% elif c_ent in ['sun'] or c_val_l in ['sunset', 'after_sunset', 'sunrise', 'night', 'dark', 'day', 'midnight', 'noon', 'dawn', 'dusk'] %}
+          {{ dict(type='sun', entity_id='sun.sun', property=c_prop, operator=c_op, value=c_val) }}
+        {% elif c_val_l in ['weekday', 'weekdays', 'weekend', 'weekends'] %}
+          {{ dict(type='day_of_week', value=c_val) }}
+        {% else %}
+          {# Device or sensor lookup across ALL domains (including sensors/binary_sensors) #}
+          {% set matched_eid = namespace(val='') %}
+          {% if '.' in _cond_entity_raw and states[_cond_entity_raw] is not none %}
+            {% set matched_eid.val = _cond_entity_raw %}
+          {% endif %}
+          {% if matched_eid.val | length == 0 %}
+            {% set s_match = states | selectattr('attributes.friendly_name', 'defined') | selectattr('attributes.friendly_name', 'eq', _cond_entity_raw) | list %}
+            {% if s_match | length > 0 %}
+              {% set matched_eid.val = s_match[0].entity_id %}
+            {% else %}
+              {% for s in states if s.attributes.friendly_name is defined %}
+                {% if matched_eid.val | length == 0 and (s.attributes.friendly_name | string | lower) == c_ent %}
+                  {% set matched_eid.val = s.entity_id %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+          {% if matched_eid.val | length == 0 %}
+            {% for device in _alias_list %}
+              {% if matched_eid.val | length == 0 %}
+                {% set aliases = device.aliases if device.aliases is sequence else [] %}
+                {% if _cond_entity_raw in aliases or c_ent in (aliases | map('lower') | list) %}
+                  {% set matched_eid.val = device.entity_id %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+          {{ dict(type='entity_property', entity_id=matched_eid.val, property=c_prop, operator=c_op, value=c_val) }}
+        {% endif %}
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ _entity_names | length > 0 and (_missing_entities | length) > 0 }}"
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='Unknown device name(s): ' ~ (_missing_entities | join(', ')), mode=_mode) }}
+          - stop: "Unknown device name(s)"
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode in ['start','cancel','extend','pause','resume'] and (_resolved_entities | length) == 0 }}"
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='No controllable devices were resolved.', mode=_mode) }}
+          - stop: "No controllable devices resolved."
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode in ['start', 'extend'] and _duration_seconds <= 0 }}"
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='Duration must be greater than zero.', mode=_mode) }}
+          - stop: "Duration must be greater than zero."
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ _resolved_entities | select('match', 'lock\.') | list | length > 0 }}
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='Security Violation: Scheduling actions for locks (smart locks) is strictly prohibited.', mode=_mode) }}
+          - stop: "Security restriction: Lock control denied."
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'start' and (_action_normalized | string | length) == 0 }}"
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='Action is required when mode is start.', mode=_mode) }}
+          - stop: "Action is required for start mode."
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'start' and _action_normalized == 'announce' and (_tts_entity | default('', true) | string | trim | length) == 0 }}"
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='TTS provider entity is required for announce action.', mode=_mode) }}
+          - stop: "TTS provider entity is required for announce action."
+            response_variable: response
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ _mode == 'start' and (_cond_entity_raw | length) > 0 and _condition_spec.type == 'entity_property' and (_condition_spec.entity_id | default('', true) | string | trim | length) == 0 }}
+        sequence:
+          - variables:
+              response: >-
+                {{ dict(error='Unknown condition device: ' ~ _cond_entity_raw, mode=_mode) }}
+          - stop: "Unknown condition device"
+            response_variable: response
+
+  - choose:
+      # START MODE: Dispatches timers with condition directly to Pyscript scheduler
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'start' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ _resolved_entities }}"
+              sequence:
+                - variables:
+                    _current_entity: "{{ repeat.item }}"
+                    _item_final_value: >-
+                      {% set a = _action_normalized %}
+                      {% set eid = _current_entity %}
+                      {% set numeric_actions = ['set_temperature','set_brightness','set_position','set_fan_speed','set_humidity','set_volume'] %}
+                      {% if not _is_relative or a not in numeric_actions %}
+                        {{ _clean_value }}
+                      {% else %}
+                        {% set delta = _value_delta %}
+                        {% if a == 'set_temperature' %}
+                          {% set current = state_attr(eid, 'temperature') | float(state_attr(eid, 'current_temperature') | float(24)) %}
+                          {{ (current + delta) | round(1) }}
+                        {% elif a == 'set_brightness' %}
+                          {% set current = (state_attr(eid, 'brightness') | float(0) / 255.0 * 100) %}
+                          {% set out = (current + delta) | round(0) | int(0) %}
+                          {{ 100 if out > 100 else (0 if out < 0 else out) }}
+                        {% elif a == 'set_position' %}
+                          {% set current = state_attr(eid, 'current_position') | float(0) %}
+                          {% set out = (current + delta) | round(0) | int(0) %}
+                          {{ 100 if out > 100 else (0 if out < 0 else out) }}
+                        {% elif a == 'set_fan_speed' %}
+                          {% set current = state_attr(eid, 'percentage') | float(0) %}
+                          {% set out = (current + delta) | round(0) | int(0) %}
+                          {{ 100 if out > 100 else (0 if out < 0 else out) }}
+                        {% elif a == 'set_humidity' %}
+                          {% set current = state_attr(eid, 'humidity') | float(state_attr(eid, 'current_humidity') | float(50)) %}
+                          {% set out = (current + delta) | round(0) | int(0) %}
+                          {{ 100 if out > 100 else (0 if out < 0 else out) }}
+                        {% elif a == 'set_volume' %}
+                          {% set current = state_attr(eid, 'volume_level') | float(0) * 100 %}
+                          {% set out = (current + delta) / 100.0 %}
+                          {{ 1.0 if out > 1.0 else (0.0 if out < 0 else out | round(2)) }}
+                        {% else %}
+                          {{ _clean_value }}
+                        {% endif %}
+                      {% endif %}
+                    _item_target_action: >-
+                      {% set current_entity_id = _current_entity | default('') %}
+                      {% set domain = current_entity_id.split('.')[0] %}
+                      {% if domain in ['button', 'input_button'] %}
+                        {{ domain }}.press
+                      {% elif _action_normalized == 'set_temperature' and domain == 'water_heater' %}
+                        water_heater.set_temperature
+                      {% elif _action_normalized in ['open','close'] %}
+                        {% if domain == 'cover' %}
+                          {% if _action_normalized == 'open' %}cover.open_cover{% else %}cover.close_cover{% endif %}
+                        {% elif domain == 'valve' %}
+                          {% if _action_normalized == 'open' %}valve.open_valve{% else %}valve.close_valve{% endif %}
+                        {% else %}
+                          {{ _action_service_map.get(_action_normalized, '') }}
+                        {% endif %}
+                      {% elif _action_normalized == 'set_position' and domain == 'valve' %}
+                        valve.set_valve_position
+                      {% elif _action_normalized == 'announce' %}
+                        tts.speak
+                      {% else %}
+                        {{ _action_service_map.get(_action_normalized, '') }}
+                      {% endif %}
+                    _item_action_data: >-
+                      {% set d = dict() %}
+                      {% if _action_normalized == 'set_position' %}
+                        {% set d = dict(position=_item_final_value) %}
+                      {% elif _action_normalized == 'set_brightness' %}
+                        {% set d = dict(brightness_pct=_item_final_value) %}
+                      {% elif _action_normalized == 'set_color' %}
+                        {% set d = dict(color_name=_item_final_value) %}
+                      {% elif _action_normalized == 'set_fan_speed' %}
+                        {% set d = dict(percentage=_item_final_value) %}
+                      {% elif _action_normalized == 'set_oscillation' %}
+                        {% set d = dict(oscillating=_item_final_value) %}
+                      {% elif _action_normalized == 'set_temperature' %}
+                        {% set d = dict(temperature=_item_final_value) %}
+                      {% elif _action_normalized == 'set_humidity' %}
+                        {% set d = dict(humidity=_item_final_value) %}
+                      {% elif _action_normalized == 'set_hvac_mode' %}
+                        {% set d = dict(hvac_mode=_item_final_value) %}
+                      {% elif _action_normalized == 'set_volume' %}
+                        {% set d = dict(volume_level=_item_final_value) %}
+                      {% elif _action_normalized == 'announce' %}
+                        {% set d = dict(media_player_entity_id=_current_entity, message=_item_final_value) %}
+                      {% endif %}
+                      {{ d }}
+                    _item_target_dict: >-
+                      {% if _action_normalized == 'announce' %}
+                        {{ {'entity_id': _tts_entity} }}
+                      {% else %}
+                        {{ {'entity_id': _current_entity} }}
+                      {% endif %}
+
+                - action: pyscript.devices_schedules_start
+                  data:
+                    target_entity: "{{ _current_entity }}"
+                    duration_seconds: "{{ _duration_seconds }}"
+                    actions:
+                      - action: "{{ _item_target_action }}"
+                        target: "{{ _item_target_dict }}"
+                        data: "{{ _item_action_data }}"
+                    condition_spec: "{{ _condition_spec }}"
+                  response_variable: _sched_res
+                - variables:
+                    _responses: "{{ (_responses | default([])) + [_sched_res] }}"
+
+          - variables:
+              response: >-
+                {{ dict(mode='start', action=_action_normalized, duration_seconds=_duration_seconds, condition=_condition_spec, targets=_resolved_entities, dispatched=_responses) }}
+
+      # CANCEL MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'cancel' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ _resolved_entities }}"
+              sequence:
+                - action: pyscript.devices_schedules_cancel
+                  data:
+                    target_entity: "{{ repeat.item }}"
+                  response_variable: _call_result
+                - variables:
+                    _responses: "{{ (_responses | default([])) + [_call_result] }}"
+          - variables:
+              response: >-
+                {{ dict(mode='cancel', targets=_resolved_entities, results=_responses) }}
+
+      # CANCEL ALL MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'cancel_all' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ _resolved_entities | length > 0 }}"
+                sequence:
+                  - repeat:
+                      for_each: "{{ _resolved_entities }}"
+                      sequence:
+                        - action: pyscript.devices_schedules_cancel_all
+                          data:
+                            target_entity: "{{ repeat.item }}"
+                          response_variable: _call_result
+                        - variables:
+                            _responses: "{{ (_responses | default([])) + [_call_result] }}"
+            default:
+              - action: pyscript.devices_schedules_cancel_all
+                data: {}
+                response_variable: _call_result
+              - variables:
+                  _responses: "{{ [_call_result] }}"
+          - variables:
+              response: >-
+                {{ dict(mode='cancel_all', targets=_resolved_entities, results=_responses) }}
+
+      # EXTEND MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'extend' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ _resolved_entities }}"
+              sequence:
+                - action: pyscript.devices_schedules_extend
+                  data:
+                    target_entity: "{{ repeat.item }}"
+                    extend_seconds: "{{ _duration_seconds }}"
+                  response_variable: _call_result
+                - variables:
+                    _responses: "{{ (_responses | default([])) + [_call_result] }}"
+          - variables:
+              response: >-
+                {{ dict(mode='extend', extend_seconds=_duration_seconds, results=_responses) }}
+
+      # PAUSE MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'pause' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ _resolved_entities }}"
+              sequence:
+                - action: pyscript.devices_schedules_pause
+                  data:
+                    target_entity: "{{ repeat.item }}"
+                  response_variable: _call_result
+                - variables:
+                    _responses: "{{ (_responses | default([])) + [_call_result] }}"
+          - variables:
+              response: >-
+                {{ dict(mode='pause', results=_responses) }}
+
+      # RESUME MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'resume' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ _resolved_entities }}"
+              sequence:
+                - action: pyscript.devices_schedules_resume
+                  data:
+                    target_entity: "{{ repeat.item }}"
+                  response_variable: _call_result
+                - variables:
+                    _responses: "{{ (_responses | default([])) + [_call_result] }}"
+          - variables:
+              response: >-
+                {{ dict(mode='resume', results=_responses) }}
+
+      # LIST MODE
+      - conditions:
+          - condition: template
+            value_template: "{{ _mode == 'list' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ _resolved_entities | length > 0 }}"
+                sequence:
+                  - repeat:
+                      for_each: "{{ _resolved_entities }}"
+                      sequence:
+                        - action: pyscript.devices_schedules_list
+                          data:
+                            entity_filter: "{{ repeat.item }}"
+                          response_variable: _call_result
+                        - variables:
+                            _responses: "{{ (_responses | default([])) + [_call_result] }}"
+            default:
+              - action: pyscript.devices_schedules_list
+                data: {}
+                response_variable: _call_result
+              - variables:
+                  _responses: "{{ [_call_result] }}"
+          - variables:
+              _list_results_with_names: >-
+                {% set responses = _responses | default([]) %}
+                {% set outer = namespace(items=[]) %}
+                {% for item in responses %}
+                  {% if item is mapping %}
+                    {% set timers = item.timers if item.timers is sequence else [] %}
+                    {% set timer_ns = namespace(items=[]) %}
+                    {% for timer in timers %}
+                      {% set entity_id = timer.entity_id | default('') | string %}
+                      {% set friendly = state_attr(entity_id, 'friendly_name') %}
+                      {% if friendly is none or (friendly | string | trim) == '' or (friendly | string | lower) in ['unknown', 'unavailable'] %}
+                        {% set alias_list = _alias_list if _alias_list is sequence else [] %}
+                        {% set alias_match = alias_list | selectattr('entity_id', 'eq', entity_id) | map(attribute='aliases') | list %}
+                        {% if alias_match | length > 0 %}
+                          {% set aliases = alias_match[0] if alias_match[0] is sequence else [] %}
+                          {% if aliases | length > 0 %}
+                            {% set friendly = aliases[0] %}
+                          {% endif %}
+                        {% endif %}
+                      {% endif %}
+                      {% if friendly is none or (friendly | string | trim) == '' %}
+                        {% set entity_part = (entity_id.split('.')[-1] if '.' in entity_id else entity_id) %}
+                        {% set friendly = (entity_part | replace('_', ' ') | title) %}
+                      {% endif %}
+                      {% set timer_ns.items = timer_ns.items + [dict(timer, friendly_name=friendly)] %}
+                    {% endfor %}
+                    {% set outer.items = outer.items + [dict(item, timers=timer_ns.items)] %}
+                  {% else %}
+                    {% set outer.items = outer.items + [item] %}
+                  {% endif %}
+                {% endfor %}
+                {{ outer.items }}
+              response: >-
+                {{ dict(mode='list', targets=_resolved_entities, results=_list_results_with_names) }}
+
+    default:
+      - variables:
+          response: >-
+            {{ dict(error='Unsupported mode requested: ' ~ _mode, mode=_mode) }}
+      - stop: "Unsupported mode requested: {{ _mode }}"
+        response_variable: response
+
+  - variables:
+      response: >-
+        {{ dict(response, current_time=now().strftime('%Y-%m-%d %H:%M:%S %z')) if response is mapping else response }}
+  - stop: ""
+    response_variable: response

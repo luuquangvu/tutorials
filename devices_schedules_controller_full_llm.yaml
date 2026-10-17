@@ -1,9 +1,13 @@
 blueprint:
-  name: Devices Schedules Controller
+  name: Devices Schedules Controller (Deprecated)
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/main/devices_schedules_controller_full_llm.yaml
   description: |-
-    # Devices Schedules Controller used for Voice Assistant
+    # Devices Schedules Controller (Deprecated)
+
+    > [!WARNING]
+    > **DEPRECATED**: This blueprint (v1) is deprecated in favor of [Devices Schedules Controller V2](https://github.com/luuquangvu/tutorials/blob/main/devices_schedules_controller_v2_full_llm.yaml).
+    > Please upgrade to V2 which uses `scripts/devices_scheduler.py` for persistent SQLite storage, dynamic condition evaluation at expiration, and a real-time status sensor (`sensor.devices_scheduler`) without requiring companion blueprints.
 
     - Uses the Devices Schedules script to manage per-device timers (start / cancel / cancel_all / extend / pause / resume / list).
     - Accepts friendly names from the LLM, resolves them to entity_ids via the provided alias sensor, and can operate on multiple devices in one request.
@@ -149,7 +153,7 @@ mode: parallel
 max_exceeded: silent
 description: Manages device timers (start, cancel, pause, resume, list)
 variables:
-  version: 20261003
+  version: 20261017
 fields:
   mode:
     name: Mode

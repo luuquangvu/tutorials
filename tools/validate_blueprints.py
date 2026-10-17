@@ -28,7 +28,7 @@ from jinja2 import nodes
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 if TYPE_CHECKING:
-    import voluptuous as vol
+    import probatio as vol
 else:
     try:
         import probatio as vol
@@ -649,8 +649,6 @@ def generate_dummy_input_value(sel_cfg: object) -> object:
     return _DEFAULT_DUMMY_VALUE
 
 
-_generate_dummy_input_value = generate_dummy_input_value
-
 _TARGET_PATH_RE: Final[re.Pattern[str]] = re.compile(r"(?:^|\.)(?:target|data\.target)$")
 _ENTITY_ID_PATH_RE: Final[re.Pattern[str]] = re.compile(r"(?:^|\.)entity_id(?:\[\d+\])?$")
 _DEVICE_ID_PATH_RE: Final[re.Pattern[str]] = re.compile(r"(?:^|\.)device_id(?:\[\d+\])?$")
@@ -771,9 +769,10 @@ def is_invalid_for_input_default(value: object, cfg: Mapping[str, object]) -> bo
 
     sel = cfg.get(_CONF_SELECTOR)
     if isinstance(sel, Mapping) and sel:
-        # In Home Assistant blueprints, TargetSelector defaults to {} for optional targets.
+        # TargetSelector defaults to {} for optional targets, but an empty mapping
+        # is invalid when directly substituted into an action target field.
         if SelectorType.TARGET in sel:
-            return not isinstance(value, Mapping)
+            return not isinstance(value, Mapping) or not any(value.values())
         if any(k in sel for k in _EMPTY_UNSAFE_SELECTORS):
             return value in ("", {}, [])
         return value != [] if SelectorType.ACTION in sel else False
@@ -785,9 +784,6 @@ def is_invalid_for_input_default(value: object, cfg: Mapping[str, object]) -> bo
         return False
     except (vol.Invalid, Exception):
         return True
-
-
-_is_invalid_for_input_default = is_invalid_for_input_default
 
 
 def _iter_input_nodes(value: object, path: str) -> list[tuple[Input, str]]:
@@ -900,7 +896,7 @@ def validate_safe_input_usages(
         path: Current traversal path.
 
     Returns:
-        List of error strings for unsafe usages.
+        List of warning strings for unsafe usages.
     """
     if empty_default_inputs is None:
         if not isinstance(obj, Mapping):
@@ -1394,9 +1390,6 @@ def check_ha_template_ast_compatibility(
     return errors
 
 
-_check_ha_template_ast_compatibility = check_ha_template_ast_compatibility
-
-
 def _validate_jinja_string(
     text: str,
     env: TemplateEnvironment,
@@ -1652,12 +1645,15 @@ def validate_substituted_ha_domain_config(
 
     dummy_inputs: dict[str, object] = {}
     for inp_name, inp_cfg in all_inputs.items():
-        if isinstance(inp_cfg, Mapping) and CONF_DEFAULT not in inp_cfg:
-            dummy_val = derive_dummy_input_value(inp_name, inp_cfg, blueprint_data)
-            if dummy_val is None:
-                sel_cfg = inp_cfg.get(_CONF_SELECTOR)
-                dummy_val = generate_dummy_input_value(sel_cfg if isinstance(sel_cfg, Mapping) else {})
-            dummy_inputs[inp_name] = dummy_val
+        if isinstance(inp_cfg, Mapping):
+            has_default = CONF_DEFAULT in inp_cfg
+            is_empty_default = has_default and is_invalid_for_input_default(inp_cfg[CONF_DEFAULT], inp_cfg)
+            if not has_default or is_empty_default:
+                dummy_val = derive_dummy_input_value(inp_name, inp_cfg, blueprint_data)
+                if dummy_val is None:
+                    sel_cfg = inp_cfg.get(_CONF_SELECTOR)
+                    dummy_val = generate_dummy_input_value(sel_cfg if isinstance(sel_cfg, Mapping) else {})
+                dummy_inputs[inp_name] = dummy_val
 
     try:
         inputs = BlueprintInputs(
@@ -1740,9 +1736,9 @@ def validate_blueprint_file(
     selector_errors = validate_selectors_in_inputs(blueprint_meta.get(CONF_INPUT, {}))
     errors.extend(selector_errors)
 
-    # 5. Safe Input Usages Validation (prevent empty default inputs in action targets)
-    unsafe_input_errors = validate_safe_input_usages(data)
-    errors.extend(unsafe_input_errors)
+    # 5. Safe Input Usages Validation (warn on unsafe empty-default inputs in targets/actions)
+    unsafe_input_warnings = validate_safe_input_usages(data)
+    warnings.extend(unsafe_input_warnings)
 
     # 6. Proactive Substituted Config Validation via Home Assistant Core Domain Schemas
     ha_domain_errors = validate_substituted_ha_domain_config(bp, data, file_path, domain)
@@ -1866,7 +1862,7 @@ def _report_file_result(
         print(f"[PASS] {rel_path}")
         if warnings and verbose:
             for w in warnings:
-                print(f"  Warning: {w}")
+                print(f"  [WARN]  {w}")
     else:
         print(f"[FAIL] {rel_path}")
         for err in errors:

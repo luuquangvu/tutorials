@@ -31,6 +31,7 @@ Transform Home Assistant into a fully-fledged personal teammate with this curate
       - [Module 3: Specialized Integrations & External Services](#module-3-specialized-integrations--external-services)
     - [Blueprint Dependency Matrix](#blueprint-dependency-matrix)
   - [Voice Assist - Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers)
+    - [Legacy Version (V1 - Deprecated)](#legacy-version-v1---deprecated)
   - [Voice Assist - Memory & Information Retrieval](#voice-assist---memory--information-retrieval)
   - [Voice Assist - Camera Image Analysis](#voice-assist---camera-image-analysis)
   - [Voice Assist - Calendar & Event Management](#voice-assist---calendar--event-management)
@@ -129,6 +130,11 @@ Several Voice Assist blueprints (including Smart Scheduling, Camera Snapshot, Fa
 
 Advanced features such as persistent multi-device scheduling, universal memory, lunar calendar calculations, YouTube searches, and interactive messaging (Telegram/Zalo) use lightweight Python backend scripts powered by the **Pyscript** integration.
 
+> [!NOTE]
+> **Why Pyscript Instead of a Custom Integration?**
+> Certain complex blueprints require rich backend capabilities (such as persistent SQLite storage, background task workers, and external API requests). Rather than bundling these into single-purpose custom integrations that clutter your setup, I leverage [Pyscript](https://github.com/custom-components/pyscript).
+> Pyscript is widely adopted, well-supported by a vibrant community, and delivers effortless plug-and-play convenience with full Python power. This design ensures you don't need to install bespoke integrations just to run these blueprints - and once Pyscript is available in your Home Assistant instance, you can easily adapt, extend, and reuse these helper scripts for many other automation scenarios.
+
 1. **Install Pyscript:**
    - Install **Pyscript Python Scripting** via [HACS](https://hacs.xyz/) (Home Assistant Community Store).
    - Restart Home Assistant.
@@ -147,12 +153,13 @@ Advanced features such as persistent multi-device scheduling, universal memory, 
 3. **Deploy the Required Scripts to `config/pyscript/`:**
    - In your Home Assistant `config/` directory, locate or create the `pyscript/` folder.
    - Copy the required script(s) from this repository's [`scripts/`](scripts/) folder into your `config/pyscript/` directory based on what you are installing:
-     - [`scripts/common_utilities.py`](scripts/common_utilities.py) — Core utility functions (required by Smart Scheduling, Memory Tool Local, Telegram, Zalo).
-     - [`scripts/memory.py`](scripts/memory.py) — Memory engine (required by Memory Tool).
-     - [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) — Lunar/Solar conversion engine (required by Lunar Calendar).
-     - [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) — Telegram bot engine.
-     - [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) — Zalo bot engine.
-     - [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) — YouTube Data API tool.
+     - [`scripts/devices_scheduler.py`](scripts/devices_scheduler.py) - Persistent device scheduling and timer engine with condition evaluation (required by Smart Scheduling V2).
+     - [`scripts/common_utilities.py`](scripts/common_utilities.py) - Core utility functions (required by Smart Scheduling v1, Memory Tool Local, Telegram, Zalo).
+     - [`scripts/memory.py`](scripts/memory.py) - Memory engine (required by Memory Tool).
+     - [`scripts/date_conversion_tool.py`](scripts/date_conversion_tool.py) - Lunar/Solar conversion engine (required by Lunar Calendar).
+     - [`scripts/telegram_bot_handle_tool.py`](scripts/telegram_bot_handle_tool.py) - Telegram bot engine.
+     - [`scripts/zalo_bot_handle_tool.py`](scripts/zalo_bot_handle_tool.py) - Zalo bot engine.
+     - [`scripts/youtube_data_tool.py`](scripts/youtube_data_tool.py) - YouTube Data API tool.
 4. **Install Python Dependencies (When Required):**
    - If using Telegram, Zalo, or YouTube scripts, copy [`scripts/requirements.txt`](scripts/requirements.txt) into your `config/pyscript/` folder. Pyscript will automatically install the necessary packages (`h2`, `google-api-python-client`).
 5. **Reload Pyscript:**
@@ -184,72 +191,105 @@ Some blueprints connect to specific Home Assistant services or third-party APIs:
 
 Use this quick reference table to find the exact requirements for each blueprint:
 
-| Blueprint                                                                | Type                 | Companion Blueprints Needed                                                                                                                      | Required Modules                                                                                                                    | Python Scripts & Secrets                                                                     |
-| ------------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [Smart Scheduling & Timers](#voice-assist---smart-scheduling--timers)    | Script + Automations | Controller (`devices_schedules_controller_full_llm.yaml`) + Core (`devices_schedules.yaml`) + Restart (`devices_schedules_restart_handler.yaml`) | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `common_utilities.py`                                                                        |
-| [Memory Tool (LLM)](#voice-assist---memory--information-retrieval)       | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`                                                                                  |
-| [Memory Tool (Local)](#voice-assist---memory--information-retrieval)     | Automation           | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`, `common_utilities.py`                                                           |
-| [Camera Image Analysis](#voice-assist---camera-image-analysis)           | Scripts              | Snapshot (`camera_snapshot_full_llm.yaml`) + Analyzer (`file_content_analyzer_full_llm.yaml`)                                                    | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | AI Task entity, `/media` storage folder                                                      |
-| [Create Calendar Events](#create-calendar-events)                        | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Calendar with Read/Write access                                                              |
-| [Calendar Events Lookup](#calendar-events-lookup)                        | Script               | None                                                                                                                                             | None                                                                                                                                | Configured Calendar entity                                                                   |
-| [Lunar Calendar Conversion & Lookup](#lunar-calendar-conversion--lookup) | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `date_conversion_tool.py`                                                                    |
-| [Create Lunar Calendar Events](#create-lunar-calendar-events)            | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts), [Module 3](#module-3-specialized-integrations--external-services)       | `date_conversion_tool.py`, Calendar with Read/Write access                                   |
-| [Interactive Chatbot (Telegram)](#interactive-smart-home-chatbot)        | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                                                                       | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Telegram Bot Token |
-| [Interactive Chatbot (Zalo)](#interactive-smart-home-chatbot)            | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                                                                       | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Zalo Bot Token         |
-| [Send to Telegram](#voice-assist---send-messages--media)                 | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `requirements.txt`, Telegram Bot Token                        |
-| [Send to Zalo](#voice-assist---send-messages--media)                     | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `requirements.txt`, Zalo Bot Token                                |
-| [Internet Knowledge Search](#voice-assist---internet-knowledge-search)   | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Gemini Agent with Google Search & 16k+ tokens                                                |
-| [YouTube Search & Playback](#voice-assist---youtube-search--playback)    | Scripts              | Search (`advanced_youtube_search_full_llm.yaml`) + Player (`play_youtube_video_full_llm.yaml`)                                                   | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
-| [Favorite YouTube Channels](#voice-assist---favorite-youtube-channels)   | Scripts              | Info Getter (`get_youtube_video_info_full_llm.yaml`) + Player (`play_youtube_video_full_llm.yaml`)                                               | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
-| [Smart Fan Control](#voice-assist---smart-fan-control)                   | Script               | None                                                                                                                                             | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Fan entities exposed to Assist                                                               |
-| [Smart AC Control](#voice-assist---smart-ac-control)                     | Script               | None                                                                                                                                             | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Climate entity exposed to Assist                                                             |
-| [Weather Forecast](#voice-assist---weather-forecast)                     | Script               | None                                                                                                                                             | None                                                                                                                                | Weather entity with hourly & daily forecasts                                                 |
-| [Music Control](#voice-assist---music-control)                           | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Music Assistant integration                                                                  |
-| [Device Location & Find](#voice-assist---device-location--find)          | Scripts              | Location Lookup (`device_location_lookup_full_llm.yaml`) + Ringing (`device_ringing_full_llm.yaml`)                                              | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | Bermuda / Mobile app tracker, HA Companion App notifications                                 |
-| [Device State Synchronization](#device-state-synchronization)            | Automation           | None                                                                                                                                             | None                                                                                                                                | Controllable switch/light entities                                                           |
+| Blueprint                                                                      | Type                 | Companion Blueprints Needed                                                                                                                      | Required Modules                                                                                                                    | Python Scripts & Secrets                                                                     |
+| ------------------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [Smart Scheduling & Timers (V2)](#voice-assist---smart-scheduling--timers)     | Script               | None                                                                                                                                             | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `devices_scheduler.py`                                                                       |
+| [Smart Scheduling & Timers (V1 - Deprecated)](#legacy-version-v1---deprecated) | Script + Automations | Controller (`devices_schedules_controller_full_llm.yaml`) + Core (`devices_schedules.yaml`) + Restart (`devices_schedules_restart_handler.yaml`) | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `common_utilities.py`                                                                        |
+| [Memory Tool (LLM)](#voice-assist---memory--information-retrieval)             | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`                                                                                  |
+| [Memory Tool (Local)](#voice-assist---memory--information-retrieval)           | Automation           | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `memory.py`, `common_utilities.py`                                                           |
+| [Camera Image Analysis](#voice-assist---camera-image-analysis)                 | Scripts              | Snapshot (`camera_snapshot_full_llm.yaml`) + Analyzer (`file_content_analyzer_full_llm.yaml`)                                                    | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | AI Task entity, `/media` storage folder                                                      |
+| [Create Calendar Events](#create-calendar-events)                              | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Calendar with Read/Write access                                                              |
+| [Calendar Events Lookup](#calendar-events-lookup)                              | Script               | None                                                                                                                                             | None                                                                                                                                | Configured Calendar entity                                                                   |
+| [Lunar Calendar Conversion & Lookup](#lunar-calendar-conversion--lookup)       | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `date_conversion_tool.py`                                                                    |
+| [Create Lunar Calendar Events](#create-lunar-calendar-events)                  | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts), [Module 3](#module-3-specialized-integrations--external-services)       | `date_conversion_tool.py`, Calendar with Read/Write access                                   |
+| [Interactive Chatbot (Telegram)](#interactive-smart-home-chatbot)              | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                                                                       | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Telegram Bot Token |
+| [Interactive Chatbot (Zalo)](#interactive-smart-home-chatbot)                  | Automation           | Optional: Analyzer (`file_content_analyzer_full_llm.yaml`)                                                                                       | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `common_utilities.py`, `requirements.txt`, Zalo Bot Token         |
+| [Send to Telegram](#voice-assist---send-messages--media)                       | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `telegram_bot_handle_tool.py`, `requirements.txt`, Telegram Bot Token                        |
+| [Send to Zalo](#voice-assist---send-messages--media)                           | Script               | None                                                                                                                                             | [Module 2](#module-2-pyscript-integration--helper-scripts)                                                                          | `zalo_bot_handle_tool.py`, `requirements.txt`, Zalo Bot Token                                |
+| [Internet Knowledge Search](#voice-assist---internet-knowledge-search)         | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Gemini Agent with Google Search & 16k+ tokens                                                |
+| [YouTube Search & Playback](#voice-assist---youtube-search--playback)          | Scripts              | Search (`advanced_youtube_search_full_llm.yaml`) + Player (`play_youtube_video_full_llm.yaml`)                                                   | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
+| [Favorite YouTube Channels](#voice-assist---favorite-youtube-channels)         | Scripts              | Info Getter (`get_youtube_video_info_full_llm.yaml`) + Player (`play_youtube_video_full_llm.yaml`)                                               | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 2](#module-2-pyscript-integration--helper-scripts)        | `youtube_data_tool.py`, `requirements.txt`, YouTube API Key, TV YouTube App                  |
+| [Smart Fan Control](#voice-assist---smart-fan-control)                         | Script               | None                                                                                                                                             | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Fan entities exposed to Assist                                                               |
+| [Smart AC Control](#voice-assist---smart-ac-control)                           | Script               | None                                                                                                                                             | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup)                                                                    | Climate entity exposed to Assist                                                             |
+| [Weather Forecast](#voice-assist---weather-forecast)                           | Script               | None                                                                                                                                             | None                                                                                                                                | Weather entity with hourly & daily forecasts                                                 |
+| [Music Control](#voice-assist---music-control)                                 | Script               | None                                                                                                                                             | [Module 3](#module-3-specialized-integrations--external-services)                                                                   | Music Assistant integration                                                                  |
+| [Device Location & Find](#voice-assist---device-location--find)                | Scripts              | Location Lookup (`device_location_lookup_full_llm.yaml`) + Ringing (`device_ringing_full_llm.yaml`)                                              | [Module 1](#module-1-entity-aliases-sensor-friendly-name-lookup), [Module 3](#module-3-specialized-integrations--external-services) | Bermuda / Mobile app tracker, HA Companion App notifications                                 |
+| [Device State Synchronization](#device-state-synchronization)                  | Automation           | None                                                                                                                                             | None                                                                                                                                | Controllable switch/light entities                                                           |
 
 ---
 
 ## Voice Assist - Smart Scheduling & Timers
 
-Want to turn on the AC for 30 minutes and have it turn off automatically? Or dim the bedroom lights after an hour?
-This blueprint transforms Voice Assist into a true time management assistant. You can use natural voice commands to **create, extend, pause, resume, or cancel** schedules for any device.
+Want to turn on the AC for 30 minutes and have it turn off automatically? Dim the bedroom lights after an hour? Or turn on the porch lights in 3 hours only if it's raining?
+This blueprint transforms Voice Assist into an intelligent scheduling powerhouse. Powered by **Version 2**, it provides full multi-device timer lifecycle management (**create, extend, pause, resume, cancel**) with dynamic real-world condition evaluation at expiration, persistent SQLite storage, and a live status sensor.
 
-**Key Features:**
+> [!TIP]
+> **Version 2 (Recommended)**: V2 streamlines the setup into a single controller blueprint backed directly by the `scripts/devices_scheduler.py` Pyscript module. It eliminates the previous 3-blueprint architecture and adds dynamic condition evaluations at expiration time. _(See [Why Pyscript?](#module-2-pyscript-integration--helper-scripts) to understand why Pyscript was chosen over a dedicated custom integration.)_
 
-- **Natural Language Understanding:** Just say "Turn on the fan for 1 hour", no rigid syntax required.
-- **Comprehensive Management:** Full support for creating, extending, pausing, resuming, and canceling schedules.
-- **Reliable & Persistent:** All schedules are saved and **automatically restored** if Home Assistant restarts. No more lost timers due to power outages.
-- **Versatile Control:** Supports most device types: Lights (brightness, color), Covers (open/close/position), Fans (speed/oscillation), Climate, Vacuums, Media Players, etc.
-- **Smart Recognition:** Automatically identifies devices by the friendly aliases you use daily.
-- **Detailed Feedback:** Ask "Are there any running schedules?" and the assistant will list devices and remaining times clearly.
+**Key Features (V2):**
+
+- **Natural Language Understanding:** Say "Turn on the fan for 1 hour" or "Turn off AC in 30 minutes if outside is cooler than 24 degrees" - no rigid syntax required.
+- **Dynamic Real-World Condition Evaluation:** Evaluates environmental or entity conditions at the moment of timer expiration (ambient weather/rain/clear, occupancy/nobody home, sun position/day/night, or specific device states such as temperature, door contact, power, battery). If the condition is not met, execution safely skips or adapts.
+- **Single-Blueprint Simplicity:** Directly connects to `scripts/devices_scheduler.py`. No companion timer scripts or restart automations required.
+- **Resilient SQLite Persistence:** Schedules are written to a native SQLite database (`devices_schedules.db`), ensuring timers survive reboots, power outages, and crashes with automatic execution for schedules expired during downtime.
+- **Real-Time Status Sensor (`sensor.devices_scheduler`):** Automatically exposes active timer counts and rich attributes (`all_timers`, `running_timers`, `paused_timers`, `next_expiring`, `total_active_count`), updated automatically every 10 seconds while a timer is active for live dashboards and custom automations.
+- **Comprehensive Lifecycle Management:** Full support for creating, extending, pausing, resuming, canceling, and listing active schedules.
+- **Versatile Device Control & Relative Adjustments:** Supports switches, lights (brightness, color), covers/valves (open, close, position), fans (speed, oscillation), climate/water heaters (temperature, HVAC mode), humidifiers, media players (play, pause, stop, volume), vacuums, buttons, scripts, scenes, and TTS announcements. Supports relative numeric adjustments (e.g., `+2`, `-10`, `+20%`).
+- **Batch Multi-Device Scheduling:** Schedule actions across multiple devices in a single request.
+- **Smart Alias Recognition:** Resolves devices naturally by the friendly names and aliases configured in Home Assistant.
 
 **Example Voice Commands:**
 
-- "Turn on the living room lights to 50% warm white for 2 hours."
-- "Open the bedroom curtains for 15 minutes to air out the room, then close them."
-- "Extend the kids' room fan timer by 30 minutes."
-- "Pause the garden watering schedule."
-- "Which devices are currently on a timer?"
+- _Basic Schedules:_
+  - "Turn on the living room lights to 50% warm white for 2 hours."
+  - "Open the bedroom curtains for 15 minutes to air out the room, then close them."
+  - "Set the bedroom AC to 25 degrees at 10 PM."
+  - "Charge phone socket for 2 hours then turn off."
+- _Conditional Schedules (New in V2):_
+  - "Turn on the porch light in 4 hours if it is raining outside."
+  - "Turn off the living room AC in 30 minutes if the room temperature is below 22 degrees."
+  - "Turn off the bedroom fan in 20 minutes if nobody is home."
+  - "Close the bedroom curtains at 6 PM if the balcony door is closed."
+- _Management & Queries:_
+  - "Extend the kids' room fan timer by 30 minutes."
+  - "Pause the garden watering schedule."
+  - "Resume the garden watering schedule."
+  - "Cancel all timers in the bedroom."
+  - "Which devices are currently on a timer?"
 
 **Use Cases:**
 
-- **Battery Protection:** "Charge phone for 2 hours then turn off socket" - Helps you charge overnight without worrying about battery degradation.
-- **Hands-Free Cooking:** "Turn off the hood in 20 minutes" - Perfect when you've finished cooking and want to go for a walk.
-- **Sleep Comfort:** "Turn the fan to the lowest speed for 1 hour then turn off" - Avoid waking up cold or with a dry throat.
+- **Energy & Climate Optimization:** "Turn off AC in 1 hour if outside temperature is below 24°C" - Automatically saves power when natural air cools down.
+- **Presence-Aware Security:** "Turn off all lights in 15 minutes if nobody is home" - Ensures lights don't stay on when the house is empty.
+- **Battery Protection:** "Charge phone for 2 hours then turn off socket" - Charges safely overnight without degrading batteries.
+- **Hands-Free Cooking:** "Turn off the hood in 20 minutes" - Hands-free kitchen timer while you eat or step away.
+- **Sleep Comfort:** "Turn the fan to speed 1 for 90 minutes then turn off" - Avoids waking up cold in early morning hours.
 
-**Prerequisites & Setup:**
+**Prerequisites & Setup (V2):**
 
 - Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup) configured in `configuration.yaml` for friendly device name resolution.
-- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/common_utilities.py`](scripts/common_utilities.py) placed in `config/pyscript/`.
-- Install all 3 blueprints below (Controller script, Core script, and Restart automation).
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/devices_scheduler.py`](scripts/devices_scheduler.py) placed in `config/pyscript/` (with `allow_all_imports: true` and `hass_is_global: true`).
+- Install the **Devices Schedules Controller V2** blueprint below.
 - Expose the Controller script to Assist and follow the [Assist Tool Setup](#universal-blueprint-installation-workflow) (keep default name, delete `description:` in YAML edit).
 
-1. **Controller Blueprint (LLM):** Processes voice commands and coordinates actions.
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_v2_full_llm.yaml)
+
+### Legacy Version (V1 - Deprecated)
+
+> [!WARNING]
+> **Version 1 is deprecated** in favor of V2. V1 relied on a 3-blueprint architecture with Pyscript cache in `scripts/common_utilities.py`. New users should install V2 directly. Existing users are encouraged to migrate to V2.
+
+**Prerequisites for V1:**
+
+- Requires [Module 1: Entity Aliases Sensor](#module-1-entity-aliases-sensor-friendly-name-lookup).
+- Requires [Module 2: Pyscript Integration](#module-2-pyscript-integration--helper-scripts) with [`scripts/common_utilities.py`](scripts/common_utilities.py) placed in `config/pyscript/`.
+- Requires installing all 3 companion blueprints below:
+
+1. **Controller Blueprint (LLM) (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_controller_full_llm.yaml)
-2. **Core Schedule Blueprint:** Responsible for creating and managing the schedules.
+2. **Core Schedule Blueprint (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules.yaml)
-3. **Restore Blueprint:** Automatically restores active schedules when Home Assistant restarts.
+3. **Restart Handler Blueprint (Deprecated):**
    [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fluuquangvu%2Ftutorials%2Fblob%2Fmain%2Fdevices_schedules_restart_handler.yaml)
 
 ---
