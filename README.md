@@ -17,6 +17,9 @@ _All blueprints in this collection are compatible with almost all local and onli
 
 Transform Home Assistant into a fully-fledged personal teammate with this curated collection of blueprints and guides. Every scenario has been proven in real homes, backed by clear explanations, example voice prompts, and deployment tips so you can bring each idea to life right away.
 
+> [!NOTE]
+> If you find these blueprints useful, please consider giving this project a ⭐ to support my work and help others discover it. Thank you! ❤️
+
 ---
 
 ## Table of Contents
