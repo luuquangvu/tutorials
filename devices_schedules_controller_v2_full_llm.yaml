@@ -7,7 +7,7 @@ blueprint:
 
     - Upgraded multi-device scheduling engine with real-world condition evaluation.
     - Integrates directly with the `scripts/devices_scheduler.py` Pyscript module for persistent timers and automatic restart recovery.
-    - Exposes real-time timer state and rich attributes via `sensor.devices_scheduler` (e.g. `all_timers`, `running_timers`, `paused_timers`, `next_expiring`, `total_active_count`).
+    - Exposes real-time timer state and rich attributes via `sensor.devices_scheduler` (e.g. `all_timers`, `running_timers`, `paused_timers`, `next_expiring`, `total_active_count`), updated automatically every 10 seconds while a timer is active.
     - Accepts friendly names from the LLM, resolves them to entity_ids via the provided alias sensor, and supports multiple devices in one request.
     - Evaluates conditions dynamically at expiration time (e.g. "turn on light in 5 hours if outside is rain", "turn off in 15 minutes if no one home", "turn off AC in 30 minutes if temperature < 22").
 
@@ -184,7 +184,7 @@ mode: parallel
 max_exceeded: silent
 description: Manages device timers with condition evaluation and restart persistence (start, cancel, pause, resume, list)
 variables:
-  version: 20261015
+  version: 20261017
 fields:
   mode:
     name: Mode

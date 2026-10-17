@@ -1,5 +1,8 @@
 # Detailed Guide: Voice Assist to Play YouTube Videos on Smart TV
 
+> [!WARNING]
+> **Deprecated / Potentially Unstable:** YouTube RSS feeds are currently unstable, and this guide is obsolete and may not work as expected. A new, updated guide will be published when time permits.
+
 This guide allows you to use Home Assistant Voice to play the latest videos from your favorite YouTube channels directly on your Smart TV.
 
 ## Introduction & Key Features

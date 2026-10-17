@@ -5,20 +5,20 @@ description = "Exclusive Home Assistant Blueprints: Voice & Smart Automations"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.14.2"
-dependencies = []
+dependencies = ["homeassistant>=2026.10.0"]
 
 [dependency-groups]
 dev = [
-  "beautifulsoup4",
-  "curl-cffi",
   "google-api-python-client",
-  "homeassistant>=2026.10.0",
   "httpx[http2]",
   "interrogate",
   "prek",
   "ruff",
   "ty",
 ]
+
+[tool.uv]
+python-preference = "only-managed"
 
 [tool.ruff]
 line-length = 120

@@ -1,9 +1,12 @@
 blueprint:
-  name: Devices Schedules Restart Handler
+  name: Devices Schedules Restart Handler (Deprecated)
   author: luuquangvu
   source_url: https://github.com/luuquangvu/tutorials/blob/dev/devices_schedules_restart_handler.yaml
   description: |-
-    # Devices Schedules Restart Handler
+    # Devices Schedules Restart Handler (Deprecated)
+
+    > [!WARNING]
+    > **DEPRECATED**: This legacy restart automation blueprint is part of Devices Schedules V1 and is deprecated in favor of [Devices Schedules Controller V2](https://github.com/luuquangvu/tutorials/blob/main/devices_schedules_controller_v2_full_llm.yaml) which handles restart recovery and persistence natively via `scripts/devices_scheduler.py`.
 
     - Runs automatically when Home Assistant comes back online.
     - Restores cached timers created by the Devices Schedules script, resuming ones still active and executing actions for any that expired while offline.
@@ -71,7 +74,7 @@ mode: queued
 max_exceeded: silent
 
 variables:
-  version: 20261003
+  version: 20261017
 
 triggers:
   - trigger: homeassistant

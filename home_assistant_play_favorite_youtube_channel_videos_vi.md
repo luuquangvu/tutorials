@@ -1,5 +1,8 @@
 # Hướng dẫn chi tiết cài đặt Voice Assist phát video Youtube lên Smart TV
 
+> [!WARNING]
+> **Cảnh báo / Hướng dẫn đã lỗi thời:** Hiện tại luồng RSS của YouTube hoạt động rất thiếu ổn định, khiến giải pháp trong hướng dẫn này đã lỗi thời và có thể không còn hoạt động như mong đợi. Mình sẽ cập nhật một hướng dẫn mới khi có thời gian.
+
 Hướng dẫn này cho phép bạn sử dụng Home Assistant Voice để phát các video mới nhất từ các kênh YouTube yêu thích lên Smart TV của mình.
 
 ## Giới thiệu & Tính năng chính

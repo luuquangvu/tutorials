@@ -1500,6 +1500,14 @@ async def prune_old_schedules() -> None:
         await _update_scheduler_sensor()
 
 
+@time_trigger("period(now, 10s)")  # noqa: F821  # ty:ignore[unresolved-reference]
+async def refresh_active_schedules_sensor() -> None:
+    """Periodically refresh sensor.devices_scheduler every 10 seconds when a timer is active."""
+    if not _ACTIVE_TASKS:
+        return
+    await _update_scheduler_sensor()
+
+
 @service(supports_response="only")  # noqa: F821  # ty:ignore[unresolved-reference]
 async def devices_schedules_start(
     target_entity: str,
