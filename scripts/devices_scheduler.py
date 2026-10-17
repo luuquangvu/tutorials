@@ -37,6 +37,7 @@ def _resolve_db_path() -> Path:
 DB_PATH = _resolve_db_path()
 SCHEDULER_SENSOR_ENTITY = "sensor.devices_scheduler"
 SCHEDULER_SENSOR_FRIENDLY_NAME = "Devices Scheduler"
+SCHEDULER_SENSOR_UNIT_OF_MEASUREMENT = "timers"
 _SUN_ENTITY = "sun.sun"
 _ZONE_PREFIX = "zone."
 _NOBODY_TERMS = frozenset({"nobody", "no_one", "empty", "0", "false", "off", "away"})
@@ -665,6 +666,8 @@ async def _update_scheduler_sensor() -> None:
         attrs = {
             "friendly_name": SCHEDULER_SENSOR_FRIENDLY_NAME,
             "icon": "mdi:timer-outline",
+            "unit_of_measurement": SCHEDULER_SENSOR_UNIT_OF_MEASUREMENT,
+            "state_class": "measurement",
             "total_active_count": total_count,
             "running_count": running_count,
             "paused_count": paused_count,
